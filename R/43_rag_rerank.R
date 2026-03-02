@@ -6,7 +6,7 @@ chat_openai_silicon_call <- function(
     api_key,
     model,
     base_url,
-    max_tokens = 600,
+    max_tokens = 2000,
     temperature = 0
 ) {
   url <- paste0(base_url, "/v1/chat/completions")
@@ -53,7 +53,7 @@ chat_gemini_call <- function(
     messages,
     api_key,
     model = "gemini-2.0-pro",
-    max_tokens = 600,
+    max_tokens = 2000,
     temperature = 0
 ) {
   prompt <- paste(
@@ -100,9 +100,18 @@ chat_gemini_call <- function(
   cont <- tryCatch(httr::content(res, encoding = "UTF-8"), error = function(e) NULL)
   if (is.null(cont)) return(NULL)
   
+  # chat_gemini_call() -- FIXED VERSION
   txt <- tryCatch({
-    cont$candidates[[1]]$content$parts[[1]]$text
+    paste(
+      vapply(
+        cont$candidates[[1]]$content$parts,
+        function(p) p$text,
+        character(1)
+      ),
+      collapse = ""
+    )
   }, error = function(e) NULL)
+  
   
   if (is.null(txt)) {
     message("Failed to extract Gemini text.")
@@ -118,9 +127,10 @@ chat_api_call <- function(
     provider = c("siliconflow", "openai", "gemini"),
     api_key,
     model,
-    max_tokens = 600,
+    max_tokens = 2000,
     temperature = 0
 ) {
+  
   provider <- match.arg(provider)
   
   if (provider == "siliconflow") {
@@ -176,10 +186,12 @@ safe_chat_call <- function(...) {
 #' Refine top-k PubMed articles for a single metabolite using SiliconFlow LLM
 #'
 #' @param res_single List. Output of embed_pubmed_for_metabolite().
+#' @param provider Character. Chat provider (e.g. `"openai"`, `"siliconflow"`, `"gemini"`).
 #' @param llm_api_key Character. SiliconFlow API key (for chat).
 #' @param llm_model Character. Chat model name on SiliconFlow.
 #' @param top_paper Integer. Number of final articles to keep (default 3).
 #' @param max_chars_abstract Integer. Truncate abstracts in prompt (default 1500).
+#' @param sleep_seconds Numeric. Delay in seconds before each LLM call.
 #'
 #' @return Same structure as res_single, but only top_paper articles kept.
 #'         On failure, falls back to similarity top_paper.
@@ -192,7 +204,7 @@ refine_pubmed_for_metabolite_llm <- function(
     max_chars_abstract = 1500,
     sleep_seconds = 1
 ) {
-  
+
   if (is.null(res_single)) return(NULL)
   
   k <- length(res_single$pmids)
@@ -259,7 +271,7 @@ refine_pubmed_for_metabolite_llm <- function(
       api_key     = llm_api_key,
       model       = llm_model,
       temperature = 0,
-      max_tokens  = 600
+      max_tokens  = 2000
     )
     
   }, error = function(e) {
@@ -290,11 +302,13 @@ refine_pubmed_for_metabolite_llm <- function(
       
       final_indices <- sel_idx
     }
+    
   }
   
   fallback_needed <- is.null(llm_raw) ||
     is.null(llm_raw$content) ||
-    is.null(parsed)
+    is.null(parsed) ||
+    length(final_indices) == 0
   
   if (fallback_needed) {
     final_indices <- order(res_single$scores, decreasing = TRUE)[
@@ -302,11 +316,12 @@ refine_pubmed_for_metabolite_llm <- function(
     ]
   }
   
-  
+
   res_single$pmids     <- res_single$pmids[final_indices]
   res_single$titles    <- res_single$titles[final_indices]
   res_single$abstracts <- res_single$abstracts[final_indices]
   res_single$scores    <- res_single$scores[final_indices]
+  res_single$contexts    <- res_single$contexts[final_indices]
   
   res_single
 }
@@ -320,10 +335,12 @@ refine_pubmed_for_metabolite_llm <- function(
 #'
 #' @param module_pubmed_embed List. Output of your current embed pipeline:
 #'   outer: modules; inner: metabolites; inner element is embed_pubmed_for_metabolite() result.
+#' @param provider Character. Chat provider (e.g. `"openai"`, `"siliconflow"`, `"gemini"`).
 #' @param llm_api_key Character. SiliconFlow API key for chat.
 #' @param llm_model Character. Chat model name on SiliconFlow.
 #' @param top_paper Integer. Number of articles to keep per metabolite (default 3).
 #' @param max_chars_abstract Integer. Truncate abstracts for prompts.
+#' @param sleep_seconds Numeric. Delay in seconds before each LLM call.
 #'
 #' @return Same structure as module_pubmed_embed, but each metabolite only keeps top_paper articles.
 refine_module_pubmed_with_llm <- function(
@@ -335,6 +352,7 @@ refine_module_pubmed_with_llm <- function(
     max_chars_abstract = 1500,
     sleep_seconds = 1
 ) {
+  
   out <- lapply(seq_along(module_pubmed_embed), function(mi) {
     
     message("--Reranking for ", names(module_pubmed_embed)[mi], " ...")
@@ -363,6 +381,7 @@ refine_module_pubmed_with_llm <- function(
 #'
 #' @param res_single List. Output of embed_pubmed_for_metabolite() *after* refinement:
 #'   list(met_name, pmids, titles, abstracts, scores, ...)
+#' @param provider Character. Chat provider (e.g. `"openai"`, `"siliconflow"`, `"gemini"`).
 #' @param llm_api_key Character. SiliconFlow API key (for chat).
 #' @param llm_model Character. Chat model name on SiliconFlow.
 #' @param max_chars_abstract Integer. Truncate each abstract in the prompt (default 1200).
@@ -373,9 +392,10 @@ summarize_metabolite_pubmed_llm <- function(
     res_single,
     provider,
     llm_api_key,
-    llm_model          = llm_model,
+    llm_model,
     max_chars_abstract = 1500
 ) {
+  
   if (is.null(res_single)) return(NULL)
   
   if (length(res_single$pmids) == 0) {
@@ -419,7 +439,7 @@ summarize_metabolite_pubmed_llm <- function(
     "Output ONLY a valid JSON object with the following format:\n",
     "{\n",
     '  \"metabolite_name\": \"', res_single$met_name, '\",\n',
-    '  \"functional_summary\": \"<3–6 sentences summarizing functions, pathways, roles>\"\n',
+    '  \"functional_summary\": \"<3-6 sentences summarizing functions, pathways, roles>\"\n',
     "}\n\n",
     "Here are the abstracts:\n\n",
     articles_txt
@@ -438,7 +458,7 @@ summarize_metabolite_pubmed_llm <- function(
       api_key     = llm_api_key,
       model       = llm_model,
       temperature = 0,
-      max_tokens  = 600
+      max_tokens  = 2000
     )
   }, error = function(e) {
     message("LLM call failed in summarize_metabolite_pubmed_llm: ", e$message)
@@ -481,6 +501,7 @@ summarize_metabolite_pubmed_llm <- function(
 #' @param module_pubmed_embed_refined List.
 #'   Output of refine_module_pubmed_with_llm():
 #'   outer: modules; inner: metabolites; inner element: res_single.
+#' @param provider Character. Chat provider (e.g. `"openai"`, `"siliconflow"`, `"gemini"`).
 #' @param llm_api_key Character.API key for chat.
 #' @param llm_model Character. Chat model name.
 #' @param max_chars_abstract Integer. Truncate abstracts for prompts.
@@ -491,12 +512,13 @@ add_metabolite_summaries_to_modules <- function(
     module_pubmed_embed_refined,
     provider,
     llm_api_key,
-    llm_model          = llm_model, 
+    llm_model, 
     max_chars_abstract = 1500
 ) {
   lapply(seq_along(module_pubmed_embed_refined), function(mi) {
     
     message("--Summarizing for ", names(module_pubmed_embed_refined)[mi], " ...")
+    
     mod_res <- module_pubmed_embed_refined[[mi]]
     
     lapply(mod_res, function(res_single) {
@@ -545,5 +567,3 @@ extract_json_object <- function(txt) {
   }
   NULL
 }
-
-

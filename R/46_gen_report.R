@@ -3,34 +3,26 @@
 #' Sends a single module's data to an LLM API (e.g., GPT) to generate a biological
 #' interpretation including a title, summary, confidence label, and rationale.
 #'
-#' @param module_obj List containing module data with elements:
-#'   \item{module_id}{Module identifier}
-#'   \item{module_stats}{List with module-level statistics:
-#'     Importance, Robustness, Annotated_fraction}
-#'   \item{top_N_metabolites}{Data frame of top metabolites (up to N, e.g. 10) with
-#'     columns:
-#'     HMDB_ID, Compound_name, Importance, Robustness, class,
-#'     functional_summary (may be NA)}
-#'   \item{other_metabolites}{Data frame of additional metabolites aggregated at
-#'     the class level with columns:
-#'     class, n_metabolites, metabolites, HMDB_IDs,
-#'     mean_importance, mean_robustness}
-#' @param study_context List containing:
-#'   \item{biospecimen}{Character. Type of biological specimen (e.g., "plasma")}
-#'   \item{phenotype}{Character. Phenotype of interest (e.g., "aging")}
-#'   \item{design}{Character. Brief study design description (optional)}
+#' @param module_obj List containing module data with fields:
+#'   - `module_id`: module identifier.
+#'   - `module_stats`: module-level statistics (Importance, Robustness, Annotated_fraction).
+#'   - `top_N_metabolites`: data frame of top metabolites with
+#'     `HMDB_ID`, `Compound_name`, `Importance`, `Robustness`, `class`,
+#'     and optional `functional_summary`.
+#'   - `other_metabolites`: data frame of additional metabolites aggregated at class level.
+#' @param study_context List containing study metadata:
+#'   - `biospecimen`: biological specimen type.
+#'   - `phenotype`: phenotype of interest.
+#'   - `design`: study design description (optional).
+#' @param provider Character. LLM provider passed to `chat_api_call()`
+#'   (e.g. `"openai"`, `"siliconflow"`, `"gemini"`).
 #' @param llm_api_key Character. API key for the LLM service
 #' @param model Character. Model name (e.g., "gpt-4", "gpt-3.5-turbo")
 #' @param max_tokens Integer. Maximum number of tokens in the response (default: 800)
 #' @param temperature Numeric. Sampling temperature for the LLM (default: 0 for deterministic output)
 #'
-#' @return A data frame with one row containing:
-#'   \item{module_id}{Module identifier}
-#'   \item{title}{Generated biological theme title}
-#'   \item{summary}{5–8 sentence biological function summary}
-#'   \item{confidence_label}{Confidence rating: "high", "medium", or "low"}
-#'   \item{rationale}{1–3 sentence explanation of confidence rating}
-#'   \item{raw_response}{Raw JSON text returned by the LLM}
+#' @return A data frame with one row containing `module_id`, `title`,
+#'   `summary`, `confidence_label`, `rationale`, and `raw_response`.
 #'
 #' @details This function:
 #'   \enumerate{
@@ -69,7 +61,7 @@ annotate_one_module <- function(module_obj,
     max_tokens  = max_tokens,
     temperature = temperature
   )
-  
+
   # Handle empty or NULL responses
   if (is.null(res_call) ||
       is.null(res_call$content) ||
@@ -164,22 +156,20 @@ annotate_one_module <- function(module_obj,
 #'     \item other_metabolites (additional metabolites aggregated at class level)
 #'   }
 #' @param study_context List containing study metadata:
-#'   \item{biospecimen}{Character. Type of biological specimen}
-#'   \item{phenotype}{Character. Phenotype of interest}
-#'   \item{design}{Character. Study design description (optional)}
+#'   - `biospecimen`: biological specimen type.
+#'   - `phenotype`: phenotype of interest.
+#'   - `design`: study design description (optional).
+#' @param provider Character. LLM provider passed to `chat_api_call()`
+#'   (e.g. `"openai"`, `"siliconflow"`, `"gemini"`).
 #' @param llm_api_key Character. API key for the LLM service
 #' @param model Character. Model name (e.g., "gpt-4", "gpt-3.5-turbo")
 #' @param max_tokens Integer. Maximum tokens per response (default: 800)
 #' @param temperature Numeric. Sampling temperature, 0 for deterministic (default: 0)
 #' @param sleep_sec Numeric. Seconds to sleep between API calls to avoid rate limits (default: 0)
 #'
-#' @return A data frame with one row per module containing:
-#'   \item{module_id}{Module identifier}
-#'   \item{title}{Generated biological theme title}
-#'   \item{summary}{Biological function summary (5–8 sentences)}
-#'   \item{confidence_label}{Confidence rating: "high", "medium", or "low"}
-#'   \item{rationale}{Explanation of confidence rating}
-#'   \item{raw_response}{Raw JSON text returned by the LLM}
+#' @return A data frame with one row per module and columns
+#'   `module_id`, `title`, `summary`, `confidence_label`, `rationale`,
+#'   and `raw_response`.
 #'
 #' @details This function:
 #'   \enumerate{
@@ -206,7 +196,7 @@ annotate_all_modules <- function(all_modules_ready,
                                  provider,
                                  llm_api_key,
                                  model,
-                                 max_tokens  = 1000,
+                                 max_tokens  = 2000,
                                  temperature = 0,
                                  sleep_sec   = 0) {
   
@@ -238,6 +228,5 @@ annotate_all_modules <- function(all_modules_ready,
   
   dplyr::bind_rows(results_list)
 }
-
 
 

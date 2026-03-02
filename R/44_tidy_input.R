@@ -52,8 +52,6 @@ combine_topN_with_pubmed <- function(module_top_df, pubmed_top_df) {
     dplyr::select(
       Compound_ID,
       Compound_name,
-      Importance,
-      Robustness,
       class,
       functional_summary
     )
@@ -76,6 +74,7 @@ combine_topN_with_pubmed <- function(module_top_df, pubmed_top_df) {
 #'   is a named list where names are HMDB IDs
 #' @param module_statistics List of statistics for each module. Names should match
 #'   format "moduleX"
+#' @param module_class Optional list of class-level summaries for each module.
 #' @param pubmed Logical. If TRUE (default), attempts to merge PubMed functional summaries.
 #'   If FALSE, functional_summary column will be NA
 #'
@@ -125,30 +124,28 @@ prepare_module <- function(
     pubmed = TRUE      
 ) {
   
-  
+
   module_topN <- module_list_top[[k]]; colnames(module_topN)[3] = "Compound_ID"
   module_id <- unique(module_topN$Module)
-  
+
   if (pubmed) {
-    
+
     if (!is.null(module_pubmed_embed_refined[[k]]) &&
         length(module_pubmed_embed_refined[[k]]) > 0) {
-      
+
       pubmed_df <- flatten_pubmed_for_one_module(module_pubmed_embed_refined[[k]])
-      
+
       module_topN_merged <- combine_topN_with_pubmed(
         module_top_df = module_topN,
         pubmed_top_df = pubmed_df)
       
     } else {
-      
+
       warning(sprintf("PubMed data missing for module %s. Skip merging.", module_id))
       module_topN_merged <- module_topN %>%
         dplyr::select(
           Compound_ID,
           Compound_name,
-          Importance,
-          Robustness,
           class
         ) %>%
         mutate(functional_summary = NA_character_)
@@ -159,18 +156,14 @@ prepare_module <- function(
       dplyr::select(
         Compound_ID,
         Compound_name,
-        Importance,
-        Robustness,
         class
       ) %>%
       mutate(functional_summary = NA_character_)
   }
-  
+
   # for other metabolites ----
-  full_df <- module_list[[ paste0("module", module_id) ]]
-  colnames(full_df)[3] = "Compound_ID"
-  
   if (!is.null(module_class)) {
+
     if (!is.null(names(module_class)) &&
         paste0("module", module_id) %in% names(module_class)) {
       module_other <- module_class[[ paste0("module", module_id) ]]
@@ -180,13 +173,13 @@ prepare_module <- function(
     
   }
   
-  
+
   stats <- module_statistics[[ paste0("module", module_id) ]]
-  
+
   list(
     module_id          = module_id,
     module_stats       = stats,
-    topN_metabolites  = module_topN_merged,
+    topN_metabolites   = module_topN_merged,
     other_metabolites  = module_other
   )
 }
