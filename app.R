@@ -451,9 +451,9 @@ ui <- fluidPage(
       }
 
       #home_page .home-shell {
-        max-width: 1460px;
+        max-width: none;
         margin: 0 auto;
-        padding: 0 20px;
+        padding: 0 28px;
       }
 
       #home_page .hero-section {
@@ -607,10 +607,12 @@ ui <- fluidPage(
 
       #home_page .home-section-head {
         display: flex;
-        align-items: flex-end;
-        justify-content: space-between;
-        gap: 12px;
-        margin-bottom: 14px;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        margin-bottom: 16px;
+        text-align: center;
       }
 
       #home_page .section-title {
@@ -730,6 +732,10 @@ ui <- fluidPage(
           padding: 0 14px;
         }
 
+        .content-wrapper {
+          padding: 0 14px;
+        }
+
         #home_page .hero-section {
           min-height: 40vh;
           padding: 26px 14px 30px 14px;
@@ -749,7 +755,7 @@ ui <- fluidPage(
 
         #home_page .home-section-head {
           flex-direction: column;
-          align-items: flex-start;
+          align-items: center;
         }
 
         #home_page .section-title {
@@ -1043,9 +1049,10 @@ ui <- fluidPage(
       
       /* Content container */
       .content-wrapper {
-        max-width: 1400px;
+        max-width: none;
+        width: 100%;
         margin: 0 auto;
-        padding: 0 20px;
+        padding: 0 28px;
       }
 
       /* Results page redesign */
@@ -1055,10 +1062,6 @@ ui <- fluidPage(
           radial-gradient(820px 340px at 96% 0%, rgba(81, 157, 158, 0.12), transparent 62%),
           #f4f7fb;
         padding: 0 0 26px 0;
-      }
-
-      #results_page .content-wrapper {
-        max-width: 1400px;
       }
 
       .results-step-box {
@@ -1251,6 +1254,14 @@ ui <- fluidPage(
         font-size: 17px;
         font-weight: 700;
         border-radius: 10px;
+      }
+
+      #results_page .results-network-wrap {
+        margin-top: 14px;
+        border: 1px solid #d6e3f2;
+        border-radius: 10px;
+        padding: 12px;
+        background: #f7fbff;
       }
 
       #results_page #analysis_parameters h5 {
@@ -2753,7 +2764,7 @@ ui <- fluidPage(
                 class = "card-body",
                 tags$p(
                   class = "results-card-note",
-                  "Select the result tables and output format. Files will be bundled as a ZIP package."
+                  "Select table format and network format. A single ZIP package will include selected tables and selected networks."
                 ),
                 checkboxGroupInput(
                   "export_items",
@@ -2766,15 +2777,38 @@ ui <- fluidPage(
                     "Module function"      = "module_function"
                   )
                 ),
-                selectInput("export_format", "Export Format",
+                selectInput("export_format", "Table Format",
                             choices = c("Excel (.xlsx)" = "xlsx",
                                         "CSV (multiple files)" = "csv",
                                         "RData" = "rdata")),
                 tags$div(
+                  class = "results-network-wrap",
+                  tags$div(class = "results-preview-title", icon("sitemap"), "Network Export"),
+                  checkboxGroupInput(
+                    "network_export_items",
+                    "Select Networks to Export",
+                    choices = c(
+                      "PCSF subnetwork" = "pcsf",
+                      "Module network" = "module"
+                    )
+                  ),
+                  selectInput(
+                    "network_export_format",
+                    "Network Format",
+                    choices = c(
+                      "Interactive HTML (.html)" = "html",
+                      "GraphML (.graphml)" = "graphml"
+                    ),
+                    selected = "html"
+                  ),
+                  uiOutput("results_module_export_selector")
+                ),
+                tags$div(
                   class = "results-preview-wrap",
                   tags$div(class = "results-preview-title", icon("list-ul"), "Selected Content"),
                   uiOutput("export_preview")
-                ),
+                )
+                ,
                 downloadButton("download_results", "Download Results",
                                class = "btn-success btn-lg w-100 results-download-btn")
               )
@@ -4958,6 +4992,201 @@ server <- function(input, output, session) {
     )
   })
 
+  results_module_choices <- reactive({
+    if (is.null(rv$module_res) || is.null(rv$module_res$module_score)) return(character(0))
+    mods <- sort(unique(as.character(rv$module_res$module_score$Module)))
+    mods[!is.na(mods) & nzchar(mods)]
+  })
+
+  selected_results_modules <- reactive({
+    mods <- results_module_choices()
+    if (length(mods) == 0) return(list(mode = "none", requested = character(0)))
+
+    selected <- input$results_export_modules
+    if (is.null(selected) || length(selected) == 0 || "__all__" %in% selected) {
+      list(mode = "all", requested = mods)
+    } else {
+      list(mode = "custom", requested = intersect(selected, mods))
+    }
+  })
+
+  observeEvent(input$results_export_modules, ignoreInit = TRUE, {
+    mods <- results_module_choices()
+    if (length(mods) == 0) return()
+
+    selected <- input$results_export_modules
+    if (is.null(selected) || length(selected) == 0) {
+      updateSelectizeInput(session, "results_export_modules", selected = "__all__")
+      return()
+    }
+    if ("__all__" %in% selected && length(selected) > 1) {
+      updateSelectizeInput(session, "results_export_modules", selected = "__all__")
+    }
+  })
+
+  output$results_module_export_selector <- renderUI({
+    selected_networks <- input$network_export_items
+    if (is.null(selected_networks) || !("module" %in% selected_networks)) {
+      return(NULL)
+    }
+
+    mods <- results_module_choices()
+    if (length(mods) == 0) {
+      return(tags$p(class = "results-empty-preview", icon("circle-info"), " Module network is not ready yet."))
+    }
+    selectizeInput(
+      "results_export_modules",
+      "Modules For Network Export",
+      choices = c("All modules" = "__all__", stats::setNames(mods, mods)),
+      selected = "__all__",
+      multiple = TRUE,
+      options = list(plugins = list("remove_button"))
+    )
+  })
+
+  pcsf_export_data <- reactive({
+    if (rv$pcsf_status != "finished") return(NULL)
+    if (is.null(rv$annotation_object) || is.null(rv$annotation_object$pcsf_subnet)) return(NULL)
+
+    g <- rv$annotation_object$pcsf_subnet
+    if (!igraph::is.igraph(g) || igraph::vcount(g) == 0) return(NULL)
+
+    node_id <- as.character(igraph::V(g)$name)
+    node_prize <- as.numeric(igraph::V(g)$prize)
+    if (length(node_prize) != length(node_id) || all(is.na(node_prize))) {
+      node_prize <- rep(1, length(node_id))
+    } else {
+      node_prize[is.na(node_prize)] <- stats::median(node_prize, na.rm = TRUE)
+      if (!is.finite(node_prize[1])) node_prize <- rep(1, length(node_id))
+    }
+
+    node_type <- as.character(igraph::V(g)$type)
+    if (length(node_type) != length(node_id) || all(is.na(node_type))) {
+      node_type <- rep("Metabolite", length(node_id))
+    }
+    node_group <- ifelse(node_type == "Terminal", "Feature", "Metabolite")
+
+    nodes <- data.frame(
+      id = node_id,
+      label = ifelse(nchar(node_id) > 28, paste0(substr(node_id, 1, 25), "..."), node_id),
+      title = node_id,
+      value = scales::rescale(node_prize, to = c(10, 40)),
+      color = ifelse(node_group == "Feature", "#fc8d58", "#4474b3"),
+      color.border = ifelse(node_group == "Feature", "#fc8d58", "#4474b3"),
+      stringsAsFactors = FALSE
+    )
+
+    edges_df <- igraph::as_data_frame(g, what = "edges")
+    if (nrow(edges_df) > 0) {
+      edge_freq <- as.numeric(igraph::E(g)$freq)
+      if (length(edge_freq) != nrow(edges_df) || all(is.na(edge_freq))) {
+        edge_freq <- rep(1, nrow(edges_df))
+      } else {
+        edge_freq[is.na(edge_freq)] <- 1
+      }
+      edge_width <- scales::rescale(edge_freq, to = c(0.8, 2.5))
+      edges <- data.frame(
+        from = as.character(edges_df$from),
+        to = as.character(edges_df$to),
+        value = scales::rescale(edge_freq, to = c(1, 6)),
+        title = paste0("freq: ", round(edge_freq, 3)),
+        color = "rgba(120,120,120,0.5)",
+        stringsAsFactors = FALSE
+      )
+    } else {
+      edge_width <- numeric(0)
+      edges <- data.frame(from = character(0), to = character(0), stringsAsFactors = FALSE)
+    }
+
+    list(
+      g = g,
+      nodes = nodes,
+      edges = edges,
+      node_group = stats::setNames(node_group, node_id),
+      edge_width = edge_width,
+      legend_labels = c("Feature", "Metabolite"),
+      title = "PCSF Subnetwork"
+    )
+  })
+
+  build_single_module_export_data <- function(module_id) {
+    if (rv$module_status != "finished") return(NULL)
+    if (is.null(rv$module_res) || is.null(rv$module_res$module_table) || is.null(rv$mrn)) return(NULL)
+
+    tbl <- rv$module_res$module_table %>%
+      dplyr::filter(as.character(Module) == as.character(module_id))
+    if (nrow(tbl) <= 1) return(NULL)
+
+    g <- igraph::induced_subgraph(rv$mrn, vids = unique(as.character(tbl$INCHI_ID)))
+    if (!igraph::is.igraph(g) || igraph::vcount(g) == 0) return(NULL)
+
+    node_id <- as.character(igraph::V(g)$name)
+    type_map <- stats::setNames(as.character(tbl$Type), as.character(tbl$INCHI_ID))
+    node_group <- ifelse(type_map[node_id] == "annotated", "Annotated", "Hidden")
+
+    nodes <- data.frame(
+      id = node_id,
+      label = ifelse(nchar(node_id) > 28, paste0(substr(node_id, 1, 25), "..."), node_id),
+      title = node_id,
+      color = ifelse(node_group == "Annotated", "#fc8d58", "#4474b3"),
+      stringsAsFactors = FALSE
+    )
+
+    edges_df <- igraph::as_data_frame(g, what = "edges")
+    edges <- data.frame(
+      from = as.character(edges_df$from),
+      to = as.character(edges_df$to),
+      color = "rgba(120,120,120,0.5)",
+      stringsAsFactors = FALSE
+    )
+
+    list(
+      g = g,
+      nodes = nodes,
+      edges = edges,
+      node_group = stats::setNames(node_group, node_id),
+      edge_width = rep(1.2, igraph::ecount(g)),
+      legend_labels = c("Annotated", "Hidden"),
+      title = paste0("Module ", module_id, " Network"),
+      module_id = module_id
+    )
+  }
+
+  module_export_info <- reactive({
+    state <- selected_results_modules()
+    requested <- state$requested
+    if (length(requested) == 0) {
+      return(list(
+        mode = state$mode,
+        requested = character(0),
+        graphs = list(),
+        missing = character(0),
+        is_ready = FALSE
+      ))
+    }
+
+    graphs <- lapply(requested, build_single_module_export_data)
+    names(graphs) <- requested
+    keep <- vapply(graphs, function(x) !is.null(x), logical(1))
+    graphs <- graphs[keep]
+    ready_ids <- names(graphs)
+    missing <- setdiff(requested, ready_ids)
+
+    list(
+      mode = state$mode,
+      requested = requested,
+      graphs = graphs,
+      missing = missing,
+      is_ready = length(requested) > 0 && length(missing) == 0
+    )
+  })
+
+  build_network_widget <- function(nodes, edges) {
+    visNetwork(nodes, edges, width = "100%", height = "760px") %>%
+      visOptions(highlightNearest = TRUE, nodesIdSelection = TRUE) %>%
+      visPhysics(stabilization = FALSE)
+  }
+
   output$results_overview <- renderUI({
     payload <- export_payload()
     module_table <- payload$module_table
@@ -5039,21 +5268,21 @@ server <- function(input, output, session) {
   })
 
   output$export_preview <- renderUI({
-    if (is.null(input$export_items) || length(input$export_items) == 0) {
-      return(
-        tags$p(
-          class = "results-empty-preview",
-          icon("circle-info"),
-          " No tables selected yet."
-        )
-      )
-    }
-
     payload <- export_payload()
+    selected_tables <- if (is.null(input$export_items)) character(0) else input$export_items
+    selected_networks <- if (is.null(input$network_export_items)) character(0) else input$network_export_items
+    network_format_label <- switch(
+      input$network_export_format,
+      html = "HTML",
+      graphml = "GraphML",
+      "HTML"
+    )
+    module_info <- module_export_info()
+    pcsf_ready <- !is.null(pcsf_export_data())
+    module_ready <- isTRUE(module_info$is_ready)
 
-    tags$ul(
-      class = "results-preview-list",
-      lapply(input$export_items, function(item) {
+    table_items <- if (length(selected_tables) > 0) {
+      lapply(selected_tables, function(item) {
         item_label <- unname(export_labels[[item]])
         if (is.null(item_label) || is.na(item_label)) item_label <- item
         ready <- is_export_ready(payload[[item]])
@@ -5067,15 +5296,96 @@ server <- function(input, output, session) {
           )
         )
       })
+    } else {
+      list()
+    }
+
+    network_label_map <- c(
+      pcsf = paste0("PCSF subnetwork (", network_format_label, ")"),
+      module = if (length(module_info$requested) == 0) {
+        paste0("Module network (none selected, ", network_format_label, ")")
+      } else if (identical(module_info$mode, "all")) {
+        paste0("Module network (all ", length(module_info$requested), " modules, ", network_format_label, ")")
+      } else if (length(module_info$requested) <= 3) {
+        paste0("Module network (", paste(module_info$requested, collapse = ", "), ", ", network_format_label, ")")
+      } else {
+        paste0(
+          "Module network (",
+          paste(utils::head(module_info$requested, 3), collapse = ", "),
+          " +", length(module_info$requested) - 3, " more, ",
+          network_format_label, ")"
+        )
+      }
+    )
+    network_ready_map <- c(
+      pcsf = pcsf_ready,
+      module = module_ready
+    )
+    network_items <- if (length(selected_networks) > 0) {
+      lapply(selected_networks, function(key) {
+        item_label <- unname(network_label_map[[key]])
+        if (is.null(item_label) || is.na(item_label)) item_label <- key
+        ready <- isTRUE(network_ready_map[[key]])
+
+        tags$li(
+          class = "results-preview-item",
+          tags$span(class = "results-preview-item-label", item_label),
+          tags$span(
+            class = paste("results-preview-status", if (ready) "ready" else "pending"),
+            if (ready) "Ready" else "Pending"
+          )
+        )
+      })
+    } else {
+      list()
+    }
+
+    preview_items <- c(table_items, network_items)
+    if (length(preview_items) == 0) {
+      return(
+        tags$p(
+          class = "results-empty-preview",
+          icon("circle-info"),
+          " No content selected yet."
+        )
+      )
+    }
+
+    tags$ul(
+      class = "results-preview-list",
+      preview_items
     )
   })
   
   observe({
     selected <- input$export_items
+    selected_networks <- input$network_export_items
     payload <- export_payload()
-    ready_for_download <- !is.null(selected) &&
-      length(selected) > 0 &&
+    selected <- if (is.null(selected)) character(0) else selected
+    selected_networks <- if (is.null(selected_networks)) character(0) else selected_networks
+
+    table_ready <- if (length(selected) == 0) {
+      TRUE
+    } else {
       all(vapply(selected, function(item) is_export_ready(payload[[item]]), logical(1)))
+    }
+
+    network_ready <- if (length(selected_networks) == 0) {
+      TRUE
+    } else {
+      all(vapply(
+        selected_networks,
+        function(key) {
+          if (identical(key, "pcsf")) return(!is.null(pcsf_export_data()))
+          if (identical(key, "module")) return(isTRUE(module_export_info()$is_ready))
+          FALSE
+        },
+        logical(1)
+      ))
+    }
+
+    has_any_selection <- (length(selected) + length(selected_networks)) > 0
+    ready_for_download <- has_any_selection && table_ready && network_ready
 
     shinyjs::toggleState(
       "download_results",
@@ -5088,15 +5398,14 @@ server <- function(input, output, session) {
       paste0("featuremap_results_", Sys.Date(), ".zip")
     },
     content = function(file) {
-      req(input$export_items)
+      selected <- if (is.null(input$export_items)) character(0) else input$export_items
+      selected_networks <- if (is.null(input$network_export_items)) character(0) else input$network_export_items
+      if ((length(selected) + length(selected_networks)) == 0) {
+        stop("No content selected. Please select tables and/or networks to export.")
+      }
 
-      selected <- input$export_items
       payload <- export_payload()
-      missing_items <- selected[!vapply(
-        selected,
-        function(item) is_export_ready(payload[[item]]),
-        logical(1)
-      )]
+      missing_items <- selected[!vapply(selected, function(item) is_export_ready(payload[[item]]), logical(1))]
       if (length(missing_items) > 0) {
         missing_labels <- unname(export_labels[missing_items])
         missing_labels[is.na(missing_labels)] <- missing_items[is.na(missing_labels)]
@@ -5116,7 +5425,7 @@ server <- function(input, output, session) {
       dir.create(tmpdir)
       
       # ---- write files ----
-      if (input$export_format == "xlsx") {
+      if (length(export_list) > 0 && input$export_format == "xlsx") {
         for (nm in names(export_list)) {
           wb <- openxlsx::createWorkbook()
           openxlsx::addWorksheet(wb, nm)
@@ -5127,7 +5436,7 @@ server <- function(input, output, session) {
             overwrite = TRUE
           )
         }
-      } else if (input$export_format == "csv") {
+      } else if (length(export_list) > 0 && input$export_format == "csv") {
         for (nm in names(export_list)) {
           write.csv(
             export_list[[nm]],
@@ -5135,12 +5444,87 @@ server <- function(input, output, session) {
             row.names = FALSE
           )
         }
-      } else if (input$export_format == "rdata") {
+      } else if (length(export_list) > 0 && input$export_format == "rdata") {
         save(
           list  = names(export_list),
           file  = file.path(tmpdir, "results.RData"),
           envir = list2env(export_list)
         )
+      }
+
+      graph_format <- if (is.null(input$network_export_format)) "html" else input$network_export_format
+      module_info <- module_export_info()
+      network_ready_map <- c(
+        pcsf = !is.null(pcsf_export_data()),
+        module = isTRUE(module_info$is_ready)
+      )
+      selected_network_ready <- unname(network_ready_map[selected_networks])
+      if (length(selected_network_ready) == 0) selected_network_ready <- logical(0)
+      selected_network_ready[is.na(selected_network_ready)] <- FALSE
+      missing_networks <- selected_networks[!selected_network_ready]
+      if (length(missing_networks) > 0) {
+        missing_network_labels <- c(
+          pcsf = "PCSF subnetwork",
+          module = "Module network"
+        )
+        module_detail <- if ("module" %in% missing_networks && length(module_info$missing) > 0) {
+          paste0(" (missing module(s): ", paste(module_info$missing, collapse = ", "), ")")
+        } else {
+          ""
+        }
+        stop(
+          paste0(
+            "Selected network(s) are not ready: ",
+            paste(unname(missing_network_labels[missing_networks]), collapse = ", "),
+            module_detail
+          )
+        )
+      }
+
+      if ("pcsf" %in% selected_networks) {
+        pcsf_obj <- pcsf_export_data()
+        if (identical(graph_format, "html")) {
+          htmlwidgets::saveWidget(
+            build_network_widget(pcsf_obj$nodes, pcsf_obj$edges),
+            file = file.path(tmpdir, "pcsf_network.html"),
+            selfcontained = TRUE
+          )
+        } else if (identical(graph_format, "graphml")) {
+          igraph::write_graph(
+            pcsf_obj$g,
+            file = file.path(tmpdir, "pcsf_network.graphml"),
+            format = "graphml"
+          )
+        } else {
+          stop("Unsupported network format: ", graph_format)
+        }
+      }
+
+      if ("module" %in% selected_networks) {
+        module_graphs <- module_info$graphs
+        for (module_obj in module_graphs) {
+          module_tag <- gsub("[^A-Za-z0-9._-]+", "_", as.character(module_obj$module_id))
+          if (identical(graph_format, "html")) {
+            htmlwidgets::saveWidget(
+              build_network_widget(module_obj$nodes, module_obj$edges),
+              file = file.path(tmpdir, paste0("module_network_", module_tag, ".html")),
+              selfcontained = TRUE
+            )
+          } else if (identical(graph_format, "graphml")) {
+            igraph::write_graph(
+              module_obj$g,
+              file = file.path(tmpdir, paste0("module_network_", module_tag, ".graphml")),
+              format = "graphml"
+            )
+          } else {
+            stop("Unsupported network format: ", graph_format)
+          }
+        }
+      }
+
+      files_to_zip <- list.files(tmpdir)
+      if (length(files_to_zip) == 0) {
+        stop("No exportable content is available yet. Run PCSF/module steps or select ready tables.")
       }
       
       # ---- zip everything ----
@@ -5150,7 +5534,7 @@ server <- function(input, output, session) {
       
       zip(
         zipfile = file,
-        files   = list.files(".")
+        files   = files_to_zip
       )
       
     }
