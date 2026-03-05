@@ -1706,7 +1706,7 @@ ui <- fluidPage(
               class = "btn btn-hero btn-hero-primary"
             ),
             tags$a(
-              href = "https://github.com/ytwangZero",
+              href = "https://github.com/tidymass/featuremap_shiny",
               target = "_blank",
               class = "btn btn-hero btn-hero-secondary",
               icon("book"),
