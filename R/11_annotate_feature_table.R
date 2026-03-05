@@ -256,7 +256,7 @@ annotate_feature_table <-
                 rt.tol = mfc_rt_tol,
                 mz.tol = ms1_match_ppm,
                 int.tol = 0.3,
-                max.isotope = 3
+                max.isotope = isotope_number
               ),
               silent = TRUE)
               
@@ -342,7 +342,7 @@ annotate_feature_table <-
               rt.tol = mfc_rt_tol,
               mz.tol = ms1_match_ppm,
               int.tol = 0.3,
-              max.isotope = 3
+              max.isotope = isotope_number
             ),
             silent = TRUE)
             
