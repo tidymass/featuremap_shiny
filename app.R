@@ -18,24 +18,6 @@ library(jsonlite)
 library(metid)
 library(PCSF2)
 
-# setwd("~/Documents/AtNTUlife/ShenLab/1_MyProject/featureFMA/shiny")
-# source("R/10_annotate_feature.R")
-# source("R/11_annotate_feature_table.R")
-# source("R/12_functions_data_checking.R")
-# source("R/13_functions_mfc.R")
-# source("R/14_functions_redundancy.R")
-# source("R/15_annotation_wrapper.R")
-# source("R/20_extract_subnetwork.R")
-# source("R/30_identify_module.R")
-# source("R/31_cal_module_score.R")
-# source("R/32_permutation_test.R")
-# source("R/40_annotate_module.R")
-# source("R/41_rag_pubmed.R")
-# source("R/42_rag_embed.R")
-# source("R/43_rag_rerank.R")
-# source("R/44_tidy_input.R")
-# source("R/45_gen_prompt.R")
-# source("R/46_gen_report.R")
 
 lapply(
   list.files("R", full.names = TRUE),
@@ -279,12 +261,16 @@ ui <- fluidPage(
           gap: 12px;
           flex: 1;
           min-height: 0;
+          width: 100%;
+          min-width: 0;
         }
         
         #annotation_page .annotation-summary-stack > .shiny-html-output {
           display: flex;
           flex: 1;
           min-height: 0;
+          width: 100%;
+          min-width: 0;
         }
         
         /* Modules */
@@ -349,6 +335,14 @@ ui <- fluidPage(
       #annotation_page .annotation-table-wrap .dataTables_wrapper {
         width: 100%;
         max-width: 100%;
+      }
+
+      #annotation_page .annotation-summary-stack .shiny-plot-output,
+      #annotation_page .annotation-summary-stack .shiny-plotly-output,
+      #annotation_page .annotation-summary-stack .plotly,
+      #annotation_page .annotation-summary-stack .html-widget {
+        width: 100% !important;
+        max-width: 100% !important;
       }
 
       #network_page .annotation-table-wrap .dataTables_wrapper {
@@ -1476,12 +1470,64 @@ ui <- fluidPage(
 
 
     document.addEventListener('DOMContentLoaded', runCounters);
-  "))
-    ,
-    tags$script(HTML("
-      window.clearQuickstartTargets = function() {
-        document.querySelectorAll('.quickstart-focus').forEach(function(el) {
-          el.classList.remove('quickstart-focus');
+	  "))
+	    ,
+	    tags$script(HTML("
+	      (function() {
+	        function resizeOnePlotly(el) {
+	          if (!el || !window.Plotly) return;
+	          var target = el.classList && el.classList.contains('js-plotly-plot') ? el : el.querySelector('.js-plotly-plot');
+	          if (!target) return;
+	          var parent = target.parentElement || target;
+	          var w = parent.getBoundingClientRect ? parent.getBoundingClientRect().width : 0;
+	          if (window.Plotly.Plots && window.Plotly.Plots.resize) {
+	            try { window.Plotly.Plots.resize(target); } catch (e) {}
+	          }
+	          if (window.Plotly.relayout && w && w > 0) {
+	            try { window.Plotly.relayout(target, {autosize: true, width: Math.floor(w)}); } catch (e) {}
+	          }
+	        }
+
+	        function resizePlotlyWidgets(selector) {
+	          var nodes;
+	          if (selector) {
+	            nodes = document.querySelectorAll(selector);
+	          } else {
+	            nodes = document.querySelectorAll('.js-plotly-plot');
+	          }
+	          nodes.forEach(function(el) { resizeOnePlotly(el); });
+	        }
+
+	        window.forcePlotlyResize = function(ids) {
+	          var doResize = function() {
+	            if (Array.isArray(ids) && ids.length > 0) {
+	              ids.forEach(function(id) {
+	                var el = document.getElementById(id);
+	                if (el) resizeOnePlotly(el);
+	              });
+	            } else {
+	              resizePlotlyWidgets();
+	            }
+	          };
+	          [0, 90, 220, 420, 760].forEach(function(t) {
+	            setTimeout(doResize, t);
+	          });
+	        };
+
+	        document.addEventListener('shown.bs.tab', function() {
+	          window.forcePlotlyResize();
+	        });
+
+	        window.addEventListener('resize', function() {
+	          setTimeout(function() { window.forcePlotlyResize(); }, 20);
+	        });
+	      })();
+	    ")),
+	    
+	    tags$script(HTML("
+	      window.clearQuickstartTargets = function() {
+	        document.querySelectorAll('.quickstart-focus').forEach(function(el) {
+	          el.classList.remove('quickstart-focus');
         });
         window.__quickstartTargetId = null;
       };
@@ -1676,10 +1722,6 @@ ui <- fluidPage(
         # Key Features Section
         tags$div(
           class = "home-section",
-          tags$div(
-            class = "home-section-head",
-            tags$h2(class = "section-title", "Key Platform Metrics")
-          ),
           fluidRow(
             column(
               width = 3,
@@ -2020,6 +2062,7 @@ ui <- fluidPage(
                   
                   tabPanel(
                     title = tagList(icon("chart-simple"), "Summary"),
+                    value = "summary",
                     tags$div(
                       class = "annotation-summary-stack",
                       uiOutput("annotation_mfc_ui"),
@@ -2029,6 +2072,7 @@ ui <- fluidPage(
                   
                   tabPanel(
                     title = tagList(icon("table"), "Annotation Table 1"),
+                    value = "table1",
                     tags$div(
                       class = "annotation-table-wrap",
                       DTOutput("annotated_table")
@@ -2809,8 +2853,17 @@ ui <- fluidPage(
                   uiOutput("export_preview")
                 )
                 ,
-                downloadButton("download_results", "Download Results",
-                               class = "btn-success btn-lg w-100 results-download-btn")
+                tags$div(
+                  class = "run-next-row",
+                  downloadButton("download_results", "Download Results",
+                                 class = "btn-success btn-lg results-download-btn"),
+                  actionButton(
+                    "back_home_reset",
+                    "Back to Home",
+                    icon = icon("house"),
+                    class = "btn btn-outline-danger btn-lg"
+                  )
+                )
               )
             )
           ),
@@ -2921,8 +2974,58 @@ server <- function(input, output, session) {
       shinyjs::removeClass(paste0("nav_", p), "active")
     })
     shinyjs::addClass(paste0("nav_", page), "active")
+
+    shinyjs::runjs(
+      "setTimeout(function() {
+        window.dispatchEvent(new Event('resize'));
+        if (window.forcePlotlyResize) {
+          window.forcePlotlyResize();
+        } else if (window.Plotly && window.Plotly.Plots && window.Plotly.Plots.resize) {
+          document.querySelectorAll('.js-plotly-plot').forEach(function(el) {
+            try { window.Plotly.Plots.resize(el); } catch (e) {}
+          });
+        }
+      }, 140);"
+    )
     
     rv$current_page <- page
+  }
+
+  reset_pipeline_state <- function() {
+    rv$feature_data <- NULL
+    rv$ms2_data <- NULL
+    rv$staged_feature_data <- NULL
+    rv$staged_ms2_data <- NULL
+    rv$mrn <- NULL
+    rv$ref_database <- NULL
+    rv$ref_database_type <- NULL
+
+    rv$upload_note <- NULL
+    rv$upload_note_type <- "info"
+
+    rv$annotation_object <- NULL
+    rv$annotated_table <- NULL
+    rv$annotation_summary <- NULL
+    rv$annotation_status <- "idle"
+
+    rv$annotation_table2 <- NULL
+    rv$pcsf_status <- "idle"
+
+    rv$module_res <- NULL
+    rv$module_status <- "idle"
+
+    rv$function_result <- NULL
+    rv$function_status <- "idle"
+    rv$function_pubmed_used <- FALSE
+
+    rv$quickstart_active <- FALSE
+    rv$quickstart_step <- NA_integer_
+    rv$quickstart_phase <- 1L
+    rv$quickstart_completed_pages <- character(0)
+    rv$quickstart_prompt_shown <- FALSE
+
+    updateCheckboxGroupInput(session, "export_items", selected = character(0))
+    updateCheckboxGroupInput(session, "network_export_items", selected = character(0))
   }
 
   quickstart_step_from_page <- function(page) {
@@ -3068,6 +3171,29 @@ server <- function(input, output, session) {
   observeEvent(input$nav_function, { switch_page("function") })
   observeEvent(input$nav_results, { switch_page("results") })
   observeEvent(input$nav_docs, { switch_page("docs") })
+
+  observeEvent(input$back_home_reset, {
+    showModal(
+      modalDialog(
+        title = tagList(icon("triangle-exclamation"), "Confirm Reset"),
+        easyClose = TRUE,
+        footer = tagList(
+          modalButton("Cancel"),
+          actionButton("confirm_back_home_reset", "Yes, Clear and Back to Home", class = "btn btn-danger")
+        ),
+        tags$p("This will clear current analysis results and return to Home."),
+        tags$p(style = "margin-bottom:0; font-weight:600;", "Do you want to continue?")
+      )
+    )
+  })
+
+  observeEvent(input$confirm_back_home_reset, {
+    removeModal()
+    reset_pipeline_state()
+    shinyjs::runjs("window.clearQuickstartTargets && window.clearQuickstartTargets(); window.__quickstartDialogTargetId = null;")
+    switch_page("home")
+    showNotification("Analysis results cleared. Returned to Home.", type = "message")
+  })
 
   show_quickstart_phase_modal <- function() {
     if (!isTRUE(rv$quickstart_active)) {
@@ -3555,6 +3681,9 @@ server <- function(input, output, session) {
         rv$annotated_table    <- res$anno_feature_table1
         rv$annotation_summary <- res$anno_redundancy
         rv$annotation_status  <- "finished"
+        shinyjs::runjs(
+          "window.forcePlotlyResize && window.forcePlotlyResize(['annotation_mfc_plot','annotation_feature_plot']);"
+        )
         update_process_modal(
           "success",
           "Step 2 Completed",
@@ -3573,6 +3702,20 @@ server <- function(input, output, session) {
     req(rv$annotation_status == "finished")
     switch_page("network")
   })
+
+  observeEvent(input$annotation_tabs, {
+    if (!identical(input$annotation_tabs, "summary")) return()
+    shinyjs::runjs(
+      "window.forcePlotlyResize && window.forcePlotlyResize(['annotation_mfc_plot','annotation_feature_plot']);"
+    )
+  }, ignoreInit = TRUE)
+
+  observeEvent(rv$current_page, {
+    if (!identical(rv$current_page, "annotation")) return()
+    shinyjs::runjs(
+      "window.forcePlotlyResize && window.forcePlotlyResize(['annotation_mfc_plot','annotation_feature_plot']);"
+    )
+  }, ignoreInit = TRUE)
   
   output$annotation_mfc_ui <- renderUI({
     if (rv$annotation_status == "running") {
@@ -3582,7 +3725,7 @@ server <- function(input, output, session) {
         "Preparing metabolite-level summary ..."
       )
     } else if (rv$annotation_status == "finished") {
-      plotlyOutput("annotation_mfc_plot", height = 280)
+      plotlyOutput("annotation_mfc_plot", width = "100%", height = 280)
     } else {
       tags$div(
         class = "empty-panel empty-panel-compact empty-panel-fill",
@@ -3600,7 +3743,7 @@ server <- function(input, output, session) {
         "Preparing feature-level summary ..."
       )
     } else if (rv$annotation_status == "finished") {
-      plotlyOutput("annotation_feature_plot", height = 280)
+      plotlyOutput("annotation_feature_plot", width = "100%", height = 280)
     } else {
       tags$div(
         class = "empty-panel empty-panel-compact empty-panel-fill",
@@ -3747,7 +3890,7 @@ server <- function(input, output, session) {
         inherit = FALSE
       ) %>%
       layout(
-        margin = list(l = 66, r = 24, t = 44, b = 58),
+        margin = list(l = 62, r = 6, t = 38, b = 52),
         plot_bgcolor = "rgba(249,252,255,1)",
         paper_bgcolor = "rgba(0,0,0,0)",
         bargap = 0.45,
