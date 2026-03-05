@@ -49,65 +49,227 @@ annotate_one_module <- function(module_obj,
   # 2) Build user prompt with module-specific data
   user_prompt <- build_module_prompt(module_obj, study_context)
   
-  # 3) Make API call to LLM
-  res_call <- chat_api_call(
-    messages = list(
-      list(role = "system", content = system_prompt),
-      list(role = "user",   content = user_prompt)
-    ),
-    provider    = provider,     
-    api_key     = llm_api_key,
-    model       = model,
-    max_tokens  = max_tokens,
-    temperature = temperature
-  )
+  normalize_parsed <- function(x) {
+    if (is.null(x)) return(NULL)
+    if (is.data.frame(x) && nrow(x) >= 1) return(as.list(x[1, , drop = FALSE]))
+    if (is.list(x) && !is.null(names(x))) return(x)
+    if (is.list(x) && length(x) >= 1 && is.list(x[[1]]) && !is.null(names(x[[1]]))) {
+      return(x[[1]])
+    }
+    NULL
+  }
 
-  # Handle empty or NULL responses
-  if (is.null(res_call) ||
-      is.null(res_call$content) ||
-      !is.character(res_call$content) ||
-      length(res_call$content) != 1 ||
-      !nzchar(res_call$content)) {
-    message("Empty or NULL response for module ", module_obj$module_id)
-    return(
-      data.frame(
-        module_id        = module_obj$module_id,
-        title            = NA_character_,
-        summary          = NA_character_,
-        confidence_label = NA_character_,
-        rationale        = NA_character_,
-        raw_response     = NA_character_,
-        stringsAsFactors = FALSE
+  parse_json_response <- function(txt) {
+    direct <- tryCatch(
+      jsonlite::fromJSON(txt, simplifyVector = FALSE),
+      error = function(e) NULL
+    )
+    direct <- normalize_parsed(direct)
+    if (!is.null(direct)) return(direct)
+
+    json_obj_txt <- extract_json_object(txt)
+    if (!is.null(json_obj_txt)) {
+      obj <- tryCatch(
+        jsonlite::fromJSON(json_obj_txt, simplifyVector = FALSE),
+        error = function(e) NULL
       )
+      obj <- normalize_parsed(obj)
+      if (!is.null(obj)) return(obj)
+    }
+
+    json_fence <- regmatches(txt, regexpr("```\\s*[\\s\\S]*?\\s*```", txt, perl = TRUE))
+    if (length(json_fence) > 0 && nzchar(json_fence[1])) {
+      inner <- sub("^```[a-zA-Z]*\\s*", "", json_fence[1], perl = TRUE)
+      inner <- sub("\\s*```$", "", inner, perl = TRUE)
+      fobj <- tryCatch(
+        jsonlite::fromJSON(inner, simplifyVector = FALSE),
+        error = function(e) NULL
+      )
+      fobj <- normalize_parsed(fobj)
+      if (!is.null(fobj)) return(fobj)
+    }
+
+    NULL
+  }
+
+  parse_labeled_fallback <- function(txt) {
+    if (is.null(txt) || !nzchar(txt)) return(NULL)
+    lines <- unlist(strsplit(txt, "\n", fixed = TRUE))
+    lines <- trimws(lines)
+    lines <- lines[nzchar(lines)]
+    if (length(lines) == 0) return(NULL)
+
+    get_value <- function(pattern) {
+      hit <- grep(pattern, lines, perl = TRUE, ignore.case = TRUE)
+      if (length(hit) == 0) return(NA_character_)
+      val <- sub(pattern, "", lines[hit[1]], perl = TRUE, ignore.case = TRUE)
+      val <- trimws(val)
+      if (!nzchar(val)) NA_character_ else val
+    }
+
+    title <- get_value("^\\s*(title|module\\s*title)\\s*[:：]\\s*")
+    summary <- get_value("^\\s*summary\\s*[:：]\\s*")
+    rationale <- get_value("^\\s*rationale\\s*[:：]\\s*")
+    conf_line <- get_value("^\\s*confidence(_label)?\\s*[:：]\\s*")
+
+    confidence_label <- NA_character_
+    if (!is.na(conf_line)) {
+      if (grepl("\\bhigh\\b", conf_line, ignore.case = TRUE)) confidence_label <- "high"
+      if (grepl("\\bmedium\\b", conf_line, ignore.case = TRUE)) confidence_label <- "medium"
+      if (grepl("\\blow\\b", conf_line, ignore.case = TRUE)) confidence_label <- "low"
+    }
+
+    found_n <- sum(!is.na(c(title, summary, confidence_label, rationale)))
+    if (found_n == 0) return(NULL)
+
+    list(
+      title = title,
+      summary = summary,
+      confidence_label = confidence_label,
+      rationale = rationale
     )
   }
-  
-  # Extract raw text response 
-  raw_text <- res_call$content
-  json_txt <- extract_json_object(raw_text)
-  parsed <- tryCatch(
-    {
-      if (is.null(json_txt)) {
-        message("No JSON found for module ", module_obj$module_id)
-        return(data.frame(
-          module_id        = module_obj$module_id,
-          title            = NA_character_,
-          summary          = NA_character_,
-          confidence_label = NA_character_,
-          rationale        = NA_character_,
-          raw_response     = raw_text,
-          stringsAsFactors = FALSE
-        ))
+
+  parse_partial_json_fallback <- function(txt) {
+    if (is.null(txt) || !nzchar(txt)) return(NULL)
+
+    extract_json_string_value <- function(key) {
+      pattern <- paste0('"', key, '"\\s*:\\s*"')
+      m <- regexpr(pattern, txt, perl = TRUE)
+      if (m[1] == -1) return(NA_character_)
+
+      start <- m[1] + attr(m, "match.length")
+      if (start > nchar(txt)) return(NA_character_)
+
+      chars <- strsplit(substr(txt, start, nchar(txt)), "", fixed = TRUE)[[1]]
+      if (length(chars) == 0) return(NA_character_)
+
+      out <- character(0)
+      esc <- FALSE
+      closed <- FALSE
+      for (ch in chars) {
+        if (!esc && ch == "\\") {
+          esc <- TRUE
+          out <- c(out, ch)
+          next
+        }
+        if (!esc && ch == "\"") {
+          closed <- TRUE
+          break
+        }
+        out <- c(out, ch)
+        esc <- FALSE
       }
-      jsonlite::fromJSON(json_txt)
-    },
-    error = function(e) {
-      message("JSON parse error for module ", module_obj$module_id, ": ", e$message)
-      NULL
+
+      val <- paste(out, collapse = "")
+      val <- gsub("\\\\n", " ", val, perl = TRUE)
+      val <- gsub("\\\\\"", "\"", val, perl = TRUE)
+      val <- trimws(val)
+      if (!nzchar(val)) return(NA_character_)
+      if (!closed && nchar(val) < 5) return(NA_character_)
+      val
     }
+
+    title <- extract_json_string_value("title")
+    summary <- extract_json_string_value("summary")
+    rationale <- extract_json_string_value("rationale")
+    confidence_label <- extract_json_string_value("confidence_label")
+
+    if (!is.na(confidence_label)) {
+      if (grepl("\\bhigh\\b", confidence_label, ignore.case = TRUE)) confidence_label <- "high"
+      if (grepl("\\bmedium\\b", confidence_label, ignore.case = TRUE)) confidence_label <- "medium"
+      if (grepl("\\blow\\b", confidence_label, ignore.case = TRUE)) confidence_label <- "low"
+      if (!confidence_label %in% c("high", "medium", "low")) confidence_label <- NA_character_
+    }
+
+    found_n <- sum(!is.na(c(title, summary, confidence_label, rationale)))
+    if (found_n == 0) return(NULL)
+
+    list(
+      title = title,
+      summary = summary,
+      confidence_label = confidence_label,
+      rationale = rationale
+    )
+  }
+
+  messages <- list(
+    list(role = "system", content = system_prompt),
+    list(role = "user",   content = user_prompt)
   )
+  gemini_schema <- NULL
+  if (identical(provider, "gemini")) {
+    gemini_schema <- list(
+      type = "OBJECT",
+      properties = list(
+        title = list(type = "STRING"),
+        summary = list(type = "STRING"),
+        confidence_label = list(type = "STRING", enum = c("high", "medium", "low")),
+        rationale = list(type = "STRING")
+      ),
+      required = c("title", "summary", "confidence_label", "rationale")
+    )
+  }
+
+  parsed <- NULL
+  raw_text <- NA_character_
+  current_max_tokens <- if (identical(provider, "gemini")) {
+    max(4000, max_tokens)
+  } else {
+    max_tokens
+  }
+
+  for (attempt in 1:2) {
+    res_call <- safe_chat_call(
+      messages = messages,
+      provider = provider,
+      api_key = llm_api_key,
+      model = model,
+      max_tokens = current_max_tokens,
+      temperature = temperature,
+      response_schema = gemini_schema
+    )
+
+    if (is.null(res_call) ||
+        is.null(res_call$content) ||
+        !is.character(res_call$content) ||
+        length(res_call$content) != 1 ||
+        !nzchar(res_call$content)) {
+      message("Empty or NULL response for module ", module_obj$module_id, " (attempt ", attempt, ")")
+    } else {
+      raw_text <- res_call$content
+      parsed <- parse_json_response(raw_text)
+      if (!is.null(parsed)) break
+      message("No JSON found for module ", module_obj$module_id, " (attempt ", attempt, ")")
+
+      if (identical(provider, "gemini") &&
+          !is.null(res_call$finish_reason) &&
+          identical(toupper(as.character(res_call$finish_reason)), "MAX_TOKENS")) {
+        current_max_tokens <- min(max(3000, current_max_tokens * 2), 8192)
+        message("Gemini output was truncated (MAX_TOKENS). Retrying with max_tokens = ", current_max_tokens)
+      }
+    }
+
+    if (attempt == 1) {
+      messages <- c(
+        messages,
+        list(list(
+          role = "user",
+          content = "Return ONLY a valid JSON object with keys: title, summary, confidence_label, rationale."
+        ))
+      )
+    }
+  }
   
   # Handle JSON parsing failure
+  if (is.null(parsed)) {
+    parsed <- parse_partial_json_fallback(raw_text)
+  }
+
+  if (is.null(parsed)) {
+    parsed <- parse_labeled_fallback(raw_text)
+  }
+
   if (is.null(parsed)) {
     return(
       data.frame(
@@ -228,5 +390,3 @@ annotate_all_modules <- function(all_modules_ready,
   
   dplyr::bind_rows(results_list)
 }
-
-

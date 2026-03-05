@@ -1,7 +1,3 @@
-
-
-
-
 annotate_module = function(res = res,
                            p = "fdr",
                            pcutoff = 0.05,
@@ -27,7 +23,7 @@ annotate_module = function(res = res,
       x
     }
   }
-
+  
   
   # Annotate metabolites via database ------------------------------------------
   message("Step 1: Annotating the module via well-established database ...\n")
@@ -303,8 +299,9 @@ annotate_module = function(res = res,
       
       module_df  <- module_list_top[[mod]]
       module_anno <- convert_module_to_met_list(module_df, refdata = res$refdata)
+      # [CHANGE 1] phenotype changed from `phenotype` to NULL, consistent with R package version
       mod_pub <- annotate_pubmed_for_module(module_anno  = module_anno,
-                                            phenotype    = phenotype,
+                                            phenotype    = NULL,
                                             NCBI_api_key = NCBI_api_key,
                                             retmax       = 10,
                                             years        = years)
@@ -391,6 +388,9 @@ annotate_module = function(res = res,
       provider = provider,
       llm_api_key = llm_api_key,
       llm_model   = llm_model)
+    # [CHANGE 2] Added names() assignment after add_metabolite_summaries_to_modules,
+    # consistent with R package version
+    names(module_pubmed_embed_refined) <- names(module_pubmed_embed)
     
     message("\nStep 2 has finished!\n")
     
@@ -455,7 +455,9 @@ annotate_module = function(res = res,
     provider          = provider,
     llm_api_key       = llm_api_key,
     model             = llm_model,
-    max_tokens        = 2000,
+    # [CHANGE 3] max_tokens now uses conditional logic for gemini provider,
+    # consistent with R package version
+    max_tokens        = if (identical(provider, "gemini")) 4000 else 2000,
     temperature       = 0,
     sleep_sec         = 0)
   

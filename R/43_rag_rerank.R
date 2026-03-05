@@ -41,12 +41,13 @@ chat_openai_silicon_call <- function(
   cont <- tryCatch(httr::content(res, encoding = "UTF-8"), error = function(e) NULL)
   if (is.null(cont)) return(NULL)
   content_txt <- tryCatch(cont$choices[[1]]$message$content, error = function(e) NULL)
+  finish_reason <- tryCatch(cont$choices[[1]]$finish_reason, error = function(e) NA_character_)
   if (is.null(content_txt)) {
     message("Failed to extract assistant content.")
     return(NULL)
   }
   
-  list(content = content_txt, raw = cont)
+  list(content = content_txt, raw = cont, finish_reason = finish_reason)
 }
 
 chat_gemini_call <- function(
@@ -54,12 +55,20 @@ chat_gemini_call <- function(
     api_key,
     model = "gemini-2.0-pro",
     max_tokens = 2000,
-    temperature = 0
+    temperature = 0,
+    response_schema = NULL
 ) {
-  prompt <- paste(
-    vapply(messages, function(m) m$content, character(1)),
-    collapse = "\n\n"
-  )
+  role_vec <- vapply(messages, function(m) {
+    if (is.null(m$role)) return("user")
+    as.character(m$role)
+  }, character(1))
+  content_vec <- vapply(messages, function(m) {
+    if (is.null(m$content)) return("")
+    as.character(m$content)
+  }, character(1))
+
+  sys_prompt <- paste(content_vec[role_vec == "system"], collapse = "\n\n")
+  user_prompt <- paste(content_vec[role_vec != "system"], collapse = "\n\n")
   
   url <- sprintf(
     "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s",
@@ -69,13 +78,24 @@ chat_gemini_call <- function(
   body <- list(
     contents = list(list(
       role = "user",
-      parts = list(list(text = prompt))
+      parts = list(list(text = user_prompt))
     )),
     generationConfig = list(
       temperature     = temperature,
-      maxOutputTokens = max_tokens
+      maxOutputTokens = max_tokens,
+      responseMimeType = "application/json"
     )
   )
+
+  if (!is.null(response_schema)) {
+    body$generationConfig$responseSchema <- response_schema
+  }
+
+  if (nzchar(sys_prompt)) {
+    body$systemInstruction <- list(
+      parts = list(list(text = sys_prompt))
+    )
+  }
   
   res <- tryCatch({
     httr::POST(
@@ -111,6 +131,7 @@ chat_gemini_call <- function(
       collapse = ""
     )
   }, error = function(e) NULL)
+  finish_reason <- tryCatch(cont$candidates[[1]]$finishReason, error = function(e) NA_character_)
   
   
   if (is.null(txt)) {
@@ -118,7 +139,7 @@ chat_gemini_call <- function(
     return(NULL)
   }
   
-  list(content = txt, raw = cont)
+  list(content = txt, raw = cont, finish_reason = finish_reason)
 }
 
 
@@ -128,7 +149,8 @@ chat_api_call <- function(
     api_key,
     model,
     max_tokens = 2000,
-    temperature = 0
+    temperature = 0,
+    response_schema = NULL
 ) {
   
   provider <- match.arg(provider)
@@ -161,7 +183,8 @@ chat_api_call <- function(
       api_key = api_key,
       model = model,
       max_tokens = max_tokens,
-      temperature = temperature
+      temperature = temperature,
+      response_schema = response_schema
     ))
   }
   
@@ -370,6 +393,8 @@ refine_module_pubmed_with_llm <- function(
       refined
     })
   })
+
+  names(out) <- names(module_pubmed_embed)
   
   return(out)
 }
@@ -515,7 +540,7 @@ add_metabolite_summaries_to_modules <- function(
     llm_model, 
     max_chars_abstract = 1500
 ) {
-  lapply(seq_along(module_pubmed_embed_refined), function(mi) {
+  out <- lapply(seq_along(module_pubmed_embed_refined), function(mi) {
     
     message("--Summarizing for ", names(module_pubmed_embed_refined)[mi], " ...")
     
@@ -531,6 +556,9 @@ add_metabolite_summaries_to_modules <- function(
       )
     })
   })
+
+  names(out) <- names(module_pubmed_embed_refined)
+  out
 }
 
 

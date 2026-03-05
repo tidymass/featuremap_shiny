@@ -974,6 +974,55 @@ ui <- fluidPage(
         color: #415366;
         margin-bottom: 12px;
       }
+
+      .function-met-pmid-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .function-met-pmid-item {
+        border: 1px solid #dbe5f2;
+        border-radius: 10px;
+        background: #ffffff;
+        padding: 12px 14px;
+      }
+
+      .function-met-pmid-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+
+      .function-met-pmid-name {
+        font-size: 15px;
+        font-weight: 700;
+        color: #1c3957;
+      }
+
+      .function-met-pmid-id {
+        font-size: 12px;
+        color: #45617d;
+        background: #f2f5fa;
+        border: 1px solid #d6e0ec;
+        border-radius: 6px;
+        padding: 1px 6px;
+      }
+
+      .function-met-pmid-count {
+        font-size: 12px;
+        color: #39556f;
+        background: #e7f0fa;
+        border: 1px solid #ccdeef;
+        border-radius: 999px;
+        padding: 2px 8px;
+      }
+
+      .function-met-pmid-empty {
+        margin: 0;
+      }
       
       /* Card styles */
       .card {
@@ -4727,7 +4776,7 @@ server <- function(input, output, session) {
 
     show_process_modal(
       title = "Step 5 Running",
-      text = "AI-powered module annotation is in progress. Please wait."
+      text = "Module annotation is in progress. Please wait."
     )
     
     # ---- set status ----
@@ -4902,44 +4951,6 @@ server <- function(input, output, session) {
   
   
   #### ---- Module annotation output ----
-  output$function_module_output <- renderUI({
-    if (rv$function_status != "finished") return(NULL)
-    if (is.null(rv$function_result) || is.null(rv$function_result$module_function)) return(NULL)
-    if (is.null(input$selected_function_module)) return(NULL)
-    
-    mod_df <- rv$function_result$module_function %>%
-      dplyr::filter(as.character(module_id) == as.character(input$selected_function_module))
-    
-    req(nrow(mod_df) == 1)
-    
-    tags$div(
-      class = "function-annotation-grid",
-      tags$div(
-        class = "param-card function-annotation-card",
-        tags$h4(icon("tag"), "Module Title"),
-        tags$p(class = "function-annotation-title", mod_df$title)
-      ),
-      
-      tags$div(
-        class = "param-card function-annotation-card",
-        tags$h4(icon("align-left"), "Functional Summary"),
-        tags$p(class = "function-annotation-text", mod_df$summary)
-      ),
-      
-      tags$div(
-        class = "param-card function-annotation-card",
-        tags$h4(icon("chart-simple"), "Confidence"),
-        tags$p(class = "function-annotation-confidence", mod_df$confidence_label)
-      ),
-      
-      tags$div(
-        class = "param-card function-annotation-card",
-        tags$h4(icon("think-peaks"), "Rationale"),
-        tags$p(class = "function-annotation-text", mod_df$rationale)
-      )
-    )
-  })
-
   output$function_literature_ui <- renderUI({
     if (rv$function_status != "finished") return(NULL)
     if (is.null(input$selected_function_module)) return(NULL)
@@ -4981,13 +4992,12 @@ server <- function(input, output, session) {
       if (is.finite(module_id_num)) as.character(module_id_num) else character(0),
       if (is.finite(module_id_num)) paste0("module", module_id_num) else character(0)
     ))
-    
+
     mod_pub <- NULL
     if (!is.null(names(pubmed_res))) {
       hit <- intersect(key_candidates, names(pubmed_res))
       if (length(hit) > 0) mod_pub <- pubmed_res[[hit[1]]]
       if (is.null(mod_pub) && is.finite(module_id_num)) {
-        # Fallback: match by numeric suffix in names like module1/module_1
         suffix_num <- suppressWarnings(as.integer(gsub("[^0-9]", "", names(pubmed_res))))
         idx2 <- which(!is.na(suffix_num) & suffix_num == module_id_num)
         if (length(idx2) > 0) mod_pub <- pubmed_res[[idx2[1]]]
@@ -5012,21 +5022,56 @@ server <- function(input, output, session) {
         )
       )
     }
-    
+
     collect_pmids <- function(x) {
       out <- character(0)
       if (is.list(x)) {
-        if (!is.null(x$pmids)) {
-          out <- c(out, as.character(x$pmids))
-        }
-        for (i in seq_along(x)) {
-          out <- c(out, collect_pmids(x[[i]]))
-        }
+        if (!is.null(x$pmids)) out <- c(out, as.character(x$pmids))
+        for (i in seq_along(x)) out <- c(out, collect_pmids(x[[i]]))
       }
       out
     }
-    
-    pmids <- unique(collect_pmids(mod_pub))
+
+    collect_compound_pmids <- function(mod_pub) {
+      if (!is.list(mod_pub)) return(list())
+      mod_names <- names(mod_pub)
+      out <- list()
+
+      for (i in seq_along(mod_pub)) {
+        ent <- mod_pub[[i]]
+        if (!is.list(ent) || (is.null(ent$pmids) && is.null(ent$met_name))) next
+
+        pmids_i <- as.character(ent$pmids %||% character(0))
+        pmids_i <- unique(trimws(pmids_i))
+        pmids_i <- pmids_i[!is.na(pmids_i) & nzchar(pmids_i)]
+
+        ent_id <- ""
+        if (!is.null(mod_names) && length(mod_names) >= i && !is.na(mod_names[i])) {
+          ent_id <- trimws(as.character(mod_names[i]))
+        }
+        if (!nzchar(ent_id)) ent_id <- as.character(i)
+
+        ent_name <- trimws(as.character(ent$met_name %||% ""))
+        ent_name <- ent_name[!is.na(ent_name) & nzchar(ent_name)]
+        ent_name <- if (length(ent_name) > 0) ent_name[1] else ent_id
+
+        out[[length(out) + 1]] <- list(
+          compound_id = ent_id,
+          compound_name = ent_name,
+          pmids = pmids_i,
+          n_pmids = length(pmids_i)
+        )
+      }
+
+      out
+    }
+
+    compound_pmids <- collect_compound_pmids(mod_pub)
+    pmids <- if (length(compound_pmids) > 0) {
+      unique(unlist(lapply(compound_pmids, `[[`, "pmids"), use.names = FALSE))
+    } else {
+      unique(collect_pmids(mod_pub))
+    }
     pmids <- pmids[!is.na(pmids) & nzchar(trimws(pmids))]
 
     if (length(pmids) == 0) {
@@ -5035,6 +5080,71 @@ server <- function(input, output, session) {
           class = "param-card function-annotation-card",
           tags$h4(icon("book"), "Literature Evidence (PMID)"),
           tags$p(class = "function-annotation-note", "No retained PubMed references for this module.")
+        )
+      )
+    }
+
+    if (length(compound_pmids) > 0) {
+      n_compounds <- length(compound_pmids)
+      n_compounds_with_hits <- sum(vapply(compound_pmids, function(x) x$n_pmids > 0, logical(1)))
+      ord <- order(vapply(compound_pmids, function(x) x$n_pmids, integer(1)), decreasing = TRUE)
+      compound_pmids <- compound_pmids[ord]
+
+      make_pmid_cell <- function(pmids_vec) {
+        if (length(pmids_vec) == 0) return(tags$span("-"))
+        if (length(pmids_vec) == 1) {
+          x <- pmids_vec[1]
+          return(tags$a(href = paste0("https://pubmed.ncbi.nlm.nih.gov/", x, "/"), target = "_blank", rel = "noopener noreferrer", x))
+        }
+        parts <- list()
+        for (i in seq_along(pmids_vec)) {
+          x <- pmids_vec[i]
+          parts[[length(parts) + 1]] <- tags$a(href = paste0("https://pubmed.ncbi.nlm.nih.gov/", x, "/"), target = "_blank", rel = "noopener noreferrer", x)
+          if (i < length(pmids_vec)) parts[[length(parts) + 1]] <- tags$span(", ")
+        }
+        do.call(tagList, parts)
+      }
+
+      return(
+        tags$div(
+          class = "param-card function-annotation-card",
+          tags$h4(icon("book"), "Literature Evidence (PMID)"),
+          tags$p(
+            class = "function-annotation-note",
+            paste0(
+              "Top compounds with retained references: ",
+              n_compounds_with_hits, "/", n_compounds,
+              " | Unique PMIDs: ", length(pmids)
+            )
+          ),
+          tags$div(
+            class = "table-responsive",
+            tags$table(
+              class = "table table-sm table-striped table-bordered",
+              style = "margin-bottom:0;",
+              tags$thead(
+                tags$tr(
+                  tags$th("Top Compound"),
+                  tags$th("Compound ID"),
+                  tags$th("PMID Count"),
+                  tags$th("PMIDs")
+                )
+              ),
+              tags$tbody(
+                lapply(compound_pmids, function(cp) {
+                  tags$tr(
+                    tags$td(cp$compound_name),
+                    tags$td(cp$compound_id),
+                    tags$td(as.character(cp$n_pmids)),
+                    tags$td(
+                      style = "min-width:280px; white-space:normal; word-break:break-word;",
+                      make_pmid_cell(cp$pmids)
+                    )
+                  )
+                })
+              )
+            )
+          )
         )
       )
     }
@@ -5057,6 +5167,43 @@ server <- function(input, output, session) {
             paste0("PMID: ", x)
           )
         })
+      )
+    )
+  })
+  output$function_module_output <- renderUI({
+    if (rv$function_status != "finished") return(NULL)
+    if (is.null(rv$function_result) || is.null(rv$function_result$module_function)) return(NULL)
+    if (is.null(input$selected_function_module)) return(NULL)
+    
+    mod_df <- rv$function_result$module_function %>%
+      dplyr::filter(as.character(module_id) == as.character(input$selected_function_module))
+    
+    req(nrow(mod_df) == 1)
+    
+    tags$div(
+      class = "function-annotation-grid",
+      tags$div(
+        class = "param-card function-annotation-card",
+        tags$h4(icon("tag"), "Module Title"),
+        tags$p(class = "function-annotation-title", mod_df$title)
+      ),
+      
+      tags$div(
+        class = "param-card function-annotation-card",
+        tags$h4(icon("align-left"), "Functional Summary"),
+        tags$p(class = "function-annotation-text", mod_df$summary)
+      ),
+      
+      tags$div(
+        class = "param-card function-annotation-card",
+        tags$h4(icon("chart-simple"), "Confidence"),
+        tags$p(class = "function-annotation-confidence", mod_df$confidence_label)
+      ),
+      
+      tags$div(
+        class = "param-card function-annotation-card",
+        tags$h4(icon("think-peaks"), "Rationale"),
+        tags$p(class = "function-annotation-text", mod_df$rationale)
       )
     )
   })
