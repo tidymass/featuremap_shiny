@@ -1054,11 +1054,11 @@ ui <- fluidPage(
           radial-gradient(900px 380px at 10% -8%, rgba(97, 145, 211, 0.14), transparent 65%),
           radial-gradient(820px 340px at 96% 0%, rgba(81, 157, 158, 0.12), transparent 62%),
           #f4f7fb;
-        padding: 14px 0 26px 0;
+        padding: 0 0 26px 0;
       }
 
       #results_page .content-wrapper {
-        max-width: 1460px;
+        max-width: 1400px;
       }
 
       .results-step-box {
