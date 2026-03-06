@@ -455,11 +455,13 @@ ui <- fluidPage(
         overflow: hidden;
         border-radius: 0;
         padding: 32px 20px 36px 20px;
-        min-height: 48vh;
+        min-height: 56vh;
         display: flex;
         align-items: center;
         justify-content: center;
         background: linear-gradient(128deg, #224a7d 0%, #336ba3 52%, #4ea4a5 100%);
+        background-size: 220% 220%;
+        animation: heroGradientShift 10s ease-in-out infinite;
         box-shadow: 0 18px 36px rgba(31, 68, 112, 0.28);
         margin: 0 0 24px 0;
       }
@@ -472,7 +474,10 @@ ui <- fluidPage(
         border-radius: 50%;
         top: -300px;
         right: -180px;
-        background: rgba(255, 255, 255, 0.15);
+        background: rgba(255, 255, 255, 0.26);
+        filter: blur(1px);
+        opacity: 0.92;
+        animation: heroBlobDriftA 11s ease-in-out infinite alternate;
       }
 
       #home_page .hero-section::after {
@@ -483,7 +488,48 @@ ui <- fluidPage(
         border-radius: 50%;
         bottom: -280px;
         left: -190px;
-        background: rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.18);
+        filter: blur(0.5px);
+        opacity: 0.88;
+        animation: heroBlobDriftB 13s ease-in-out infinite alternate;
+      }
+
+      @keyframes heroGradientShift {
+        0% {
+          background-position: 0% 35%;
+        }
+        50% {
+          background-position: 100% 65%;
+        }
+        100% {
+          background-position: 0% 35%;
+        }
+      }
+
+      @keyframes heroBlobDriftA {
+        0% {
+          transform: translate3d(0, 0, 0) scale(1);
+        }
+        100% {
+          transform: translate3d(-74px, 46px, 0) scale(1.18);
+        }
+      }
+
+      @keyframes heroBlobDriftB {
+        0% {
+          transform: translate3d(0, 0, 0) scale(1);
+        }
+        100% {
+          transform: translate3d(68px, -52px, 0) scale(1.16);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        #home_page .hero-section,
+        #home_page .hero-section::before,
+        #home_page .hero-section::after {
+          animation: none !important;
+        }
       }
 
       #home_page .hero-content {
@@ -709,7 +755,7 @@ ui <- fluidPage(
 
       @media (max-width: 1080px) {
         #home_page .hero-section {
-          min-height: 44vh;
+          min-height: 50vh;
         }
 
         #home_page .hero-subtitle {
@@ -731,7 +777,7 @@ ui <- fluidPage(
         }
 
         #home_page .hero-section {
-          min-height: 40vh;
+          min-height: 46vh;
           padding: 26px 14px 30px 14px;
         }
 
