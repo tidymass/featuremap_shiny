@@ -1,0 +1,58 @@
+Package: featuremapshiny
+Type: Package
+Title: Interactive Shiny Interface for FeatureMAP
+Version: 0.1.0
+Depends: R (>= 3.5.0)
+Authors@R: c(
+    person("Yuting", "Wang",
+           email = "ytwangzero@outlook.com",
+           role = c("aut", "cre")),
+    person("Xiaotao", "Shen",
+           email = "xiaotao.shen@ntu.edu.sg",
+           role = c("aut", "cph"))
+    )
+Description: Provides an installable wrapper around the FeatureMAP Shiny
+    application for metabolomics feature annotation, network extraction,
+    module identification, and functional interpretation.
+License: GPL-3
+Encoding: UTF-8
+Imports:
+    shiny,
+    shinyjs,
+    shinyWidgets,
+    DT,
+    plotly,
+    visNetwork,
+    ggplot2,
+    bslib,
+    tidyverse,
+    dplyr,
+    tibble,
+    tidyr,
+    stringr,
+    magrittr,
+    R6,
+    future,
+    furrr,
+    igraph,
+    tidygraph,
+    purrr,
+    glue,
+    jsonlite,
+    metid,
+    metpath,
+    PCSF2,
+    data.table,
+    plyr,
+    MASS,
+    httr,
+    rentrez,
+    xml2,
+    mclust,
+    openxlsx,
+    htmlwidgets,
+    scales,
+    massdataset,
+    rlang
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2

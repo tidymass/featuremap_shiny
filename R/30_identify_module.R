@@ -63,7 +63,11 @@ identify_module = function(res = NULL,
   
   ## Induced subgraph based on steiner nodes---
   steiner_subnet <- induced_subgraph(res$mrn, vids = steiner_nodes)
-  V(steiner_subnet)$type = ifelse(V(steiner_subnet)$name %in% annotated_ID, "annotated", "hidden")
+  steiner_subnet <- igraph::set_vertex_attr(
+    steiner_subnet,
+    "type",
+    value = ifelse(igraph::V(steiner_subnet)$name %in% annotated_ID, "annotated", "hidden")
+  )
   
   # prepare edge weights for community detection -------------------------------
   res$edge_frequency %>% 
@@ -91,7 +95,7 @@ identify_module = function(res = NULL,
   edge_ends <- igraph::ends(steiner_subnet, igraph::E(steiner_subnet))
   w_adj <- w / sqrt(mrn_deg[edge_ends[,1]] * mrn_deg[edge_ends[,2]])
   w_adj[!is.finite(w_adj)] <- min(w_adj[is.finite(w_adj)], na.rm = TRUE)
-  E(steiner_subnet)$weight <- w_adj
+  steiner_subnet <- igraph::set_edge_attr(steiner_subnet, "weight", value = w_adj)
   
   
   # module detection -----------------------------------------------------------
@@ -136,7 +140,7 @@ identify_module = function(res = NULL,
           if (all(is.na(w)) || sum(w, na.rm = TRUE) == 0) {
             mean(x, na.rm = TRUE)
           } else {
-            weighted.mean(x, w, na.rm = TRUE)
+            stats::weighted.mean(x, w, na.rm = TRUE)
           }
         }
       ) %>% 
@@ -174,7 +178,7 @@ identify_module = function(res = NULL,
           if (all(is.na(w)) || sum(w, na.rm = TRUE) == 0) {
             mean(x, na.rm = TRUE)
           } else {
-            weighted.mean(x, w, na.rm = TRUE)
+            stats::weighted.mean(x, w, na.rm = TRUE)
           }
         }
       ) %>% 
@@ -236,8 +240,6 @@ identify_module = function(res = NULL,
   return(res)
   
 }
-
-
 
 
 

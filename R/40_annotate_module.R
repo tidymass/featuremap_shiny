@@ -17,8 +17,9 @@ annotate_module = function(res = NULL,
                            llm_api_key = Sys.getenv("FEATUREMAP_LLM_API_KEY", unset = "")){
   
   safe_set_featuremap_stage <- function(x, stage) {
-    if (exists("set_featuremap_stage", mode = "function")) {
-      set_featuremap_stage(x, stage)
+    stage_setter <- get0("set_featuremap_stage", mode = "function", inherits = TRUE)
+    if (is.function(stage_setter)) {
+      stage_setter(x, stage)
     } else {
       x
     }
@@ -127,7 +128,7 @@ annotate_module = function(res = NULL,
         mod_non_top <- .x
         
         if (nrow(mod_non_top) == 0) {
-          return(tibble())
+          return(tibble::tibble())
         }
         
         out <- mod_non_top %>%
@@ -175,7 +176,7 @@ annotate_module = function(res = NULL,
         mod_non_top <- .x
         
         if (nrow(mod_non_top) == 0) {
-          return(tibble())
+          return(tibble::tibble())
         }
         
         out <- mod_non_top %>%
@@ -246,9 +247,9 @@ annotate_module = function(res = NULL,
       )
     })
     
-    q_hhi  <- quantile(tmp_all$HHI, probs = c(0.3, 0.7), na.rm = TRUE)
-    q_rob  <- quantile(tmp_all$Robustness, probs = c(0.3, 0.7), na.rm = TRUE)
-    q_ann  <- quantile(tmp_all$Annotated_fraction, probs = c(0.3, 0.7), na.rm = TRUE)
+    q_hhi  <- stats::quantile(tmp_all$HHI, probs = c(0.3, 0.7), na.rm = TRUE)
+    q_rob  <- stats::quantile(tmp_all$Robustness, probs = c(0.3, 0.7), na.rm = TRUE)
+    q_ann  <- stats::quantile(tmp_all$Annotated_fraction, probs = c(0.3, 0.7), na.rm = TRUE)
     
     level3 <- function(x, qs) {
       dplyr::case_when(

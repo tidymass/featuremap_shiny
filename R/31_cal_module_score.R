@@ -10,7 +10,7 @@ calc_activity_score <- function(graph,
                                 seed_nodes,
                                 importance_tbl = NULL) {
   
-  m   <- gsize(graph)  # Total edges in FULL network (mrn)
+  m   <- igraph::gsize(graph)  # Total edges in FULL network (mrn)
   N_I <- length(seed_nodes)  # Total annotated nodes
   N_G <- length(module_nodes)  # Nodes in module
   N_I_G <- sum(module_nodes %in% seed_nodes)  # Annotated nodes in module
@@ -27,7 +27,7 @@ calc_activity_score <- function(graph,
   
   # Extract module subgraph from FULL network
   subg <- induced_subgraph(graph, vids = module_nodes)
-  E_G  <- gsize(subg)  # Edges within module
+  E_G  <- igraph::gsize(subg)  # Edges within module
   
   # Get degrees of module nodes in FULL network 
   degs <- degree(graph, v = module_nodes)

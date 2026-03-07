@@ -118,7 +118,7 @@ extract_subnetwork = function(res = NULL,
   }
   
   if (nrow(FMpair) == 0){
-    stop("[Error] No matched feature–metabolite pairs (FMpair); check annotation table or ID format.")
+    stop("[Error] No matched feature-metabolite pairs (FMpair); check annotation table or ID format.")
   }
   
   mrn %>% 

@@ -1,0 +1,6 @@
+^\.Rproj\.user$
+^featuremap_shiny\.Rproj$
+^\.DS_Store$
+^\.Rhistory$
+^[.].*Rcheck$
+^.*[.]Rcheck$

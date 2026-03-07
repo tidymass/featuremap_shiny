@@ -140,10 +140,9 @@ remove_redundancy <-
       
       
       ###re-calculated confidence score for each compound class.
-      library(plyr)
       annotation_table =
         annotation_table %>%
-        plyr::dlply(.variables = .(metabolite_feature_cluster)) %>%
+        plyr::dlply(.variables = plyr::.(metabolite_feature_cluster)) %>%
         purrr::map(function(x) {
           score <- score_mfc(x)
           x$score = score

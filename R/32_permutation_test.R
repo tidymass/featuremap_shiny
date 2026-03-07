@@ -62,9 +62,9 @@ permutation_test_gamma <- function(subnet,
   
   
   # perform permutation test ------
-  plan(multisession, workers = workers)
+  future::plan(future::multisession, workers = workers)
   
-  perm_results <- future_map_dfr(1:n_perm, function(i) {
+  perm_results <- furrr::future_map_dfr(1:n_perm, function(i) {
     
     # Extract fake Steiner subnet via stratified sampling ---
     avail_df <- mrn_df
@@ -178,12 +178,12 @@ permutation_test_gamma <- function(subnet,
     
   }, 
   .progress = TRUE, 
-  .options = furrr_options(
+  .options = furrr::furrr_options(
     seed = TRUE,
     packages = c("igraph","dplyr","tibble","tidyr","MASS")
   ))
   
-  plan(sequential)
+  future::plan(future::sequential)
   
   # Remove invalid results
   perm_results <- perm_results %>% 
@@ -207,7 +207,7 @@ permutation_test_gamma <- function(subnet,
     suppressWarnings(MASS::fitdistr(null_scores_shifted, "gamma"))
   }, error = function(e) {
     mean_score <- mean(null_scores_shifted)
-    var_score <- var(null_scores_shifted)
+    var_score <- stats::var(null_scores_shifted)
     list(estimate = c(shape = mean_score^2 / var_score, rate = mean_score / var_score))
   })
   
@@ -223,11 +223,11 @@ permutation_test_gamma <- function(subnet,
   pvalue_results <- module_score %>%
     dplyr::rowwise() %>%
     mutate(
-      p = pgamma(Module_score + shift, shape = shape_param, rate  = rate_param, lower.tail = FALSE)
+      p = stats::pgamma(Module_score + shift, shape = shape_param, rate  = rate_param, lower.tail = FALSE)
     ) %>%
     dplyr::ungroup() %>%
     mutate(
-      fdr = p.adjust(p, method = "BH")
+      fdr = stats::p.adjust(p, method = "BH")
     ) %>%
     dplyr::arrange(p)
   
