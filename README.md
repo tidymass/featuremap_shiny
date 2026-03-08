@@ -1,9 +1,9 @@
 # featuremapshiny
 
-Install locally:
+Install:
 
 ```r
-devtools::install()
+devtools::install_github("tidymass/featuremapshiny")
 ```
 
 Run the app:
