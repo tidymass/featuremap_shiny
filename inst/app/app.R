@@ -57,6 +57,12 @@ load_featuremap_functions <- function() {
 
 load_featuremap_functions()
 
+citation_text <- paste(
+  "FeatureMAP: A Comprehensive Pipeline for Metabolite Feature-based",
+  "Functional Module Identification and Annotation.",
+  "Journal Name, Year;Volume:Pages."
+)
+
 
 # UI Definition=================================================================
 ui <- fluidPage(
@@ -1648,6 +1654,69 @@ ui <- fluidPage(
 
 	        window.addEventListener('resize', function() {
 	          setTimeout(function() { window.forcePlotlyResize(); }, 20);
+	        });
+	      })();
+	    ")),
+	    
+	    tags$script(HTML("
+	      (function() {
+	        function fallbackCopyText(text) {
+	          return new Promise(function(resolve, reject) {
+	            var textarea = document.createElement('textarea');
+	            textarea.value = text;
+	            textarea.setAttribute('readonly', '');
+	            textarea.style.position = 'fixed';
+	            textarea.style.top = '-9999px';
+	            textarea.style.left = '-9999px';
+	            document.body.appendChild(textarea);
+	            textarea.focus();
+	            textarea.select();
+
+	            try {
+	              var copied = document.execCommand('copy');
+	              document.body.removeChild(textarea);
+	              if (copied) {
+	                resolve();
+	              } else {
+	                reject(new Error('execCommand copy failed'));
+	              }
+	            } catch (err) {
+	              document.body.removeChild(textarea);
+	              reject(err);
+	            }
+	          });
+	        }
+
+	        function copyText(text) {
+	          if (
+	            navigator.clipboard &&
+	            typeof navigator.clipboard.writeText === 'function' &&
+	            window.isSecureContext
+	          ) {
+	            return navigator.clipboard.writeText(text).catch(function() {
+	              return fallbackCopyText(text);
+	            });
+	          }
+	          return fallbackCopyText(text);
+	        }
+
+	        Shiny.addCustomMessageHandler('copy-to-clipboard', function(message) {
+	          var text = message && message.text ? String(message.text) : '';
+	          var inputId = message && message.inputId ? String(message.inputId) : 'clipboard_copy_result';
+
+	          copyText(text)
+	            .then(function() {
+	              Shiny.setInputValue(inputId, {
+	                ok: true,
+	                nonce: Date.now()
+	              }, { priority: 'event' });
+	            })
+	            .catch(function() {
+	              Shiny.setInputValue(inputId, {
+	                ok: false,
+	                nonce: Date.now()
+	              }, { priority: 'event' });
+	            });
 	        });
 	      })();
 	    ")),
@@ -3458,7 +3527,24 @@ server <- function(input, output, session) {
   
   # Copy citation button
   observeEvent(input$copy_citation, {
-    showNotification("Citation copied to clipboard!", type = "message")
+    session$sendCustomMessage(
+      "copy-to-clipboard",
+      list(
+        text = citation_text,
+        inputId = "copy_citation_result"
+      )
+    )
+  })
+
+  observeEvent(input$copy_citation_result, {
+    if (isTRUE(input$copy_citation_result$ok)) {
+      showNotification("Citation copied to clipboard!", type = "message")
+    } else {
+      showNotification(
+        "Clipboard copy failed. Please copy the citation manually.",
+        type = "error"
+      )
+    }
   })
   
   # Workflow diagram (delete later)
