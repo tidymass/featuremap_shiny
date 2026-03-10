@@ -156,13 +156,9 @@ annotate_isotope <-
     iso.info$`rtError.s` <-
       rt.error[as.numeric(iso.info$peakIndex)]
     
-    iso.info <-
-      iso.info %>%
-      dplyr::mutate(
-        peakIndex = as.numeric(peakIndex),
-        mzError.ppm = as.numeric(mzError.ppm),
-        rtError.s = as.numeric(rtError.s)
-      )
+    iso.info$peakIndex <- as.numeric(iso.info$peakIndex)
+    iso.info$mzError.ppm <- as.numeric(iso.info$mzError.ppm)
+    iso.info$rtError.s <- as.numeric(iso.info$rtError.s)
     
     if (!"[M+2]" %in% iso.info$isotopes) {
       iso.info <- iso.info[1, ]

@@ -268,7 +268,7 @@ annotate_feature_table <-
         dplyr::select(dplyr::all_of(template_cols))
     }
 
-    future::plan(multisession, workers = workers)
+    future::plan(future::multisession, workers = workers)
     
     message("\nIsotope annotation for feature table positive mode ...\n")
     
