@@ -56,6 +56,27 @@ annotate_feature_table <-
            workers) {
     
     column = match.arg(column)
+
+    load_metid_adduct_table <- function(polarity, column) {
+      dataset_name <- switch(
+        paste(column, polarity, sep = "."),
+        "rp.positive" = "rp.pos",
+        "rp.negative" = "rp.neg",
+        "hilic.positive" = "hilic.pos",
+        "hilic.negative" = "hilic.neg",
+        stop("Unsupported column/polarity combination: ", column, "/", polarity)
+      )
+
+      adduct_env <- new.env(parent = emptyenv())
+      data(dataset_name, package = "metid", envir = adduct_env)
+
+      if (!exists(dataset_name, envir = adduct_env, inherits = FALSE)) {
+        stop("Could not load metid adduct table dataset: ", dataset_name, call. = FALSE)
+      }
+
+      get(dataset_name, envir = adduct_env, inherits = FALSE)
+    }
+
     ####feature_table is required
     ###check feature_table
     if (missing(feature_table)) {
@@ -105,6 +126,7 @@ annotate_feature_table <-
           ms1.match.ppm = ms1_match_ppm,
           column = column,
           polarity = "positive",
+          adduct.table = load_metid_adduct_table("positive", column),
           database = metabolite_database,
           candidate.num = 1000
         )
@@ -138,6 +160,7 @@ annotate_feature_table <-
           ms1.match.ppm = ms1_match_ppm,
           column = column,
           polarity = "negative",
+          adduct.table = load_metid_adduct_table("negative", column),
           database = metabolite_database,
           candidate.num = 1000
         )
