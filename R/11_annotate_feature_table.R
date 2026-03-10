@@ -94,16 +94,6 @@ annotate_feature_table <-
       feature_table %>%
       dplyr::filter(polarity == "negative")
 
-    isotope_feature_cols <- c(
-      "variable_id",
-      "mz",
-      "rt",
-      "condition",
-      "polarity",
-      "mean_intensity"
-    )
-    
-    
     ############metabolite database matching for feature_table
     message("\nAnnotating features positive mode...\n")
     
@@ -291,41 +281,44 @@ annotate_feature_table <-
                   return(NULL)
                 }
                 
-                temp_iso <-
-                  cbind(feature_table_pos[temp_iso$peakIndex, isotope_feature_cols, drop = FALSE], temp_iso) %>%
-                  dplyr::select(-c(peakIndex))
-                
-                colnames(temp_iso) <- c(
-                  "variable_id",
-                  "mz",
-                  "rt",
-                  "condition",
-                  "polarity",
-                  "mean_intensity",
-                  "mz.error",
-                  "isotope",
-                  "RT.error"
-                )
-                temp_iso$Compound.name <-
+                matched_feature_rows <-
+                  feature_table_pos[temp_iso$peakIndex, , drop = FALSE]
+
+                temp_iso_result <- matched_feature_rows
+                temp_iso_result$mz.error <- temp_iso$mzError.ppm
+                temp_iso_result$isotope <- temp_iso$isotopes
+                temp_iso_result$RT.error <- temp_iso$`rtError.s`
+
+                temp_iso_result$Compound.name <-
                   annotation_table_final_pos$Compound.name[x]
-                temp_iso$Lab.ID <- annotation_table_final_pos$Lab.ID[x]
-                temp_iso$Adduct <- annotation_table_final_pos$Adduct[x]
-                temp_iso$Formula <- annotation_table_final_pos$Formula[x]
-                temp_iso$rt <- annotation_table_final_pos$rt[x]
-                temp_iso$CAS.ID <- annotation_table_final_pos$CAS.ID[x]
-                temp_iso$HMDB.ID <- annotation_table_final_pos$HMDB.ID[x]
-                temp_iso$KEGG.ID <- annotation_table_final_pos$KEGG.ID[x]
-                temp_iso$Database <- annotation_table_final_pos$Database[x]
-                temp_iso$SS <- annotation_table_final_pos$SS[x]
-                temp_iso$Total.score <- annotation_table_final_pos$Total.score[x]
-                temp_iso$Level <- annotation_table_final_pos$Level[x]
-                temp_iso$CE <- annotation_table_final_pos$CE[x]
+                temp_iso_result$Lab.ID <- annotation_table_final_pos$Lab.ID[x]
+                temp_iso_result$Adduct <- annotation_table_final_pos$Adduct[x]
+                temp_iso_result$Formula <- annotation_table_final_pos$Formula[x]
+                temp_iso_result$CAS.ID <- annotation_table_final_pos$CAS.ID[x]
+                temp_iso_result$HMDB.ID <- annotation_table_final_pos$HMDB.ID[x]
+                temp_iso_result$KEGG.ID <- annotation_table_final_pos$KEGG.ID[x]
+                temp_iso_result$Database <- annotation_table_final_pos$Database[x]
+                temp_iso_result$SS <- annotation_table_final_pos$SS[x]
+                temp_iso_result$Total.score <- annotation_table_final_pos$Total.score[x]
+                temp_iso_result$Level <- annotation_table_final_pos$Level[x]
+                temp_iso_result$CE <- annotation_table_final_pos$CE[x]
                 
-                temp_iso$mz.match.score <-
-                  (ms1_match_ppm - temp_iso$mz.error) / ms1_match_ppm
-                temp_iso$RT.match.score <-
-                  (mfc_rt_tol - temp_iso$RT.error) / mfc_rt_tol
-                temp_iso %>%
+                temp_iso_result$mz.match.score <-
+                  (ms1_match_ppm - temp_iso_result$mz.error) / ms1_match_ppm
+                temp_iso_result$RT.match.score <-
+                  (mfc_rt_tol - temp_iso_result$RT.error) / mfc_rt_tol
+
+                missing_cols <- setdiff(
+                  colnames(annotation_table_final_pos),
+                  colnames(temp_iso_result)
+                )
+                if (length(missing_cols) > 0) {
+                  for (col_name in missing_cols) {
+                    temp_iso_result[[col_name]] <- NA
+                  }
+                }
+
+                temp_iso_result %>%
                   dplyr::select(colnames(annotation_table_final_pos))
               }, error = function(e) {
                 message(
@@ -392,41 +385,44 @@ annotate_feature_table <-
                   return(NULL)
                 }
                 
-                temp_iso <-
-                  cbind(feature_table_neg[temp_iso$peakIndex, isotope_feature_cols, drop = FALSE], temp_iso) %>%
-                  dplyr::select(-c(peakIndex))
-                
-                colnames(temp_iso) <- c(
-                  "variable_id",
-                  "mz",
-                  "rt",
-                  "condition",
-                  "polarity",
-                  "mean_intensity",
-                  "mz.error",
-                  "isotope",
-                  "RT.error"
-                )
-                temp_iso$Compound.name <-
+                matched_feature_rows <-
+                  feature_table_neg[temp_iso$peakIndex, , drop = FALSE]
+
+                temp_iso_result <- matched_feature_rows
+                temp_iso_result$mz.error <- temp_iso$mzError.ppm
+                temp_iso_result$isotope <- temp_iso$isotopes
+                temp_iso_result$RT.error <- temp_iso$`rtError.s`
+
+                temp_iso_result$Compound.name <-
                   annotation_table_final_neg$Compound.name[x]
-                temp_iso$Lab.ID <- annotation_table_final_neg$Lab.ID[x]
-                temp_iso$Adduct <- annotation_table_final_neg$Adduct[x]
-                temp_iso$Formula <- annotation_table_final_neg$Formula[x]
-                temp_iso$rt <- annotation_table_final_neg$rt[x]
-                temp_iso$CAS.ID <- annotation_table_final_neg$CAS.ID[x]
-                temp_iso$HMDB.ID <- annotation_table_final_neg$HMDB.ID[x]
-                temp_iso$KEGG.ID <- annotation_table_final_neg$KEGG.ID[x]
-                temp_iso$Database <- annotation_table_final_neg$Database[x]
-                temp_iso$SS <- annotation_table_final_neg$SS[x]
-                temp_iso$Total.score <- annotation_table_final_neg$Total.score[x]
-                temp_iso$Level <- annotation_table_final_neg$Level[x]
-                temp_iso$CE <- annotation_table_final_neg$CE[x]
+                temp_iso_result$Lab.ID <- annotation_table_final_neg$Lab.ID[x]
+                temp_iso_result$Adduct <- annotation_table_final_neg$Adduct[x]
+                temp_iso_result$Formula <- annotation_table_final_neg$Formula[x]
+                temp_iso_result$CAS.ID <- annotation_table_final_neg$CAS.ID[x]
+                temp_iso_result$HMDB.ID <- annotation_table_final_neg$HMDB.ID[x]
+                temp_iso_result$KEGG.ID <- annotation_table_final_neg$KEGG.ID[x]
+                temp_iso_result$Database <- annotation_table_final_neg$Database[x]
+                temp_iso_result$SS <- annotation_table_final_neg$SS[x]
+                temp_iso_result$Total.score <- annotation_table_final_neg$Total.score[x]
+                temp_iso_result$Level <- annotation_table_final_neg$Level[x]
+                temp_iso_result$CE <- annotation_table_final_neg$CE[x]
                 
-                temp_iso$mz.match.score <-
-                  (ms1_match_ppm - temp_iso$mz.error) / ms1_match_ppm
-                temp_iso$RT.match.score <-
-                  (mfc_rt_tol - temp_iso$RT.error) / mfc_rt_tol
-                temp_iso %>%
+                temp_iso_result$mz.match.score <-
+                  (ms1_match_ppm - temp_iso_result$mz.error) / ms1_match_ppm
+                temp_iso_result$RT.match.score <-
+                  (mfc_rt_tol - temp_iso_result$RT.error) / mfc_rt_tol
+
+                missing_cols <- setdiff(
+                  colnames(annotation_table_final_neg),
+                  colnames(temp_iso_result)
+                )
+                if (length(missing_cols) > 0) {
+                  for (col_name in missing_cols) {
+                    temp_iso_result[[col_name]] <- NA
+                  }
+                }
+
+                temp_iso_result %>%
                   dplyr::select(colnames(annotation_table_final_neg))
               }, error = function(e) {
                 message(
