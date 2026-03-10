@@ -1,57 +1,36 @@
 library(shiny)
 library(shinyjs)
-library(shinyWidgets)
 library(DT)
 library(plotly)
 library(visNetwork)
-library(ggplot2)
 library(bslib)
-library(tidyverse)
-library(R6)
-library(future)
-library(furrr)
-library(igraph)
-library(tidygraph)
-library(purrr)
-library(glue)
-library(jsonlite)
-library(metid)
-library(PCSF2)
+library(magrittr)
 
 load_featuremap_functions <- function() {
   package_name <- "featuremapshiny"
   target_env <- parent.frame()
 
-  if (package_name %in% loadedNamespaces()) {
-    ns <- asNamespace(package_name)
-    package_objects <- ls(ns, all.names = TRUE)
-    package_functions <- package_objects[vapply(
-      package_objects,
-      function(name) is.function(get(name, envir = ns)),
-      logical(1)
-    )]
-    package_functions <- setdiff(package_functions, "run_featuremap")
-
-    for (name in package_functions) {
-      assign(name, get(name, envir = ns), envir = target_env)
-    }
-    return(invisible(NULL))
-  }
-
-  source_dir <- normalizePath(file.path("..", "..", "R"), mustWork = FALSE)
-  if (!dir.exists(source_dir)) {
+  if (!(package_name %in% loadedNamespaces()) &&
+      !requireNamespace(package_name, quietly = TRUE)) {
     stop(
-      "Could not find FeatureMAP R sources. Launch the installed app with ",
-      "featuremapshiny::run_featuremap(), or run this project from the source root.",
+      "The featuremapshiny package must be installed or loaded before launching this app.",
       call. = FALSE
     )
   }
 
-  lapply(
-    list.files(source_dir, full.names = TRUE, pattern = "[.]R$"),
-    source,
-    local = target_env
-  )
+  ns <- asNamespace(package_name)
+  package_objects <- ls(ns, all.names = TRUE)
+  package_functions <- package_objects[vapply(
+    package_objects,
+    function(name) is.function(get(name, envir = ns)),
+    logical(1)
+  )]
+  package_functions <- setdiff(package_functions, "run_featuremap")
+
+  for (name in package_functions) {
+    assign(name, get(name, envir = ns), envir = target_env)
+  }
+
   invisible(NULL)
 }
 
@@ -4622,7 +4601,7 @@ server <- function(input, output, session) {
     
     req(nrow(tbl) > 1)
     
-    g <- induced_subgraph(
+    g <- igraph::induced_subgraph(
       rv$mrn,
       vids = tbl$INCHI_ID
     )

@@ -38,7 +38,7 @@
 
 calculate_redundancy <-
   function(annotation_table) {
-    if (is(annotation_table, "list")) {
+    if (is.list(annotation_table)) {
       annotation_table <-
         annotation_table %>%
         data.table::rbindlist()
@@ -96,10 +96,6 @@ calculate_redundancy <-
 #' data("example_annotation_table")
 #' filtered_table <- remove_redundancy(annotation_table = example_annotation_table)
 #' }
-#'
-#' @importFrom dplyr group_by filter ungroup bind_rows
-#' @importFrom purrr map
-#' @importFrom plyr dlply
 #'
 #' @export
 

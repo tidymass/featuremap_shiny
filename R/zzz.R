@@ -64,3 +64,15 @@ utils::globalVariables(c(
   "weighted_anno_score",
   "weighted_score"
 ))
+
+# Keep app-only runtime dependencies visible to R CMD check.
+.app_runtime_symbols <- list(
+  DT = DTOutput,
+  bslib = bs_theme,
+  htmlwidgets = saveWidget,
+  openxlsx = createWorkbook,
+  plotly = plotlyOutput,
+  scales = rescale,
+  shinyjs = useShinyjs,
+  visNetwork = visNetwork
+)

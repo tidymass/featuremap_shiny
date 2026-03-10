@@ -3,6 +3,8 @@ Type: Package
 Title: Interactive Shiny Interface for FeatureMAP
 Version: 0.1.0
 Depends: R (>= 3.5.0)
+Author: Yuting Wang [aut, cre], Xiaotao Shen [aut, cph]
+Maintainer: Yuting Wang <ytwangzero@outlook.com>
 Authors@R: c(
     person("Yuting", "Wang",
            email = "ytwangzero@outlook.com",
@@ -19,13 +21,10 @@ Encoding: UTF-8
 Imports:
     shiny,
     shinyjs,
-    shinyWidgets,
     DT,
     plotly,
     visNetwork,
-    ggplot2,
     bslib,
-    tidyverse,
     dplyr,
     tibble,
     tidyr,
@@ -39,9 +38,6 @@ Imports:
     purrr,
     glue,
     jsonlite,
-    metid,
-    metpath,
-    PCSF2,
     data.table,
     plyr,
     MASS,
@@ -53,6 +49,14 @@ Imports:
     htmlwidgets,
     scales,
     massdataset,
+    metid,
+    metpath,
+    PCSF2,
     rlang
+Remotes:
+    tidymass/massdataset,
+    tidymass/metid,
+    tidymass/metpath,
+    ytwangZero/PCSF2
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.2
+RoxygenNote: 7.3.3

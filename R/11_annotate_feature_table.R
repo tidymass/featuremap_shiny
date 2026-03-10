@@ -42,12 +42,6 @@
 #' )
 #' }
 #'
-#' @importFrom dplyr filter select mutate left_join arrange desc pull
-#' @importFrom stringr str_extract str_replace
-#' @importFrom future plan multisession
-#' @importFrom furrr future_map
-#' @importFrom data.table as.data.table rbindlist
-#'
 #' @export
 
 annotate_feature_table <-
@@ -466,11 +460,6 @@ annotate_feature_table <-
 #' scored_table <- score_annotation_table(annotation_table = example_annotation_table, mfc_rt_tol = 5)
 #' head(scored_table)
 #' }
-#'
-#' @importFrom dplyr filter arrange
-#' @importFrom furrr future_map
-#' @importFrom purrr map
-#' @importFrom future plan multisession
 #'
 #' @export
 

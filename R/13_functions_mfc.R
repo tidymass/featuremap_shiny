@@ -23,7 +23,6 @@
 #' rt_values <- c(100, 102, 109, 120, 123, 180)
 #' group_peaks_rt(rt = rt_values, rt.tol = 10)
 #'
-#' @importFrom purrr map2
 #' @export
 group_peaks_rt <- function(rt, rt.tol = 10) {
   rt_class <-
