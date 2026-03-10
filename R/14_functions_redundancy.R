@@ -38,7 +38,7 @@
 
 calculate_redundancy <-
   function(annotation_table) {
-    if (is.list(annotation_table)) {
+    if (is.list(annotation_table) && !is.data.frame(annotation_table)) {
       annotation_table <-
         annotation_table %>%
         data.table::rbindlist()
