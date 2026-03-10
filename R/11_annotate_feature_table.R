@@ -57,26 +57,6 @@ annotate_feature_table <-
     
     column = match.arg(column)
 
-    load_metid_adduct_table <- function(polarity, column) {
-      dataset_name <- switch(
-        paste(column, polarity, sep = "."),
-        "rp.positive" = "rp.pos",
-        "rp.negative" = "rp.neg",
-        "hilic.positive" = "hilic.pos",
-        "hilic.negative" = "hilic.neg",
-        stop("Unsupported column/polarity combination: ", column, "/", polarity)
-      )
-
-      adduct_env <- new.env(parent = emptyenv())
-      data(dataset_name, package = "metid", envir = adduct_env)
-
-      if (!exists(dataset_name, envir = adduct_env, inherits = FALSE)) {
-        stop("Could not load metid adduct table dataset: ", dataset_name, call. = FALSE)
-      }
-
-      get(dataset_name, envir = adduct_env, inherits = FALSE)
-    }
-
     ####feature_table is required
     ###check feature_table
     if (missing(feature_table)) {
@@ -126,9 +106,13 @@ annotate_feature_table <-
           ms1.match.ppm = ms1_match_ppm,
           column = column,
           polarity = "positive",
-          adduct.table = load_metid_adduct_table("positive", column),
+          adduct.table = featuremap_load_metid_adduct_table(
+            polarity = "positive",
+            column = column
+          ),
           database = metabolite_database,
-          candidate.num = 1000
+          candidate.num = 1000,
+          threads = max(1L, as.integer(workers))
         )
       
       annotation_table_ms1_pos <-
@@ -160,9 +144,13 @@ annotate_feature_table <-
           ms1.match.ppm = ms1_match_ppm,
           column = column,
           polarity = "negative",
-          adduct.table = load_metid_adduct_table("negative", column),
+          adduct.table = featuremap_load_metid_adduct_table(
+            polarity = "negative",
+            column = column
+          ),
           database = metabolite_database,
-          candidate.num = 1000
+          candidate.num = 1000,
+          threads = max(1L, as.integer(workers))
         )
       
       annotation_table_ms1_neg <-
@@ -528,6 +516,36 @@ score_annotation_table <-
     annotation_table <-
       annotation_table %>%
       dplyr::arrange(metabolite_feature_cluster, rt)
-    
+
     return(annotation_table)
   }
+
+
+# Internal helper: load metid adduct tables without relying on metid's
+# default dataset loader.
+featuremap_load_metid_adduct_table <- function(polarity = c("positive", "negative"),
+                                               column = c("rp", "hilic")) {
+  polarity <- match.arg(polarity)
+  column <- match.arg(column)
+
+  data_name <- switch(
+    paste(column, polarity, sep = "."),
+    "rp.positive" = "rp.pos",
+    "rp.negative" = "rp.neg",
+    "hilic.positive" = "hilic.pos",
+    "hilic.negative" = "hilic.neg",
+    stop("[Error] Unsupported adduct table combination: ", column, "/", polarity)
+  )
+
+  e <- new.env(parent = emptyenv())
+  utils::data(list = data_name, package = "metid", envir = e)
+
+  if (!exists(data_name, envir = e, inherits = FALSE)) {
+    stop(
+      "[Error] Failed to load default adduct table '", data_name,
+      "' from package 'metid'. Please reinstall metid and retry."
+    )
+  }
+
+  get(data_name, envir = e, inherits = FALSE)
+}
