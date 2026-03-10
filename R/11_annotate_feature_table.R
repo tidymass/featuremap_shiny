@@ -238,7 +238,7 @@ annotate_feature_table <-
                 stringr::str_replace("\\(", "") %>%
                 stringr::str_replace("\\)", "")
               
-              temp_iso <- try(metpath::annotate_isotope(
+              temp_iso <- try(annotate_isotope(
                 formula = annotation_table_final_pos$Formula[x],
                 adduct = adduct,
                 mz = annotation_table_final_pos$mz[x],
@@ -324,7 +324,7 @@ annotate_feature_table <-
               stringr::str_replace("\\(", "") %>%
               stringr::str_replace("\\)", "")
             
-            temp_iso <- try(metpath::annotate_isotope(
+            temp_iso <- try(annotate_isotope(
               formula = annotation_table_final_neg$Formula[x],
               adduct = adduct,
               mz = annotation_table_final_neg$mz[x],
