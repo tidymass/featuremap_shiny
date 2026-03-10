@@ -9,6 +9,29 @@ library(magrittr)
 load_featuremap_functions <- function() {
   package_name <- "featuremapshiny"
   target_env <- parent.frame()
+  candidate_roots <- unique(
+    normalizePath(
+      c(getwd(), file.path(getwd(), ".."), file.path(getwd(), "..", "..")),
+      winslash = "/",
+      mustWork = FALSE
+    )
+  )
+  source_root <- Filter(
+    function(path) {
+      file.exists(file.path(path, "DESCRIPTION")) &&
+        file.exists(file.path(path, "inst", "app", "app.R"))
+    },
+    candidate_roots
+  )
+
+  if (length(source_root) > 0 && requireNamespace("pkgload", quietly = TRUE)) {
+    pkgload::load_all(
+      source_root[[1]],
+      export_all = FALSE,
+      helpers = FALSE,
+      quiet = TRUE
+    )
+  }
 
   if (!(package_name %in% loadedNamespaces()) &&
       !requireNamespace(package_name, quietly = TRUE)) {

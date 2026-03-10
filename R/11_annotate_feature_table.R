@@ -266,72 +266,77 @@ annotate_feature_table <-
           furrr::future_map(
             .x = 1:nrow(annotation_table_final_pos),
             .f = function(x) {
-              # cat(x, " ")
-              adduct <-
-                stringr::str_extract(annotation_table_final_pos$Adduct[x], "\\(.+\\)") %>%
-                stringr::str_replace("\\(", "") %>%
-                stringr::str_replace("\\)", "")
-              
-              temp_iso <- try(annotate_isotope(
-                formula = annotation_table_final_pos$Formula[x],
-                adduct = adduct,
-                mz = annotation_table_final_pos$mz[x],
-                rt = annotation_table_final_pos$rt[x],
-                mean_intensity = annotation_table_final_pos$mean_intensity[x],
-                peak.mz = feature_table_pos$mz,
-                peak.rt = feature_table_pos$rt,
-                peak.int = feature_table_pos$mean_intensity,
-                rt.tol = mfc_rt_tol,
-                mz.tol = ms1_match_ppm,
-                int.tol = 0.3,
-                max.isotope = isotope_number
-              ),
-              silent = TRUE)
-              
-              if (inherits(temp_iso, "try-error")) {
-                return(NULL)
-              }
-              
-              if (is.null(temp_iso)) {
-                return(NULL)
-              }
-              
-              temp_iso <-
-                cbind(feature_table_pos[temp_iso$peakIndex, isotope_feature_cols, drop = FALSE], temp_iso) %>%
-                dplyr::select(-c(peakIndex))
-              
-              colnames(temp_iso) <- c(
-                "variable_id",
-                "mz",
-                "rt",
-                "condition",
-                "polarity",
-                "mean_intensity",
-                "mz.error",
-                "isotope",
-                "RT.error"
-              )
-              temp_iso$Compound.name <-
-                annotation_table_final_pos$Compound.name[x]
-              temp_iso$Lab.ID <- annotation_table_final_pos$Lab.ID[x]
-              temp_iso$Adduct <- annotation_table_final_pos$Adduct[x]
-              temp_iso$Formula <- annotation_table_final_pos$Formula[x]
-              temp_iso$rt <- annotation_table_final_pos$rt[x]
-              temp_iso$CAS.ID <- annotation_table_final_pos$CAS.ID[x]
-              temp_iso$HMDB.ID <- annotation_table_final_pos$HMDB.ID[x]
-              temp_iso$KEGG.ID <- annotation_table_final_pos$KEGG.ID[x]
-              temp_iso$Database <- annotation_table_final_pos$Database[x]
-              temp_iso$SS <- annotation_table_final_pos$SS[x]
-              temp_iso$Total.score <- annotation_table_final_pos$Total.score[x]
-              temp_iso$Level <- annotation_table_final_pos$Level[x]
-              temp_iso$CE <- annotation_table_final_pos$CE[x]
-              
-              temp_iso$mz.match.score <-
-                (ms1_match_ppm - temp_iso$mz.error) / ms1_match_ppm
-              temp_iso$RT.match.score <-
-                (mfc_rt_tol - temp_iso$RT.error) / mfc_rt_tol
-              temp_iso %>%
-                dplyr::select(colnames(annotation_table_final_pos))
+              tryCatch({
+                adduct <-
+                  stringr::str_extract(annotation_table_final_pos$Adduct[x], "\\(.+\\)") %>%
+                  stringr::str_replace("\\(", "") %>%
+                  stringr::str_replace("\\)", "")
+                
+                temp_iso <- annotate_isotope(
+                  formula = annotation_table_final_pos$Formula[x],
+                  adduct = adduct,
+                  mz = annotation_table_final_pos$mz[x],
+                  rt = annotation_table_final_pos$rt[x],
+                  mean_intensity = annotation_table_final_pos$mean_intensity[x],
+                  peak.mz = feature_table_pos$mz,
+                  peak.rt = feature_table_pos$rt,
+                  peak.int = feature_table_pos$mean_intensity,
+                  rt.tol = mfc_rt_tol,
+                  mz.tol = ms1_match_ppm,
+                  int.tol = 0.3,
+                  max.isotope = isotope_number
+                )
+                
+                if (is.null(temp_iso)) {
+                  return(NULL)
+                }
+                
+                temp_iso <-
+                  cbind(feature_table_pos[temp_iso$peakIndex, isotope_feature_cols, drop = FALSE], temp_iso) %>%
+                  dplyr::select(-c(peakIndex))
+                
+                colnames(temp_iso) <- c(
+                  "variable_id",
+                  "mz",
+                  "rt",
+                  "condition",
+                  "polarity",
+                  "mean_intensity",
+                  "mz.error",
+                  "isotope",
+                  "RT.error"
+                )
+                temp_iso$Compound.name <-
+                  annotation_table_final_pos$Compound.name[x]
+                temp_iso$Lab.ID <- annotation_table_final_pos$Lab.ID[x]
+                temp_iso$Adduct <- annotation_table_final_pos$Adduct[x]
+                temp_iso$Formula <- annotation_table_final_pos$Formula[x]
+                temp_iso$rt <- annotation_table_final_pos$rt[x]
+                temp_iso$CAS.ID <- annotation_table_final_pos$CAS.ID[x]
+                temp_iso$HMDB.ID <- annotation_table_final_pos$HMDB.ID[x]
+                temp_iso$KEGG.ID <- annotation_table_final_pos$KEGG.ID[x]
+                temp_iso$Database <- annotation_table_final_pos$Database[x]
+                temp_iso$SS <- annotation_table_final_pos$SS[x]
+                temp_iso$Total.score <- annotation_table_final_pos$Total.score[x]
+                temp_iso$Level <- annotation_table_final_pos$Level[x]
+                temp_iso$CE <- annotation_table_final_pos$CE[x]
+                
+                temp_iso$mz.match.score <-
+                  (ms1_match_ppm - temp_iso$mz.error) / ms1_match_ppm
+                temp_iso$RT.match.score <-
+                  (mfc_rt_tol - temp_iso$RT.error) / mfc_rt_tol
+                temp_iso %>%
+                  dplyr::select(colnames(annotation_table_final_pos))
+              }, error = function(e) {
+                message(
+                  "[isotope-positive] skipped index ", x,
+                  " variable_id=", annotation_table_final_pos$variable_id[x],
+                  " formula=", annotation_table_final_pos$Formula[x],
+                  " adduct=", annotation_table_final_pos$Adduct[x],
+                  " error=", conditionMessage(e)
+                )
+                NULL
+              })
             },
             .progress = TRUE
           ) %>%
@@ -362,71 +367,77 @@ annotate_feature_table <-
           furrr::future_map(
             .x = 1:nrow(annotation_table_final_neg),
             .f = function(x) {
-              adduct <-
-                stringr::str_extract(annotation_table_final_neg$Adduct[x], "\\(.+\\)") %>%
-                stringr::str_replace("\\(", "") %>%
-                stringr::str_replace("\\)", "")
-              
-              temp_iso <- try(annotate_isotope(
-                formula = annotation_table_final_neg$Formula[x],
-                adduct = adduct,
-                mz = annotation_table_final_neg$mz[x],
-                rt = annotation_table_final_neg$rt[x],
-                mean_intensity = annotation_table_final_neg$mean_intensity[x],
-                peak.mz = feature_table_neg$mz,
-                peak.rt = feature_table_neg$rt,
-                peak.int = feature_table_neg$mean_intensity,
-                rt.tol = mfc_rt_tol,
-                mz.tol = ms1_match_ppm,
-                int.tol = 0.3,
-                max.isotope = isotope_number
-              ),
-              silent = TRUE)
-              
-              if (inherits(temp_iso, "try-error")) {
-                return(NULL)
-              }
-              
-              if (is.null(temp_iso)) {
-                return(NULL)
-            }
-            
-            temp_iso <-
-              cbind(feature_table_neg[temp_iso$peakIndex, isotope_feature_cols, drop = FALSE], temp_iso) %>%
-              dplyr::select(-c(peakIndex))
-              
-              colnames(temp_iso) <- c(
-                "variable_id",
-                "mz",
-                "rt",
-                "condition",
-                "polarity",
-                "mean_intensity",
-                "mz.error",
-                "isotope",
-                "RT.error"
-              )
-              temp_iso$Compound.name <-
-                annotation_table_final_neg$Compound.name[x]
-              temp_iso$Lab.ID <- annotation_table_final_neg$Lab.ID[x]
-              temp_iso$Adduct <- annotation_table_final_neg$Adduct[x]
-              temp_iso$Formula <- annotation_table_final_neg$Formula[x]
-              temp_iso$rt <- annotation_table_final_neg$rt[x]
-              temp_iso$CAS.ID <- annotation_table_final_neg$CAS.ID[x]
-              temp_iso$HMDB.ID <- annotation_table_final_neg$HMDB.ID[x]
-              temp_iso$KEGG.ID <- annotation_table_final_neg$KEGG.ID[x]
-              temp_iso$Database <- annotation_table_final_neg$Database[x]
-              temp_iso$SS <- annotation_table_final_neg$SS[x]
-              temp_iso$Total.score <- annotation_table_final_neg$Total.score[x]
-              temp_iso$Level <- annotation_table_final_neg$Level[x]
-              temp_iso$CE <- annotation_table_final_neg$CE[x]
-              
-              temp_iso$mz.match.score <-
-                (ms1_match_ppm - temp_iso$mz.error) / ms1_match_ppm
-              temp_iso$RT.match.score <-
-                (mfc_rt_tol - temp_iso$RT.error) / mfc_rt_tol
-              temp_iso %>%
-                dplyr::select(colnames(annotation_table_final_neg))
+              tryCatch({
+                adduct <-
+                  stringr::str_extract(annotation_table_final_neg$Adduct[x], "\\(.+\\)") %>%
+                  stringr::str_replace("\\(", "") %>%
+                  stringr::str_replace("\\)", "")
+                
+                temp_iso <- annotate_isotope(
+                  formula = annotation_table_final_neg$Formula[x],
+                  adduct = adduct,
+                  mz = annotation_table_final_neg$mz[x],
+                  rt = annotation_table_final_neg$rt[x],
+                  mean_intensity = annotation_table_final_neg$mean_intensity[x],
+                  peak.mz = feature_table_neg$mz,
+                  peak.rt = feature_table_neg$rt,
+                  peak.int = feature_table_neg$mean_intensity,
+                  rt.tol = mfc_rt_tol,
+                  mz.tol = ms1_match_ppm,
+                  int.tol = 0.3,
+                  max.isotope = isotope_number
+                )
+                
+                if (is.null(temp_iso)) {
+                  return(NULL)
+                }
+                
+                temp_iso <-
+                  cbind(feature_table_neg[temp_iso$peakIndex, isotope_feature_cols, drop = FALSE], temp_iso) %>%
+                  dplyr::select(-c(peakIndex))
+                
+                colnames(temp_iso) <- c(
+                  "variable_id",
+                  "mz",
+                  "rt",
+                  "condition",
+                  "polarity",
+                  "mean_intensity",
+                  "mz.error",
+                  "isotope",
+                  "RT.error"
+                )
+                temp_iso$Compound.name <-
+                  annotation_table_final_neg$Compound.name[x]
+                temp_iso$Lab.ID <- annotation_table_final_neg$Lab.ID[x]
+                temp_iso$Adduct <- annotation_table_final_neg$Adduct[x]
+                temp_iso$Formula <- annotation_table_final_neg$Formula[x]
+                temp_iso$rt <- annotation_table_final_neg$rt[x]
+                temp_iso$CAS.ID <- annotation_table_final_neg$CAS.ID[x]
+                temp_iso$HMDB.ID <- annotation_table_final_neg$HMDB.ID[x]
+                temp_iso$KEGG.ID <- annotation_table_final_neg$KEGG.ID[x]
+                temp_iso$Database <- annotation_table_final_neg$Database[x]
+                temp_iso$SS <- annotation_table_final_neg$SS[x]
+                temp_iso$Total.score <- annotation_table_final_neg$Total.score[x]
+                temp_iso$Level <- annotation_table_final_neg$Level[x]
+                temp_iso$CE <- annotation_table_final_neg$CE[x]
+                
+                temp_iso$mz.match.score <-
+                  (ms1_match_ppm - temp_iso$mz.error) / ms1_match_ppm
+                temp_iso$RT.match.score <-
+                  (mfc_rt_tol - temp_iso$RT.error) / mfc_rt_tol
+                temp_iso %>%
+                  dplyr::select(colnames(annotation_table_final_neg))
+              }, error = function(e) {
+                message(
+                  "[isotope-negative] skipped index ", x,
+                  " variable_id=", annotation_table_final_neg$variable_id[x],
+                  " formula=", annotation_table_final_neg$Formula[x],
+                  " adduct=", annotation_table_final_neg$Adduct[x],
+                  " error=", conditionMessage(e)
+                )
+                NULL
+              })
             },
             .progress = TRUE
           ) %>%
@@ -515,43 +526,77 @@ annotate_feature_table <-
 
 score_annotation_table <-
   function(annotation_table, mfc_rt_tol) {
+    combine_scored_clusters <- function(results, template) {
+      keep <- Filter(Negate(is.null), results)
+      if (length(keep) == 0) {
+        template$metabolite_feature_cluster <- character(0)
+        template$score <- numeric(0)
+        return(template)
+      }
+
+      out <- do.call(rbind, keep)
+      if (is.null(out)) {
+        template$metabolite_feature_cluster <- character(0)
+        template$score <- numeric(0)
+        return(template)
+      }
+
+      as.data.frame(out)
+    }
+
     ##calculate the score for each metabolite feature cluster
     annotation_table <-
       unique(annotation_table$Lab.ID) %>%
       furrr::future_map(
         .f = function(temp_id) {
-          x <- annotation_table %>%
-            dplyr::filter(Lab.ID == temp_id)
-          
-          x <- x %>%
-            dplyr::arrange(rt)
-          
-          rt_class <-
-            group_peaks_rt(rt = x$rt, rt.tol = mfc_rt_tol) %>%
-            dplyr::arrange(rt)
-          
-          rt_class <- paste(x$Lab.ID[1], rt_class$class, sep = "@")
-          
-          x$metabolite_feature_cluster <-
-            rt_class
-          
-          x <-
-            unique(x$metabolite_feature_cluster) %>%
-            purrr::map(function(y) {
-              z = x[x$metabolite_feature_cluster == y, , drop = FALSE]
-              score <- score_mfc(z)
-              z$score <- score
-              z
-            }) %>%
-            do.call(rbind, .) %>%
-            as.data.frame()
-          x
+          tryCatch({
+            x <- annotation_table %>%
+              dplyr::filter(Lab.ID == temp_id)
+
+            x <- x %>%
+              dplyr::filter(!is.na(rt)) %>%
+              dplyr::arrange(rt)
+
+            if (nrow(x) == 0) {
+              return(NULL)
+            }
+
+            rt_class <-
+              group_peaks_rt(rt = x$rt, rt.tol = mfc_rt_tol) %>%
+              dplyr::arrange(rt)
+
+            if (nrow(rt_class) == 0) {
+              return(NULL)
+            }
+
+            rt_class <- paste(x$Lab.ID[1], rt_class$class, sep = "@")
+
+            x$metabolite_feature_cluster <-
+              rt_class
+
+            x <-
+              unique(x$metabolite_feature_cluster) %>%
+              purrr::map(function(y) {
+                z = x[x$metabolite_feature_cluster == y, , drop = FALSE]
+                score <- score_mfc(z)
+                z$score <- score
+                z
+              }) %>%
+              do.call(rbind, .) %>%
+              as.data.frame()
+            x
+          }, error = function(e) {
+            message(
+              "[score-annotation] skipped Lab.ID=", temp_id,
+              " error=", conditionMessage(e)
+            )
+            NULL
+          })
         },
         .progress = TRUE
       ) %>%
-      do.call(rbind, .) %>%
-      as.data.frame()
-    
+      combine_scored_clusters(annotation_table[0, , drop = FALSE])
+
     annotation_table <-
       annotation_table %>%
       dplyr::arrange(metabolite_feature_cluster, rt)
