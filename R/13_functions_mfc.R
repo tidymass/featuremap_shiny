@@ -20,27 +20,30 @@
 #' @author Xiaotao Shen \email{xiaotao.shen@outlook.com}
 #'
 #' @examples
+#' \dontrun{
 #' rt_values <- c(100, 102, 109, 120, 123, 180)
 #' group_peaks_rt(rt = rt_values, rt.tol = 10)
+#' }
 #'
-#' @export
+#' @importFrom purrr map2
+
 group_peaks_rt <- function(rt, rt.tol = 10) {
   rt_class <-
     lapply(rt, function(x) {
       which(rt >= x & rt < x + rt.tol)
     })
-  
+
   rt_class <-
     lapply(seq_along(rt_class)[-1], function(i) {
       setdiff(rt_class[[i]], unlist(rt_class[1:(i - 1)]) %>% unique())
     }) %>%
     `c`(rt_class[1], .)
-  
+
   rt_class <-
     rt_class[which(lapply(rt_class, length) != 0)]
-  
+
   names(rt_class) <- seq_along(rt_class)
-  
+
   rt_class <-
     purrr::map2(
       .x = rt_class,
@@ -80,17 +83,17 @@ group_peaks_rt <- function(rt, rt.tol = 10) {
 #' Score a Metabolite Feature Cluster (MFC)
 #'
 #' Computes a heuristic score for a metabolite feature cluster (`mfc`) based on MS annotation features such as
-#' adduct type, polarity, isotopic composition, and spectral similarity.
+#' adduct type, polarity, isotopic composition, and MS2-supported annotation level.
 #'
 #' @param mfc A data frame representing a single metabolite feature cluster. Must contain at least the columns:
-#'   `Adduct`, `polarity`, `isotope`, and optionally `SS` (spectral similarity score).
+#'   `Adduct`, `polarity`, `isotope`, and optionally `Level`.
 #'
 #' @return A numeric score representing the confidence or quality of the MFC annotation.
 #'
 #' @details
 #' The scoring logic is based on heuristic rules:
 #' \itemize{
-#'   \item +150 points if any feature has a non-missing `SS` (spectrum similarity)
+#'   \item +150 points if any feature has `Level == 2`, indicating MS2-backed confirmation
 #'   \item +50 for canonical adducts: `(M+H)+` in positive mode or `(M-H)-` in negative mode
 #'   \item +20 if isotopic peaks are observed for canonical adducts
 #'   \item +20–10 for secondary adducts or isotopic forms
@@ -100,66 +103,68 @@ group_peaks_rt <- function(rt, rt.tol = 10) {
 #' @author Xiaotao Shen \email{xiaotao.shen@outlook.com}
 #'
 #' @examples
+#' \dontrun{
 #' mfc <- data.frame(
 #'   Adduct = c("(M+H)+", "(M+H)+"),
 #'   polarity = c("positive", "positive"),
 #'   isotope = c("[M]", "[M+1]"),
-#'   SS = c(0.9, NA),
+#'   Level = c(2L, 2L),
 #'   stringsAsFactors = FALSE
 #' )
 #'
 #' score_mfc(mfc)
+#' }
 #'
-#' @export
+
 
 score_mfc <- function(mfc) {
   score <- 0
-  
-  ###
-  if (any(!is.na(mfc$SS))) {
+
+  if ("Level" %in% colnames(mfc) &&
+      any(!is.na(mfc$Level) & mfc$Level == 2L)) {
     score <-
       score + 150
   }
-  
+
   ##This should be optimized in the future
   ###if positive adduct are +H, score add 50
   if (any(mfc$Adduct == "(M+H)+")) {
     score <- score + 50
   }
-  
+
   if (any(mfc$Adduct == "(M+H)+" &
           mfc$isotope != "[M]")) {
     score <- score + 20
   }
-  
+
   if (any(mfc$polarity == "positive" &
           mfc$Adduct != "(M+H)+")) {
     score <- score + 20
   }
-  
+
   if (any(mfc$polarity == "positive" & mfc$Adduct != "(M+H)+" &
           mfc$isotope != "[M]")) {
     score <- score + 10
   }
-  
+
   if (any(mfc$Adduct == "(M-H)-")) {
     score <- score + 50
   }
-  
+
   if (any(mfc$Adduct == "(M-H)-" &
           mfc$isotope != "[M]")) {
     score <- score + 20
   }
-  
+
   if (any(mfc$polarity == "negative" &
           mfc$Adduct != "(M-H)-")) {
     score <- score + 20
   }
-  
+
   if (any(mfc$polarity == "negative" & mfc$Adduct != "(M-H)-" &
           mfc$isotope != "[M]")) {
     score <- score + 10
   }
-  
+
   return(score)
 }

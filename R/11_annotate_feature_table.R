@@ -5,11 +5,17 @@
 #'
 #' @param feature_table A data frame with metabolite features. Must include columns:
 #'   `variable_id`, `mz`, `rt`, `condition`, `polarity`, and `mean_intensity`.
+#' @param ms2_table Optional MS2 confirmation table. When provided, it must
+#'   contain `variable_id` and at least one identifier column among `HMDB.ID`
+#'   and `KEGG.ID`, and is used only as a key-based confirmation signal.
 #' @param column Character. Chromatographic column type: either `"rp"` (reverse-phase) or `"hilic"`. Default is `"rp"`.
 #' @param metabolite_database A metabolite database object (from `metid`) used for annotation.
+#' @param refdata Character. Reference identifier system used downstream.
+#'   Typically `"hmdb"` or `"kegg"`.
 #' @param ms1_match_ppm Numeric. m/z tolerance (in ppm) for MS1 matching. Default is 15.
 #' @param mfc_rt_tol Numeric. Retention time tolerance (in seconds) for metabolite feature cluster scoring. Default is 5.
 #' @param isotope_number Integer. Maximum number of isotopes to annotate. Default is 3.
+#' @param workers Integer. Number of parallel workers for isotope annotation.
 #'
 #' @return A data frame containing the final annotated metabolite feature table. It includes matched annotations,
 #'   isotope annotations, compound-level metadata, and scoring metrics.
@@ -48,8 +54,6 @@
 #' @importFrom furrr future_map
 #' @importFrom data.table as.data.table rbindlist
 #'
-#' @export
-
 annotate_feature_table <-
   function(feature_table,
            ms2_table,
@@ -60,9 +64,8 @@ annotate_feature_table <-
            mfc_rt_tol = 5,
            isotope_number = 3,
            workers) {
-    
-    column = match.arg(column)
 
+    column = match.arg(column)
     ####feature_table is required
     ###check feature_table
     if (missing(feature_table)) {
@@ -70,25 +73,35 @@ annotate_feature_table <-
     } else{
       check_feature_table(feature_table)
     }
-    
-    
-    
+
+    if (!is.null(ms2_table)) {
+      check_annotation_table_ms2(ms2_table)
+      if (identical(refdata, "hmdb") && !"HMDB.ID" %in% colnames(ms2_table)) {
+        stop("ms2_table must contain HMDB.ID when refdata = 'hmdb'.")
+      }
+      if (identical(refdata, "kegg") && !"KEGG.ID" %in% colnames(ms2_table)) {
+        stop("ms2_table must contain KEGG.ID when refdata = 'kegg'.")
+      }
+    }
+
+
     ##metabolite_database is required
     if (missing(metabolite_database)) {
       stop("metabolite_database is required.")
     }
-    
+
     feature_table_pos <-
       feature_table %>%
       dplyr::filter(polarity == "positive")
-    
+
     feature_table_neg <-
       feature_table %>%
       dplyr::filter(polarity == "negative")
 
+
     ############metabolite database matching for feature_table
     message("\nAnnotating features positive mode...\n")
-    
+
     if (nrow(feature_table_pos) == 0) {
       annotation_table_ms1_pos <- NULL
     } else{
@@ -103,7 +116,7 @@ annotate_feature_table <-
           sample_info = sample_info,
           variable_info = feature_table_pos
         )
-      
+
       object_pos <-
         metid::annotate_metabolites(
           object = object_pos,
@@ -119,14 +132,14 @@ annotate_feature_table <-
           candidate.num = 1000,
           threads = max(1L, as.integer(workers))
         )
-      
+
       annotation_table_ms1_pos <-
         object_pos@annotation_table
       annotation_table_ms1_pos$polarity <- "positive"
     }
-    
+
     message("\nAnnotating features negative mode...\n")
-    
+
     if (nrow(feature_table_neg) == 0) {
       annotation_table_ms1_neg <- NULL
     } else{
@@ -134,14 +147,14 @@ annotate_feature_table <-
         data.frame(sample_1 = rep(1, nrow(feature_table_neg)))
       sample_info = data.frame(sample_id = "sample_1", class = "Subject")
       rownames(expression_data) <- feature_table_neg$variable_id
-      
+
       object_neg <-
         massdataset::create_mass_dataset(
           expression_data = expression_data,
           sample_info = sample_info,
           variable_info = feature_table_neg
         )
-      
+
       object_neg <-
         metid::annotate_metabolites(
           object = object_neg,
@@ -157,12 +170,12 @@ annotate_feature_table <-
           candidate.num = 1000,
           threads = max(1L, as.integer(workers))
         )
-      
+
       annotation_table_ms1_neg <-
         object_neg@annotation_table
       annotation_table_ms1_neg$polarity <- "negative"
     }
-    
+
     if(refdata == "kegg"){
       annotation_table_ms1 <-
         rbind(annotation_table_ms1_pos, annotation_table_ms1_neg) %>%
@@ -176,8 +189,8 @@ annotate_feature_table <-
         dplyr::filter(!is.na(HMDB.ID)) %>%
         dplyr::mutate(isotope = "[M]")
     }
-    
-    
+
+
     annotation_table_final <-
       annotation_table_ms1 %>%
       dplyr::select(
@@ -200,42 +213,42 @@ annotate_feature_table <-
         "polarity",
         "isotope"
       )
-    
+
     if(refdata == "kegg"){
-      
+
       annotation_table_final <-
         annotation_table_final %>%
         dplyr::left_join(metabolite_database@spectra.info[, c("KEGG.ID", "Formula")], by = "KEGG.ID") %>%
         dplyr::filter(!is.na(KEGG.ID)) %>%
         dplyr::filter(KEGG.ID != "")
-      
+
     }else if(refdata == "hmdb"){
-      
+
       annotation_table_final <-
         annotation_table_final %>%
         dplyr::left_join(metabolite_database@spectra.info[, c("HMDB.ID", "Formula")], by = "HMDB.ID") %>%
         dplyr::filter(!is.na(HMDB.ID)) %>%
         dplyr::filter(HMDB.ID != "")
-      
+
     }
-    
-    
+
+
     annotation_table_final <-
       annotation_table_final %>%
       dplyr::left_join(feature_table %>% dplyr::select(-polarity), by = "variable_id")
-    
+
     ##------------------------------------------------------------------------------
     ####isotope annotation
     annotation_table_final_pos <-
       annotation_table_final %>%
       dplyr::filter(polarity == "positive")
-    
+
     annotation_table_final_neg =
       annotation_table_final %>%
       dplyr::filter(polarity == "negative")
-    
+
     ###positive
-    
+
     build_isotope_rows <- function(temp_iso_input,
                                    feature_table_mode,
                                    annotation_row,
@@ -268,10 +281,10 @@ annotate_feature_table <-
         dplyr::select(dplyr::all_of(template_cols))
     }
 
-    future::plan(future::multisession, workers = workers)
-    
+    future::plan(multisession, workers = workers)
+
     message("\nIsotope annotation for feature table positive mode ...\n")
-    
+
     if (nrow(annotation_table_final_pos) == 0) {
       isotope_pos <- NULL
     } else{
@@ -280,26 +293,27 @@ annotate_feature_table <-
           furrr::future_map(
             .x = 1:nrow(annotation_table_final_pos),
             .f = function(x) {
+              # cat(x, " ")
               adduct <-
                 stringr::str_extract(annotation_table_final_pos$Adduct[x], "\\(.+\\)") %>%
                 stringr::str_replace("\\(", "") %>%
                 stringr::str_replace("\\)", "")
-              
+
               temp_iso <- try(annotate_isotope(
-                  formula = annotation_table_final_pos$Formula[x],
-                  adduct = adduct,
-                  mz = annotation_table_final_pos$mz[x],
-                  rt = annotation_table_final_pos$rt[x],
-                  mean_intensity = annotation_table_final_pos$mean_intensity[x],
-                  peak.mz = feature_table_pos$mz,
-                  peak.rt = feature_table_pos$rt,
-                  peak.int = feature_table_pos$mean_intensity,
-                  rt.tol = mfc_rt_tol,
-                  mz.tol = ms1_match_ppm,
-                  int.tol = 0.3,
-                  max.isotope = isotope_number
-                ),
-                silent = TRUE)
+                formula = annotation_table_final_pos$Formula[x],
+                adduct = adduct,
+                mz = annotation_table_final_pos$mz[x],
+                rt = annotation_table_final_pos$rt[x],
+                mean_intensity = annotation_table_final_pos$mean_intensity[x],
+                peak.mz = feature_table_pos$mz,
+                peak.rt = feature_table_pos$rt,
+                peak.int = feature_table_pos$mean_intensity,
+                rt.tol = mfc_rt_tol,
+                mz.tol = ms1_match_ppm,
+                int.tol = 0.3,
+                max.isotope = isotope_number
+              ),
+              silent = TRUE)
 
               if (inherits(temp_iso, "try-error")) {
                 return(NULL)
@@ -308,7 +322,7 @@ annotate_feature_table <-
               if (is.null(temp_iso)) {
                 return(NULL)
               }
-              
+
               annotation_row <- annotation_table_final_pos[x, , drop = FALSE]
 
               temp_iso <- build_isotope_rows(
@@ -325,13 +339,13 @@ annotate_feature_table <-
           as.data.frame()
       )
     }
-    
-    
+
+
     annotation_table_final_pos <-
       rbind(annotation_table_final_pos, isotope_pos) %>%
       as.data.frame() %>%
       dplyr::arrange(Compound.name, isotope, rt)
-    
+
     message("\nIsotope annotation for feature table negative mode...\n")
 
     if (nrow(annotation_table_final_neg) == 0) {
@@ -346,22 +360,22 @@ annotate_feature_table <-
                 stringr::str_extract(annotation_table_final_neg$Adduct[x], "\\(.+\\)") %>%
                 stringr::str_replace("\\(", "") %>%
                 stringr::str_replace("\\)", "")
-              
+
               temp_iso <- try(annotate_isotope(
-                  formula = annotation_table_final_neg$Formula[x],
-                  adduct = adduct,
-                  mz = annotation_table_final_neg$mz[x],
-                  rt = annotation_table_final_neg$rt[x],
-                  mean_intensity = annotation_table_final_neg$mean_intensity[x],
-                  peak.mz = feature_table_neg$mz,
-                  peak.rt = feature_table_neg$rt,
-                  peak.int = feature_table_neg$mean_intensity,
-                  rt.tol = mfc_rt_tol,
-                  mz.tol = ms1_match_ppm,
-                  int.tol = 0.3,
-                  max.isotope = isotope_number
-                ),
-                silent = TRUE)
+                formula = annotation_table_final_neg$Formula[x],
+                adduct = adduct,
+                mz = annotation_table_final_neg$mz[x],
+                rt = annotation_table_final_neg$rt[x],
+                mean_intensity = annotation_table_final_neg$mean_intensity[x],
+                peak.mz = feature_table_neg$mz,
+                peak.rt = feature_table_neg$rt,
+                peak.int = feature_table_neg$mean_intensity,
+                rt.tol = mfc_rt_tol,
+                mz.tol = ms1_match_ppm,
+                int.tol = 0.3,
+                max.isotope = isotope_number
+              ),
+              silent = TRUE)
 
               if (inherits(temp_iso, "try-error")) {
                 return(NULL)
@@ -370,7 +384,7 @@ annotate_feature_table <-
               if (is.null(temp_iso)) {
                 return(NULL)
               }
-              
+
               annotation_row <- annotation_table_final_neg[x, , drop = FALSE]
 
               temp_iso <- build_isotope_rows(
@@ -387,41 +401,59 @@ annotate_feature_table <-
           as.data.frame()
       )
     }
-    
+
     annotation_table_final_neg <-
       rbind(annotation_table_final_neg, isotope_neg) %>%
       as.data.frame() %>%
       dplyr::arrange(Compound.name, isotope, rt)
-    
+
     annotation_table_final <-
       rbind(annotation_table_final_pos, annotation_table_final_neg) %>%
       dplyr::arrange(Lab.ID, rt)
-    
+
     if(!is.null(ms2_table)){
       if(refdata == "hmdb"){
+        ms2_hmdb_keys <-
+          ms2_table %>%
+          dplyr::filter(!is.na(HMDB.ID), HMDB.ID != "") %>%
+          dplyr::distinct(variable_id, HMDB.ID) %>%
+          with(paste(variable_id, HMDB.ID, sep = "\r"))
+
         annotation_table_final <-
           annotation_table_final %>%
-          dplyr::left_join(ms2_table,by = c("variable_id", "HMDB.ID"),suffix = c("", ".ms2")) %>%
-          dplyr::mutate(SS = coalesce(SS.ms2, SS),
-                        Level = if_else(!is.na(SS), 2L, Level)) %>%
-          dplyr::select(-SS.ms2)
+          dplyr::mutate(
+            Level = if_else(
+              paste(variable_id, HMDB.ID, sep = "\r") %in% ms2_hmdb_keys,
+              2L,
+              Level
+            )
+          )
       }else if(refdata == "kegg"){
+        ms2_kegg_keys <-
+          ms2_table %>%
+          dplyr::filter(!is.na(KEGG.ID), KEGG.ID != "") %>%
+          dplyr::distinct(variable_id, KEGG.ID) %>%
+          with(paste(variable_id, KEGG.ID, sep = "\r"))
+
         annotation_table_final <-
           annotation_table_final %>%
-          dplyr::left_join(ms2_table,by = c("variable_id", "KEGG.ID"),suffix = c("", ".ms2")) %>%
-          dplyr::mutate(SS = coalesce(SS.ms2, SS),
-                        Level = if_else(!is.na(SS), 2L, Level)) %>%
-          dplyr::select(-SS.ms2)
+          dplyr::mutate(
+            Level = if_else(
+              paste(variable_id, KEGG.ID, sep = "\r") %in% ms2_kegg_keys,
+              2L,
+              Level
+            )
+          )
       }
     }
-    
+
     ####combine peaks to metabolite feature cluster (MFC)
     message("\n\nScoring metabolite feature clusters...\n")
-    
+
     annotation_table_final <-
       score_annotation_table(annotation_table = annotation_table_final, mfc_rt_tol = mfc_rt_tol)
-    
-    
+
+
     ###remove redundant annotation according to metabolite
     calculate_redundancy(annotation_table = annotation_table_final)
     message("\nAll done!\n")
@@ -458,7 +490,12 @@ annotate_feature_table <-
 #' head(scored_table)
 #' }
 #'
-#' @export
+#' @importFrom dplyr filter arrange
+#' @importFrom furrr future_map
+#' @importFrom purrr map
+#' @importFrom future plan multisession
+#'
+
 
 score_annotation_table <-
   function(annotation_table, mfc_rt_tol) {
@@ -469,19 +506,19 @@ score_annotation_table <-
         .f = function(temp_id) {
           x <- annotation_table %>%
             dplyr::filter(Lab.ID == temp_id)
-          
+
           x <- x %>%
             dplyr::arrange(rt)
-          
+
           rt_class <-
             group_peaks_rt(rt = x$rt, rt.tol = mfc_rt_tol) %>%
             dplyr::arrange(rt)
-          
+
           rt_class <- paste(x$Lab.ID[1], rt_class$class, sep = "@")
-          
+
           x$metabolite_feature_cluster <-
             rt_class
-          
+
           x <-
             unique(x$metabolite_feature_cluster) %>%
             purrr::map(function(y) {
@@ -507,8 +544,7 @@ score_annotation_table <-
   }
 
 
-# Internal helper: load metid adduct tables without relying on metid's
-# default dataset loader.
+# Internal helper: load metid adduct tables without requiring library(metid)
 featuremap_load_metid_adduct_table <- function(polarity = c("positive", "negative"),
                                                column = c("rp", "hilic")) {
   polarity <- match.arg(polarity)
@@ -525,11 +561,10 @@ featuremap_load_metid_adduct_table <- function(polarity = c("positive", "negativ
 
   e <- new.env(parent = emptyenv())
   utils::data(list = data_name, package = "metid", envir = e)
-
   if (!exists(data_name, envir = e, inherits = FALSE)) {
     stop(
-      "[Error] Failed to load default adduct table '", data_name,
-      "' from package 'metid'. Please reinstall metid and retry."
+      "[Error] Failed to load default adduct table '", data_name, "' from package 'metid'. ",
+      "Please reinstall metid and retry."
     )
   }
 
