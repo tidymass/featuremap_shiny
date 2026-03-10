@@ -14,6 +14,9 @@
 #' @param b_grid 
 #' @param w_grid 
 #' @param times_tune 
+#'
+#' @return Updated result object with PCSF subnetwork outputs.
+#' @export
 
 extract_subnetwork = function(res = NULL,
                               feature = c("all", "sig"),

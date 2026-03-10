@@ -5,19 +5,27 @@
 "_PACKAGE"
 
 #' @importFrom R6 R6Class
+#' @importFrom Rdisop getIsotope getMolecule
 #' @importFrom DT DTOutput
 #' @importFrom bslib bs_theme
-#' @importFrom dplyr arrange bind_rows coalesce desc filter group_by if_else left_join mutate n pull ungroup
+#' @importFrom data.table as.data.table rbindlist
+#' @importFrom dplyr arrange bind_rows coalesce desc filter group_by if_else left_join mutate n pull select ungroup
+#' @importFrom furrr furrr_options future_map future_map_dfr
+#' @importFrom future multisession plan
 #' @importFrom htmlwidgets saveWidget
-#' @importFrom igraph E V degree induced_subgraph vcount
+#' @importFrom igraph E V E<- V<- degree gsize induced_subgraph vcount
 #' @importFrom magrittr %>%
+#' @importFrom masstools sum_formula
+#' @importFrom methods is
 #' @importFrom openxlsx createWorkbook
 #' @importFrom plotly plotlyOutput
-#' @importFrom purrr imap imap_dfr
+#' @importFrom plyr dlply
+#' @importFrom purrr imap imap_dfr map map2
 #' @importFrom rlang %||% .data
 #' @importFrom scales rescale
 #' @importFrom shinyjs useShinyjs
-#' @importFrom stringr str_detect
+#' @importFrom stats p.adjust pgamma quantile rt var weighted.mean
+#' @importFrom stringr str_detect str_extract str_replace
 #' @importFrom tibble tibble
 #' @importFrom visNetwork visNetwork
 NULL

@@ -2,21 +2,24 @@
 
 #' Identify modules via community detection
 #'
-#' @param res 
-#' @param method 
-#' @param min_size 
-#' @param max_size 
-#' @param n_perm 
-#' @param seed 
-#' @param workers 
-#' @param p 
-#' @param pcutoff 
+#' @param res Result object containing the PCSF subnetwork.
+#' @param method Community detection method.
+#' @param min_size Minimum module size.
+#' @param max_size Maximum module size.
+#' @param n_perm Number of permutations for module scoring.
+#' @param seed Random seed.
+#' @param workers Number of parallel workers.
+#' @param node_freq Minimum retained node frequency.
+#' @param louvain_resolution Resolution used for Louvain clustering.
+#' @param walktrap_steps Number of steps for walktrap clustering.
 #'
-#' @returns
+#' @return Updated result object with detected modules and module scores.
 #' @export
 #'
 #' @examples
-#' 
+#' \dontrun{
+#' identify_module(res)
+#' }
 
 identify_module = function(res = NULL,
                            method = c("louvain","leading_eigen","fast_greedy","walktrap"),
@@ -240,6 +243,5 @@ identify_module = function(res = NULL,
   return(res)
   
 }
-
 
 

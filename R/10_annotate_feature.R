@@ -1,21 +1,23 @@
 
 #' Annotate raw feature via MS1 information
 #'
-#' @param feature_table 
-#' @param ms2_table
-#' @param metabolite_database 
-#' @param refdata 
-#' @param column 
-#' @param ms1_match_ppm 
-#' @param mfc_rt_tol 
-#' @param isotope_number 
-#' @param workers 
+#' @param feature_table Input feature table.
+#' @param ms2_table Optional MS2 annotation table.
+#' @param metabolite_database Reference metabolite database.
+#' @param refdata Database source, either `"kegg"` or `"hmdb"`.
+#' @param column Chromatography mode.
+#' @param ms1_match_ppm MS1 mass tolerance in ppm.
+#' @param mfc_rt_tol Retention-time tolerance for metabolite feature clustering.
+#' @param isotope_number Maximum isotope number to annotate.
+#' @param workers Number of parallel workers.
 #'
-#' @return
+#' @return A result object containing feature annotations and redundancy summaries.
 #' @export
 #'
 #' @examples
-#' 
+#' \dontrun{
+#' annotate_feature(feature_table, ms2_table, metabolite_database)
+#' }
 annotate_feature <- function(feature_table,
                              ms2_table,
                              metabolite_database,

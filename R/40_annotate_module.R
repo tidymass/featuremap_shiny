@@ -1,3 +1,26 @@
+#' Annotate modules with database, PubMed, and LLM summaries
+#'
+#' @param res Result object returned by previous FeatureMAP steps.
+#' @param p Adjusted p-value column used for module filtering.
+#' @param pcutoff Significance cutoff for module selection.
+#' @param ref_data Reference annotation table.
+#' @param species Study species.
+#' @param biospecimen Sample biospecimen.
+#' @param phenotype Study phenotype or condition.
+#' @param pubmed Whether to include PubMed-based annotation.
+#' @param top_compound Proportion of top compounds retained per module.
+#' @param years Number of recent years for PubMed search.
+#' @param top_paper Maximum number of papers kept per metabolite.
+#' @param min_similarity Minimum embedding similarity cutoff.
+#' @param provider LLM provider.
+#' @param embed_model Embedding model name.
+#' @param llm_model Chat model name.
+#' @param NCBI_api_key NCBI API key.
+#' @param llm_api_key LLM API key.
+#'
+#' @return Updated result object with module annotations.
+#' @export
+
 annotate_module = function(res = NULL,
                            p = "fdr",
                            pcutoff = 0.05,
