@@ -2061,10 +2061,9 @@ ui <- fluidPage(
                 tags$div(
                   class = "param-card",
                   tags$h4("Reference Database"),
-                  selectInput(
-                    "ref_db",
-                    "Choose reference type",
-                    choices = c("HMDB" = "hmdb", "KEGG" = "kegg")
+                  tags$p(
+                    style = "margin-bottom:0;",
+                    "FeatureMAP uses the built-in merged annotation database by default."
                   )
                 ),
                 
@@ -2113,18 +2112,10 @@ ui <- fluidPage(
                     selected = "default"
                   ),
                   conditionalPanel(
-                    condition = "input.ref_source == 'upload' && input.ref_db == 'hmdb'",
+                    condition = "input.ref_source == 'upload'",
                     fileInput(
-                      "hmdb_file",
-                      "HMDB Database (.rda)",
-                      accept = c(".rda", ".RData")
-                    )
-                  ),
-                  conditionalPanel(
-                    condition = "input.ref_source == 'upload' && input.ref_db == 'kegg'",
-                    fileInput(
-                      "kegg_file",
-                      "KEGG Database (.rda)",
+                      "compound_db_file",
+                      "Merged Annotation Database (.rda)",
                       accept = c(".rda", ".RData")
                     )
                   ),
@@ -3570,7 +3561,7 @@ server <- function(input, output, session) {
   
   ## Step 1: Data upload================================================
   observeEvent(
-    list(input$ref_db, input$ref_source),
+    list(input$ref_source, input$compound_db_file, input$mrn_file),
     ignoreInit = TRUE,
     {
       if (!is.null(rv$ref_database) || !is.null(rv$mrn)) {
@@ -3616,11 +3607,8 @@ server <- function(input, output, session) {
       if (is.null(input$mrn_file)) {
         missing <- c(missing, "Metabolic Reaction Network")
       }
-      if (input$ref_db == "hmdb" && is.null(input$hmdb_file)) {
-        missing <- c(missing, "HMDB Database")
-      }
-      if (input$ref_db == "kegg" && is.null(input$kegg_file)) {
-        missing <- c(missing, "KEGG Database")
+      if (is.null(input$compound_db_file)) {
+        missing <- c(missing, "Merged Annotation Database")
       }
     }
     if (length(missing) > 0) {
@@ -3628,8 +3616,7 @@ server <- function(input, output, session) {
       rv$upload_note_type <- "error"
       return()
     }
-
-    req(input$ref_db, input$ref_source)
+    req(input$ref_source)
 
     loaded <- tryCatch({
       if (use_staged_demo) {
@@ -3670,13 +3657,8 @@ server <- function(input, output, session) {
         mrn_obj <- e_mrn[[ls(e_mrn)[1]]]
 
         e_ref <- new.env()
-        if (input$ref_db == "hmdb") {
-          load("www/hmdb_compound_ms1.rda", envir = e_ref)
-          ref_label <- "HMDB (default)"
-        } else {
-          load("www/kegg_compound_ms1.rda", envir = e_ref)
-          ref_label <- "KEGG (default)"
-        }
+        load("www/featuremap_compound.rda", envir = e_ref)
+        ref_label <- "Built-in merged database"
         ref_db_obj <- e_ref[[ls(e_ref)[1]]]
       } else {
         req(input$mrn_file)
@@ -3685,15 +3667,9 @@ server <- function(input, output, session) {
         mrn_obj <- e_mrn[[ls(e_mrn)[1]]]
 
         e_ref <- new.env()
-        if (input$ref_db == "hmdb") {
-          req(input$hmdb_file)
-          load(input$hmdb_file$datapath, envir = e_ref)
-          ref_label <- "HMDB (uploaded)"
-        } else {
-          req(input$kegg_file)
-          load(input$kegg_file$datapath, envir = e_ref)
-          ref_label <- "KEGG (uploaded)"
-        }
+        req(input$compound_db_file)
+        load(input$compound_db_file$datapath, envir = e_ref)
+        ref_label <- "Uploaded merged database"
         ref_db_obj <- e_ref[[ls(e_ref)[1]]]
       }
 
@@ -3750,14 +3726,17 @@ server <- function(input, output, session) {
       feature_tbl <- e_feat[[ls(e_feat)[1]]]
       check_feature_columns(feature_tbl)
 
-      ms2_path <- if (input$ref_db == "hmdb") {
-        "www/demo_ms2_hmdb.rda"
-      } else {
-        "www/demo_ms2_kegg.rda"
-      }
-      e_ms2 <- new.env()
-      load(ms2_path, envir = e_ms2)
-      ms2_tbl <- e_ms2[[ls(e_ms2)[1]]]
+      e_ms2_hmdb <- new.env()
+      load("www/demo_ms2_hmdb.rda", envir = e_ms2_hmdb)
+      ms2_hmdb <- e_ms2_hmdb[[ls(e_ms2_hmdb)[1]]]
+
+      e_ms2_kegg <- new.env()
+      load("www/demo_ms2_kegg.rda", envir = e_ms2_kegg)
+      ms2_kegg <- e_ms2_kegg[[ls(e_ms2_kegg)[1]]]
+
+      ms2_tbl <- dplyr::full_join(ms2_hmdb, ms2_kegg, by = "variable_id") %>%
+        dplyr::mutate(SS = dplyr::coalesce(SS.x, SS.y)) %>%
+        dplyr::select(variable_id, dplyr::any_of(c("HMDB.ID", "KEGG.ID")), SS)
 
       list(
         feature_tbl = feature_tbl,
@@ -3774,7 +3753,7 @@ server <- function(input, output, session) {
     rv$staged_feature_data <- staged$feature_tbl
     rv$staged_ms2_data <- staged$ms2_tbl
 
-    rv$upload_note <- "Demo data is prepared. Choose Reference Source, then click Load."
+    rv$upload_note <- "Demo data is prepared. Click Load to continue."
     rv$upload_note_type <- "info"
   })
   
@@ -3877,7 +3856,6 @@ server <- function(input, output, session) {
           feature_table = rv$feature_data,
           ms2_table = rv$ms2_data,
           metabolite_database = rv$ref_database,
-          refdata = input$ref_db,
           column = input$column_type,
           ms1_match_ppm = input$ms1_ppm,
           mfc_rt_tol = input$rt_tol,
@@ -4889,22 +4867,7 @@ server <- function(input, output, session) {
     ref_data <- tryCatch({
       
       if (input$func_class_source == "default") {
-        
-        cat("Loading default database for:", rv$module_res$refdata, "\n")
-        
-        e <- new.env()
-        
-        if (rv$module_res$refdata == "hmdb") {
-          load("www/hmdb_function.Rdata", envir = e)
-          cat("Loaded HMDB function database\n")
-        } else {
-          load("www/kegg_function.Rdata", envir = e)
-          cat("Loaded KEGG function database\n")
-        }
-        
-        result <- e[[ls(e)[1]]]
-        cat("Database dimensions:", nrow(result), "x", ncol(result), "\n")
-        result
+        NULL
         
       } else {
         
@@ -4936,7 +4899,7 @@ server <- function(input, output, session) {
       NULL
     })
 
-    if (is.null(ref_data)) {
+    if (input$func_class_source != "default" && is.null(ref_data)) {
       cat("ref_data is NULL, aborting\n")
       return()
     }

@@ -55,7 +55,7 @@
 #' @importFrom purrr map
 #' @importFrom dplyr mutate
 #'
-#' @export
+#' @keywords internal
 
 annotate_isotope <-
   function(formula = "C9H14N2O12P2",
@@ -156,9 +156,13 @@ annotate_isotope <-
     iso.info$`rtError.s` <-
       rt.error[as.numeric(iso.info$peakIndex)]
     
-    iso.info$peakIndex <- as.numeric(iso.info$peakIndex)
-    iso.info$mzError.ppm <- as.numeric(iso.info$mzError.ppm)
-    iso.info$rtError.s <- as.numeric(iso.info$rtError.s)
+    iso.info <-
+      iso.info %>%
+      dplyr::mutate(
+        peakIndex = as.numeric(peakIndex),
+        mzError.ppm = as.numeric(mzError.ppm),
+        rtError.s = as.numeric(rtError.s)
+      )
     
     if (!"[M+2]" %in% iso.info$isotopes) {
       iso.info <- iso.info[1, ]

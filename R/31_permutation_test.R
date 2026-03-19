@@ -2,9 +2,11 @@
 
 #' Permutation test with Gamma distribution
 #' 
-#' @param res Result object
-#' @param annotated_ID Original annotated node IDs
+#' @param subnet Steiner subnetwork graph with vertex `type` labels.
 #' @param mrn Full metabolic reaction network
+#' @param module_table Module membership/annotation table containing
+#'   `INCHI_ID`, `Module`, `Type`, and `Importance`.
+#' @param module_score Observed module scores to be tested.
 #' @param method Community detection method
 #' @param min_size Minimum module size
 #' @param n_perm Number of permutations
@@ -24,7 +26,7 @@ permutation_test_gamma <- function(subnet,
   
   set.seed(seed)
   
-  
+
   all_mrn_nodes <- V(mrn)$name
   n_annotated <- sum(V(subnet)$type == "annotated")
   n_hidden <- sum(V(subnet)$type == "hidden")
@@ -60,11 +62,12 @@ permutation_test_gamma <- function(subnet,
     dplyr::distinct(INCHI_ID, .keep_all = TRUE) %>%
     dplyr::pull(Importance)
   
-  
+
   # perform permutation test ------
   future::plan(future::multisession, workers = workers)
+  on.exit(future::plan(future::sequential), add = TRUE)
   
-  perm_results <- furrr::future_map_dfr(1:n_perm, function(i) {
+  perm_results <- future_map_dfr(1:n_perm, function(i) {
     
     # Extract fake Steiner subnet via stratified sampling ---
     avail_df <- mrn_df
@@ -115,7 +118,7 @@ permutation_test_gamma <- function(subnet,
         importance_pool,
         size    = length(fake_annotated),
         replace = TRUE))
-    
+
     fake_steiner <- c(fake_annotated, fake_hidden)
     fake_steiner_subnet <- induced_subgraph(mrn, vids = fake_steiner)
     
@@ -178,7 +181,7 @@ permutation_test_gamma <- function(subnet,
     
   }, 
   .progress = TRUE, 
-  .options = furrr::furrr_options(
+  .options = furrr_options(
     seed = TRUE,
     packages = c("igraph","dplyr","tibble","tidyr","MASS")
   ))
@@ -189,7 +192,7 @@ permutation_test_gamma <- function(subnet,
   perm_results <- perm_results %>% 
     filter((!is.na(Module_score)) & is.finite(Module_score))
   
-  message(paste0("\n",sprintf("Generated %d null moduel scores", nrow(perm_results))))
+  # message(paste0("\n",sprintf("Generated %d null moduel scores", nrow(perm_results))))
   
   # Fit Gamma distribution
   null_scores <- perm_results$Module_score
@@ -207,27 +210,27 @@ permutation_test_gamma <- function(subnet,
     suppressWarnings(MASS::fitdistr(null_scores_shifted, "gamma"))
   }, error = function(e) {
     mean_score <- mean(null_scores_shifted)
-    var_score <- stats::var(null_scores_shifted)
+    var_score <- var(null_scores_shifted)
     list(estimate = c(shape = mean_score^2 / var_score, rate = mean_score / var_score))
   })
   
   shape_param <- fit$estimate["shape"]
   rate_param <- fit$estimate["rate"]
   
-  message(sprintf(
-    "Fitted Gamma distribution: shape = %.4f, rate = %.4f",
-    shape_param, rate_param
-  ))
+  # message(sprintf(
+  #   "Fitted Gamma distribution: shape = %.4f, rate = %.4f",
+  #   shape_param, rate_param
+  # ))
   
   # Calculate p-values---
   pvalue_results <- module_score %>%
     dplyr::rowwise() %>%
     mutate(
-      p = stats::pgamma(Module_score + shift, shape = shape_param, rate  = rate_param, lower.tail = FALSE)
+      p = pgamma(Module_score + shift, shape = shape_param, rate  = rate_param, lower.tail = FALSE)
     ) %>%
     dplyr::ungroup() %>%
     mutate(
-      fdr = stats::p.adjust(p, method = "BH")
+      fdr = p.adjust(p, method = "BH")
     ) %>%
     dplyr::arrange(p)
   

@@ -1,0 +1,270 @@
+#' Identify functional modules via community detection
+#'
+#' Perform community detection on a PCSF-derived metabolic subnetwork
+#' to identify functional modules. Modules are evaluated for activity
+#' and statistical significance using permutation testing.
+#'
+#' @param res A \code{featuremap_result} object returned by
+#'   \code{\link{extract_subnetwork}} (or later). It should contain at least:
+#'   \code{pcsf_subnet}, \code{mrn}, \code{edge_frequency},
+#'   \code{node_frequency}, \code{anno_feature_table2}, and
+#'   \code{feature_table}. Expected stage is \code{"subnetwork_extracted"} or later.
+#' @param method Character. Community detection algorithm. One of
+#'   \code{"louvain"}, \code{"leading_eigen"}, \code{"fast_greedy"},
+#'   or \code{"walktrap"}.
+#' @param min_size Integer. Minimum module size (number of nodes) to keep.
+#' @param max_size Integer. Maximum module size (number of nodes) to keep.
+#' @param n_perm Integer. Number of permutations for module-level significance
+#'   estimation via gamma-model-based null scores.
+#' @param seed Integer. Random seed used in permutation testing.
+#' @param workers Integer. Number of parallel workers used in permutation testing.
+#' @param node_freq Numeric. Frequency threshold applied to
+#'   \code{res$node_frequency} for retaining metabolite Steiner nodes in
+#'   module detection.
+#' @param louvain_resolution Numeric. Resolution parameter used only when
+#'   \code{method = "louvain"}.
+#' @param walktrap_steps Integer. Number of random-walk steps used only when
+#'   \code{method = "walktrap"}.
+#'
+#' @return The input \code{res} object updated with:
+#' \itemize{
+#'   \item \code{module_table}: node-to-module assignments with node type,
+#'         node frequency, and aggregated importance
+#'   \item \code{module_score}: module activity scores with permutation-based
+#'         \code{p} and \code{fdr}
+#'   \item \code{stage}: updated to \code{"module_identified"}
+#' }
+#'
+#' @details
+#' Edge weights are adjusted using a hub-penalty strategy based on
+#' full MRN degree to reduce hub bias. Module activity scores are
+#' calculated from node-level importance and evaluated using a
+#' permutation-based gamma model.
+#'
+#' @examples
+#' \dontrun{
+#' res <- identify_module(
+#'   res = res,
+#'   method = "louvain",
+#'   min_size = 3,
+#'   max_size = 100000,
+#'   n_perm = 100,
+#'   seed = 123,
+#'   workers = 4,
+#'   node_freq = 0.05
+#' )
+#' }
+#'
+#' @export
+identify_module = function(res = NULL,
+                           method = c("louvain","leading_eigen","fast_greedy","walktrap"),
+                           min_size = 3,
+                           max_size = 100000,
+                           n_perm = 100,
+                           seed = 123,
+                           workers = 4,
+                           node_freq = 0.05,
+                           louvain_resolution = 1,
+                           walktrap_steps = 4){
+  notify_step <- function(type = c("info", "success", "warning"), text) {
+    type <- match.arg(type)
+    if (requireNamespace("cli", quietly = TRUE)) {
+      if (type == "info") {
+        cli::cli_alert_info(text)
+      } else if (type == "success") {
+        cli::cli_alert_success(text)
+      } else {
+        cli::cli_alert_warning(text)
+      }
+    } else {
+      message(text)
+    }
+  }
+
+  notify_title <- function(text) {
+    if (requireNamespace("cli", quietly = TRUE)) {
+      cli::cli_h2(text)
+    } else {
+      message("\n", text)
+    }
+  }
+
+  method <- match.arg(method)
+
+  if (is.null(res)){
+    stop("[Error] res cannot be NULL.")
+  }
+  res <- ensure_featuremap_object(
+    res,
+    expected_stages = c("subnetwork_extracted", "module_identified", "module_annotated")
+  )
+  notify_title("Step 3: Module Identification")
+
+  start_time <- Sys.time()
+  notify_step("info", "[1/3] Detecting modules.")
+
+  set.seed(seed)
+
+  res$edge_frequency %>%
+    dplyr::filter(!stringr::str_detect(to, "InChI")) %>%
+    dplyr::pull(from) -> annotated_ID1
+
+  res$edge_frequency %>%
+    dplyr::filter(!stringr::str_detect(from, "InChI")) %>%
+    dplyr::pull(to) -> annotated_ID2
+
+  c(annotated_ID1, annotated_ID2) -> annotated_ID
+
+  mrn_node <- as.data.frame(igraph::as_data_frame(res$mrn, what = "vertices"))
+
+  res$node_frequency %>%
+    dplyr::filter(type == "metabolite") %>%
+    dplyr::filter(freq > node_freq) %>%
+    dplyr::pull(name) -> res_node
+
+  steiner_nodes <- igraph::V(res$pcsf_subnet)[igraph::V(res$pcsf_subnet)$type == "Steiner"]$name
+  steiner_nodes <- steiner_nodes[steiner_nodes %in% res_node]
+
+  steiner_subnet <- igraph::induced_subgraph(res$mrn, vids = steiner_nodes)
+  igraph::V(steiner_subnet)$type = ifelse(igraph::V(steiner_subnet)$name %in% annotated_ID, "annotated", "hidden")
+
+  res$edge_frequency %>%
+    dplyr::filter(stringr::str_detect(from, "InChI") & stringr::str_detect(to, "InChI")) %>%
+    dplyr::rename(weight = freq) -> edge_weight
+
+  g_edges <- igraph::as_data_frame(steiner_subnet, what = "edges")
+  g_edges$u <- pmin(g_edges$from, g_edges$to)
+  g_edges$v <- pmax(g_edges$from, g_edges$to)
+
+  edge_weight$u <- pmin(edge_weight$from, edge_weight$to)
+  edge_weight$v <- pmax(edge_weight$from, edge_weight$to)
+
+  g_edges$key      <- paste(g_edges$u,      g_edges$v,      sep = "_")
+  edge_weight$key  <- paste(edge_weight$u,  edge_weight$v,  sep = "_")
+
+  idx <- match(g_edges$key, edge_weight$key)
+  w <- edge_weight$weight[idx]
+  mean_w <- mean(edge_weight$weight, na.rm = TRUE)
+  w[is.na(w)] <- mean_w
+
+  mrn_deg <- igraph::degree(res$mrn)
+  edge_ends <- igraph::ends(steiner_subnet, igraph::E(steiner_subnet))
+  w_adj <- w / sqrt(mrn_deg[edge_ends[,1]] * mrn_deg[edge_ends[,2]])
+  w_adj[!is.finite(w_adj)] <- min(w_adj[is.finite(w_adj)], na.rm = TRUE)
+  igraph::E(steiner_subnet)$weight <- w_adj
+
+
+  if (method == "louvain") {
+    comm <- igraph::cluster_louvain(steiner_subnet, weights = igraph::E(steiner_subnet)$weight, resolution = louvain_resolution)
+  } else if (method == "fast_greedy") {
+    comm <- igraph::cluster_fast_greedy(igraph::as_undirected(steiner_subnet), weights = igraph::E(steiner_subnet)$weight)
+  } else if (method == "walktrap") {
+    comm <- igraph::cluster_walktrap(steiner_subnet, weights = igraph::E(steiner_subnet)$weight, steps = walktrap_steps)
+  } else if (method == "leading_eigen") {
+    comm <- igraph::cluster_leading_eigen(steiner_subnet, weights = igraph::E(steiner_subnet)$weight)
+  }
+
+  member <- igraph::membership(comm)
+
+  res$module_table <- data.frame(
+    name = names(member),
+    module = as.integer(member)
+  ) %>%
+    dplyr::arrange(module) %>%
+    dplyr::group_by(module) %>%
+    dplyr::filter(dplyr::n() >= min_size & dplyr::n() <= min(max_size, igraph::vcount(steiner_subnet))) %>%
+    dplyr::ungroup() %>%
+    dplyr::left_join(
+      mrn_node[, c("HMDB_ID", "KEGG_ID", "INCHI_ID", "Compound_name")] %>%
+        dplyr::distinct(INCHI_ID, .keep_all = TRUE),
+      by = c("name" = "INCHI_ID")
+    ) %>%
+    dplyr::left_join((res$node_frequency %>% dplyr::select(-type)), by = c("name")) %>%
+    dplyr::rename(INCHI_ID = name, Module = module, Node_freq = freq) %>%
+    dplyr::left_join(
+      data.frame(
+        INCHI_ID = igraph::V(steiner_subnet)$name,
+        Type = igraph::V(steiner_subnet)$type
+      ),
+      by = "INCHI_ID"
+    )
+
+  res$anno_feature_table2 %>%
+    dplyr::filter(INCHI_ID %in% res$module_table$INCHI_ID) %>%
+    dplyr::distinct(variable_id, INCHI_ID, .keep_all = TRUE) %>%
+    dplyr::group_by(INCHI_ID) %>%
+    dplyr::summarise(
+      Importance = {
+        w <- weighted_anno_score
+        x <- importance
+        if (all(is.na(w)) || sum(w, na.rm = TRUE) == 0) {
+          mean(x, na.rm = TRUE)
+        } else {
+          weighted.mean(x, w, na.rm = TRUE)
+        }
+      }
+    ) %>%
+    dplyr::ungroup() -> meta_importance
+
+  res$module_table <- res$module_table %>%
+    dplyr::left_join(meta_importance, by = "INCHI_ID") %>%
+    dplyr::select(INCHI_ID, Module, HMDB_ID, KEGG_ID, Compound_name, Node_freq, Type, Importance)
+
+  notify_step(
+    "success",
+    paste0("Detected ", length(unique(res$module_table$Module)), " modules using the ", method, " method.")
+  )
+
+
+  notify_step("info", "[2/3] Calculating module activity scores.")
+
+  read_importance_tbl<- res$module_table %>%
+    dplyr::filter(Type == "annotated", is.finite(Importance)) %>%
+    dplyr::select(INCHI_ID, Importance) %>%
+    dplyr::distinct(INCHI_ID, .keep_all = TRUE)
+
+  res$module_score <- calculate_module_activity(
+    res = res,
+    annotated_ID = annotated_ID,
+    mrn = res$mrn,
+    importance_tbl = read_importance_tbl)
+  notify_step(
+    "success",
+    paste0("Calculated activity scores for ", nrow(res$module_score), " modules.")
+  )
+
+  notify_step("info", "[3/3] Estimating module significance.")
+
+  perm_p <- permutation_test_gamma(
+    subnet = steiner_subnet,
+    mrn = res$mrn,
+    module_table = res$module_table,
+    module_score = res$module_score,
+    method = method,
+    min_size = min_size,
+    n_perm = n_perm,
+    workers = workers,
+    seed = seed
+  )
+
+  res$module_score <- res$module_score %>%
+    dplyr::left_join(perm_p[,c("Module","p","fdr")], by = "Module")
+
+  if(nrow(res$module_score) == 0){
+    notify_step("warning", "No modules passed the identification step.")
+  }
+  res <- set_featuremap_stage(res, "module_identified")
+
+  end_time <- Sys.time()
+  elapsed_min <- round(as.numeric(end_time - start_time, units = "mins"), 2)
+  n_modules <- dplyr::n_distinct(res$module_table$Module)
+  n_sig_modules <- sum(res$module_score$p < 0.05, na.rm = TRUE)
+  notify_step(
+    "success",
+    paste0("Identified ", n_sig_modules, " modules with p < 0.05 among ", n_modules, " detected modules.")
+  )
+  notify_step("info", paste0("Elapsed time: ", elapsed_min, " minutes."))
+
+
+  return(res)
+}

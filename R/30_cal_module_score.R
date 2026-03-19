@@ -3,6 +3,8 @@
 #' @param graph Full metabolic reaction network (mrn)
 #' @param module_nodes Vector of node IDs in the module
 #' @param seed_nodes Vector of annotated (seed) node IDs
+#' @param importance_tbl Optional data frame with columns `INCHI_ID` and
+#'   `Importance` used to compute module-level mean importance.
 #' 
 #' @return Data frame with module metrics
 calc_activity_score <- function(graph, 
@@ -10,7 +12,7 @@ calc_activity_score <- function(graph,
                                 seed_nodes,
                                 importance_tbl = NULL) {
   
-  m   <- igraph::gsize(graph)  # Total edges in FULL network (mrn)
+  m   <- gsize(graph)  # Total edges in FULL network (mrn)
   N_I <- length(seed_nodes)  # Total annotated nodes
   N_G <- length(module_nodes)  # Nodes in module
   N_I_G <- sum(module_nodes %in% seed_nodes)  # Annotated nodes in module
@@ -27,7 +29,7 @@ calc_activity_score <- function(graph,
   
   # Extract module subgraph from FULL network
   subg <- induced_subgraph(graph, vids = module_nodes)
-  E_G  <- igraph::gsize(subg)  # Edges within module
+  E_G  <- gsize(subg)  # Edges within module
   
   # Get degrees of module nodes in FULL network 
   degs <- degree(graph, v = module_nodes)
@@ -73,6 +75,7 @@ calc_activity_score <- function(graph,
 #' @param res Result object from pcsf_network
 #' @param annotated_ID Vector of annotated node IDs
 #' @param mrn Full metabolic reaction network
+#' @param importance_tbl Data frame with columns `INCHI_ID` and `Importance`.
 #' 
 #' @return Data frame with module activity scores
 calculate_module_activity <- function(res, annotated_ID, mrn, importance_tbl) {

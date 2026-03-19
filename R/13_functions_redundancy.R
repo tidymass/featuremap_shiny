@@ -1,8 +1,3 @@
-#' @title calculate_redundancy
-#' @description calculate_redundancy
-#' @author Xiaotao Shen
-#' \email{xiaotao.shen@@outlook.com}
-#' @param annotation_table annotation table
 #' Calculate Annotation Redundancy Metrics
 #'
 #' Computes two types of annotation redundancy from an annotation table:
@@ -24,6 +19,7 @@
 #' @author Xiaotao Shen \email{xiaotao.shen@outlook.com}
 #'
 #' @examples
+#' \dontrun{
 #' # Example annotation table
 #' annotation_table <- data.frame(
 #'   Lab.ID = c("C001", "C001", "C002", "C002", "C002"),
@@ -33,33 +29,35 @@
 #' )
 #'
 #' calculate_redundancy(annotation_table)
+#' }
 #'
-#' @export
+#' @keywords internal
+
 
 calculate_redundancy <-
   function(annotation_table) {
-    if (is.list(annotation_table) && !is.data.frame(annotation_table)) {
+    if (is(annotation_table, "list")) {
       annotation_table <-
         annotation_table %>%
         data.table::rbindlist()
     }
-    
+
     ##redundancy1 means one compound contains how many compound class
     annotation_table <-
       data.table::as.data.table(annotation_table)
-    
+
     redundancy1 <-
-      annotation_table[, .(number = length(unique(metabolite_feature_cluster))), by = Lab.ID]
-    
+      annotation_table[, list(number = length(unique(metabolite_feature_cluster))), by = Lab.ID]
+
     redundancy1 <-
       mean(redundancy1$number)
-    
+
     ##redundancy2 means one peak matches how many compound
     redundancy2 <-
       annotation_table[, .N, by = variable_id] %>%
       pull(N) %>%
       mean()
-    
+
     c("mfc per metabolite" = redundancy1,
       "metabolite per feature" = redundancy2)
   }
@@ -97,21 +95,26 @@ calculate_redundancy <-
 #' filtered_table <- remove_redundancy(annotation_table = example_annotation_table)
 #' }
 #'
-#' @export
+#' @importFrom dplyr group_by filter ungroup bind_rows
+#' @importFrom purrr map
+#' @importFrom plyr dlply
+#' @keywords internal
+#'
+
 
 
 remove_redundancy <-
   function(annotation_table) {
     ##for one compound, if one compound class with score > 100, then remove the
     ##compound class with score <= 20
-    
+
     redundancy_diff = c(-1, -1)
-    
+
     while (any(redundancy_diff < 0)) {
       # cat("i", " ")
       before_redundancy =
         calculate_redundancy(annotation_table = annotation_table)
-      
+
       annotation_table <-
         annotation_table %>%
         dplyr::group_by(Lab.ID) %>%
@@ -121,7 +124,7 @@ remove_redundancy <-
           score > 0
         }) %>%
         dplyr::ungroup()
-      
+
       ##for one peak, if it has a annotation with score > 100, then remove other
       ##annotations with score <= 20
       annotation_table <-
@@ -133,24 +136,23 @@ remove_redundancy <-
           score > 0
         }) %>%
         dplyr::ungroup()
-      
-      
+
+
       ###re-calculated confidence score for each compound class.
       annotation_table =
-        annotation_table %>%
-        plyr::dlply(.variables = plyr::.(metabolite_feature_cluster)) %>%
+        split(annotation_table, annotation_table$metabolite_feature_cluster) %>%
         purrr::map(function(x) {
           score <- score_mfc(x)
           x$score = score
           x
         }) %>%
         dplyr::bind_rows()
-      
+
       after_redundancy =
         calculate_redundancy(annotation_table = annotation_table)
-      
+
       redundancy_diff = after_redundancy - before_redundancy
     }
-    
+
     annotation_table
   }
