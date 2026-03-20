@@ -3726,17 +3726,11 @@ server <- function(input, output, session) {
       feature_tbl <- e_feat[[ls(e_feat)[1]]]
       check_feature_columns(feature_tbl)
 
-      e_ms2_hmdb <- new.env()
-      load("www/demo_ms2_hmdb.rda", envir = e_ms2_hmdb)
-      ms2_hmdb <- e_ms2_hmdb[[ls(e_ms2_hmdb)[1]]]
-
-      e_ms2_kegg <- new.env()
-      load("www/demo_ms2_kegg.rda", envir = e_ms2_kegg)
-      ms2_kegg <- e_ms2_kegg[[ls(e_ms2_kegg)[1]]]
-
-      ms2_tbl <- dplyr::full_join(ms2_hmdb, ms2_kegg, by = "variable_id") %>%
-        dplyr::mutate(SS = dplyr::coalesce(SS.x, SS.y)) %>%
-        dplyr::select(variable_id, dplyr::any_of(c("HMDB.ID", "KEGG.ID")), SS)
+      e_ms2 <- new.env()
+      load("www/demo_ms2.rda", envir = e_ms2)
+      ms2_tbl <- e_ms2[[ls(e_ms2)[1]]] %>%
+        dplyr::ungroup() %>%
+        dplyr::select(variable_id, dplyr::any_of(c("HMDB.ID", "KEGG.ID", "SS", "Level")))
 
       list(
         feature_tbl = feature_tbl,

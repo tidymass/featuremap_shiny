@@ -12,13 +12,14 @@
 #'   \code{mean_intensity}, \code{condition}, and \code{pvalue}.
 #' @param ms2_table Optional MS2 confirmation table. Can be \code{NULL}.
 #'   If provided, it should contain \code{variable_id} and at least one
-#'   identifier column among \code{HMDB.ID} and \code{KEGG.ID}.
-#' @param metabolite_database A \code{metid} database object used for MS1
-#'   annotation. If \code{NULL}, shiny loads the built-in merged reference
-#'   database \code{featuremap_compound.rda}.
-#' @param refdata Deprecated compatibility argument retained for existing shiny
-#'   callers. It is ignored and the returned object always stores
-#'   \code{refdata = "all"} for the merged database.
+#'   identifier column among \code{HMDB.ID} and \code{KEGG.ID}. It is used only
+#'   as auxiliary evidence for MS1-derived feature-metabolite pairs: a pair is
+#'   considered MS2-supported when \code{variable_id + HMDB.ID} or
+#'   \code{variable_id + KEGG.ID} matches the MS2 table.
+#' @param metabolite_database A \code{metid} database object (typically
+#'   \code{databaseClass}) used for MS1 annotation. If \code{NULL},
+#'   the function loads the bundled merged reference database
+#'   \code{featuremap_compound.rda}.
 #' @param column Character. LC column mode used by \code{metid} adduct/matching
 #'   rules. Must be one of \code{"rp"} or \code{"hilic"}.
 #' @param ms1_match_ppm Numeric. MS1 mass tolerance (ppm) used in candidate
@@ -33,27 +34,35 @@
 #'
 #' @return A \code{featuremap_result} R6 object containing at least:
 #'   \itemize{
-#'     \item \code{feature_table}: input feature table
-#'     \item \code{refdata}: fixed to \code{"all"} for the merged annotation database
+#'     \item \code{feature_table}: input feature table (with derived fields added later in pipeline)
+#'     \item \code{refdata}: fixed to \code{"all"} to indicate merged HMDB/KEGG annotation
 #'     \item \code{anno_feature_table1}: feature-metabolite annotation table after redundancy removal
 #'     \item \code{anno_redundancy}: redundancy summary before/after filtering
 #'     \item \code{object_type}: \code{"featuremap_result"}
 #'     \item \code{stage}: \code{"feature_annotated"}
 #'   }
-#' @export
 #'
 #' @examples
 #' \dontrun{
-#' annotate_feature(
-#'   feature_table = feature_table,
-#'   ms2_table = NULL,
-#'   metabolite_database = NULL
+#' data("demo_feature_table", package = "featuremap")
+#' data("demo_ms2", package = "featuremap")
+#'
+#' res <- annotate_feature(
+#'   feature_table = demo_feature_table,
+#'   ms2_table = demo_ms2,
+#'   metabolite_database = NULL,
+#'   column = "rp",
+#'   ms1_match_ppm = 15,
+#'   mfc_rt_tol = 5,
+#'   isotope_number = 3,
+#'   workers = 4
 #' )
 #' }
+#'
+#' @export
 annotate_feature <- function(feature_table,
                              ms2_table = NULL,
                              metabolite_database = NULL,
-                             refdata = NULL,
                              column = c("rp", "hilic"),
                              ms1_match_ppm = 15,
                              mfc_rt_tol = 5,
@@ -81,17 +90,6 @@ annotate_feature <- function(feature_table,
     }
   }
 
-  safe_set_featuremap_stage <- function(x, stage) {
-    stage_setter <- get0("set_featuremap_stage", mode = "function", inherits = TRUE)
-    if (is.function(stage_setter)) {
-      return(stage_setter(x, stage))
-    }
-
-    x$stage <- stage
-    x$object_type <- "featuremap_result"
-    x
-  }
-
   load_bundled_metabolite_database <- function() {
     candidate_paths <- c(
       system.file("app/www/featuremap_compound.rda", package = "featuremapshiny"),
@@ -115,15 +113,18 @@ annotate_feature <- function(feature_table,
   }
 
   column <- match.arg(column)
+  has_user_database <- !is.null(metabolite_database)
   start_time <- Sys.time()
 
   notify_title("Step 1: Feature Annotation")
-  notify_step("info", "[1/3] Preparing annotation references.")
+  notify_step("info", "[1/3] Loading annotation references.")
   if (is.null(metabolite_database)) {
     metabolite_database <- load_bundled_metabolite_database()
-    notify_step("success", "Loaded built-in merged annotation reference: featuremap_compound.rda.")
-  } else {
+  }
+  if (has_user_database) {
     notify_step("success", "Using user-supplied annotation references.")
+  } else {
+    notify_step("success", "No user-supplied annotation references detected; loaded built-in resources.")
   }
 
   res <- R6Class(
@@ -131,7 +132,7 @@ annotate_feature <- function(feature_table,
     public = list(initialize = function(...) {}),
     lock_objects = FALSE
   )$new()
-  res <- safe_set_featuremap_stage(res, "initialized")
+  res <- set_featuremap_stage(res, "initialized")
 
   res$feature_table <- feature_table
   res$refdata <- "all"
@@ -177,7 +178,7 @@ annotate_feature <- function(feature_table,
   )
 
   rownames(res$anno_redundancy) <- c("before", "after")
-  res <- safe_set_featuremap_stage(res, "feature_annotated")
+  res <- set_featuremap_stage(res, "feature_annotated")
 
   end_time <- Sys.time()
   elapsed_min <- round(as.numeric(end_time - start_time, units = "mins"), 2)

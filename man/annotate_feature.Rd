@@ -8,7 +8,6 @@ annotate_feature(
   feature_table,
   ms2_table = NULL,
   metabolite_database = NULL,
-  refdata = NULL,
   column = c("rp", "hilic"),
   ms1_match_ppm = 15,
   mfc_rt_tol = 5,
@@ -18,17 +17,21 @@ annotate_feature(
 }
 \arguments{
 \item{feature_table}{A feature-level data frame to annotate. Must satisfy
-\code{\link{check_feature_table}} requirements.}
+\code{\link{check_feature_table}} requirements, including columns:
+\code{variable_id}, \code{mz}, \code{rt}, \code{polarity},
+\code{mean_intensity}, \code{condition}, and \code{pvalue}.}
 
-\item{ms2_table}{Optional MS2 confirmation table. Can be \code{NULL}.}
+\item{ms2_table}{Optional MS2 confirmation table. Can be \code{NULL}.
+If provided, it should contain \code{variable_id} and at least one
+identifier column among \code{HMDB.ID} and \code{KEGG.ID}. It is used only
+as auxiliary evidence for MS1-derived feature-metabolite pairs: a pair is
+considered MS2-supported when \code{variable_id + HMDB.ID} or
+\code{variable_id + KEGG.ID} matches the MS2 table.}
 
-\item{metabolite_database}{A \code{metid} database object used for MS1
-annotation. If \code{NULL}, shiny loads the built-in merged reference
-database \code{featuremap_compound.rda}.}
-
-\item{refdata}{Deprecated compatibility argument retained for existing shiny
-callers. It is ignored and the returned object always stores
-\code{refdata = "all"}.}
+\item{metabolite_database}{A \code{metid} database object (typically
+\code{databaseClass}) used for MS1 annotation. If \code{NULL},
+the function loads the bundled merged reference database
+\code{featuremap_compound.rda}.}
 
 \item{column}{Character. LC column mode used by \code{metid} adduct/matching
 rules. Must be one of \code{"rp"} or \code{"hilic"}.}
@@ -46,9 +49,15 @@ annotation.}
 passed to \code{metid::annotate_metabolites()}.}
 }
 \value{
-A \code{featuremap_result} R6 object containing at least
-\code{feature_table}, \code{refdata = "all"}, \code{anno_feature_table1},
-\code{anno_redundancy}, \code{object_type}, and \code{stage}.
+A \code{featuremap_result} R6 object containing at least:
+\itemize{
+\item \code{feature_table}: input feature table (with derived fields added later in pipeline)
+\item \code{refdata}: fixed to \code{"all"} to indicate merged HMDB/KEGG annotation
+\item \code{anno_feature_table1}: feature-metabolite annotation table after redundancy removal
+\item \code{anno_redundancy}: redundancy summary before/after filtering
+\item \code{object_type}: \code{"featuremap_result"}
+\item \code{stage}: \code{"feature_annotated"}
+}
 }
 \description{
 Perform preliminary metabolite annotation for raw MS1 features by matching
@@ -57,10 +66,18 @@ isotope patterns, and optional MS2 confirmation.
 }
 \examples{
 \dontrun{
-annotate_feature(
-  feature_table = feature_table,
-  ms2_table = NULL,
-  metabolite_database = NULL
+data("demo_feature_table", package = "featuremap")
+data("demo_ms2", package = "featuremap")
+
+res <- annotate_feature(
+  feature_table = demo_feature_table,
+  ms2_table = demo_ms2,
+  metabolite_database = NULL,
+  column = "rp",
+  ms1_match_ppm = 15,
+  mfc_rt_tol = 5,
+  isotope_number = 3,
+  workers = 4
 )
 }
 }
