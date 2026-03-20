@@ -65,6 +65,21 @@ citation_text <- paste(
   "Journal Name, Year;Volume:Pages."
 )
 
+build_info_icon <- function(content) {
+  tags$span(
+    class = "inline-info-wrap",
+    tabindex = "0",
+    tags$span(
+      class = "inline-info-icon",
+      icon("circle-info")
+    ),
+    tags$span(
+      class = "inline-info-card",
+      HTML(content)
+    )
+  )
+}
+
 
 # UI Definition=================================================================
 ui <- fluidPage(
@@ -204,6 +219,65 @@ ui <- fluidPage(
         color: #5f6b76;
         line-height: 1.6;
         min-height: 52px;
+      }
+
+      .inline-info-wrap {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        margin-left: 6px;
+      }
+
+      .inline-info-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #5b6f82;
+        cursor: pointer;
+      }
+
+      .inline-info-wrap:hover .inline-info-icon,
+      .inline-info-wrap:focus-within .inline-info-icon,
+      .inline-info-wrap:focus .inline-info-icon {
+        color: #2f5d8a;
+        outline: none;
+      }
+
+      .inline-info-card {
+        display: none;
+        position: absolute;
+        top: calc(100% + 8px);
+        left: 0;
+        z-index: 2200;
+        width: 320px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid #d7e1ec;
+        background: #ffffff;
+        box-shadow: 0 14px 30px rgba(28, 49, 74, 0.16);
+        color: #415366;
+        font-size: 12px;
+        line-height: 1.5;
+        white-space: normal;
+      }
+
+      .inline-info-card code {
+        color: #1f4f82;
+        background: #eef4fb;
+        padding: 1px 4px;
+        border-radius: 4px;
+      }
+
+      .inline-info-card a {
+        color: #1f5e98;
+        text-decoration: underline;
+      }
+
+      .inline-info-wrap:hover .inline-info-card,
+      .inline-info-wrap:focus-within .inline-info-card,
+      .inline-info-wrap:focus .inline-info-card,
+      .inline-info-wrap.is-pinned .inline-info-card {
+        display: block;
       }
       
       /* Keep parameter/result cards aligned in each analysis step (desktop) */
@@ -1575,7 +1649,42 @@ ui <- fluidPage(
       }
       
     ")),
-    
+
+    tags$script(HTML("
+      (function() {
+        function clearPinnedInfo(exceptEl) {
+          document.querySelectorAll('.inline-info-wrap.is-pinned').forEach(function(el) {
+            if (!exceptEl || el !== exceptEl) {
+              el.classList.remove('is-pinned');
+            }
+          });
+        }
+
+        document.addEventListener('click', function(event) {
+          var trigger = event.target.closest('.inline-info-wrap');
+          if (trigger) {
+            event.stopPropagation();
+            var shouldPin = !trigger.classList.contains('is-pinned');
+            clearPinnedInfo(trigger);
+            if (shouldPin) {
+              trigger.classList.add('is-pinned');
+            } else {
+              trigger.classList.remove('is-pinned');
+            }
+            return;
+          }
+
+          clearPinnedInfo();
+        });
+
+        document.addEventListener('keydown', function(event) {
+          if (event.key === 'Escape') {
+            clearPinnedInfo();
+          }
+        });
+      })();
+    ")),
+
     tags$script(HTML("
     function runCounters() {
       const counters = document.querySelectorAll('.counter');
@@ -2060,15 +2169,6 @@ ui <- fluidPage(
                 class = "card-body",
                 tags$div(
                   class = "param-card",
-                  tags$h4("Reference Database"),
-                  tags$p(
-                    style = "margin-bottom:0;",
-                    "FeatureMAP uses the built-in merged annotation database by default."
-                  )
-                ),
-                
-                tags$div(
-                  class = "param-card",
                   tags$h4("Data Tables"),
                   fileInput(
                     "feature_file",
@@ -2088,20 +2188,38 @@ ui <- fluidPage(
                   ),
                   tags$small(
                     style = "color:#6c757d;",
-                    "This field is optional."
+                    "This field is optional. Required columns: variable_id, and at least one of HMDB.ID or KEGG.ID."
                   ),
                   tags$hr(),
-                  actionButton(
-                    "use_demo_both",
-                    "Use Demo Data",
-                    icon = icon("flask"),
-                    class = "btn btn-outline-secondary"
+                  tags$div(
+                    style = "display:flex; gap:8px; flex-wrap:wrap;",
+                    actionButton(
+                      "use_demo_both",
+                      "Use Demo Data",
+                      icon = icon("flask"),
+                      class = "btn btn-outline-secondary"
+                    ),
+                    downloadButton(
+                      "download_demo_data",
+                      "Download Demo",
+                      class = "btn btn-outline-secondary"
+                    )
                   )
                 ),
                 
                 tags$div(
                   class = "param-card",
-                  tags$h4("Reference Source"),
+                  tags$h4(
+                    "Reference Source",
+                    build_info_icon(
+                      paste0(
+                        "Choose <code>Default reference</code> to use the built-in MS1 annotation database ",
+                        "and metabolic reaction network provided by FeatureMAP.<br><br>",
+                        "If you want to supplement or replace these built-in resources, ",
+                        "choose <code>Upload reference datasets</code> and provide your own files."
+                      )
+                    )
+                  ),
                   radioButtons(
                     "ref_source",
                     "",
@@ -2113,18 +2231,51 @@ ui <- fluidPage(
                   ),
                   conditionalPanel(
                     condition = "input.ref_source == 'upload'",
-                    fileInput(
-                      "compound_db_file",
-                      "Merged Annotation Database (.rda)",
-                      accept = c(".rda", ".RData")
+                    tags$div(
+                      tags$div(
+                        style = "font-weight:600; margin-bottom:6px;",
+                        "MS1 Annotation Database (.rda)",
+                        build_info_icon(
+                          paste0(
+                            "Upload a single object in .rda/.RData format.<br><br>",
+                            "It should be a metid-compatible MS1 annotation database whose ",
+                            "<code>spectra.info</code> contains at least:<br>",
+                            "<code>Lab.ID</code>, <code>Compound.name</code>, <code>Formula</code>, ",
+                            "<code>HMDB.ID</code>, <code>KEGG.ID</code>, <code>CAS.ID</code>, ",
+                            "<code>mz</code>, <code>RT</code>, and <code>Submitter</code>.<br><br>",
+                            "Specific reference-format examples can be downloaded from our GitHub: ",
+                            "<a href='https://github.com/tidymass/featuremap_resources' target='_blank'>featuremap_resources</a>"
+                          )
+                        )
+                      ),
+                      fileInput(
+                        "compound_db_file",
+                        NULL,
+                        accept = c(".rda", ".RData")
+                      )
                     )
                   ),
+                  tags$br(),
                   conditionalPanel(
                     condition = "input.ref_source == 'upload'",
-                    fileInput(
-                      "mrn_file",
-                      "Metabolic Reaction Network (.rda)",
-                      accept = c(".rda", ".RData")
+                    tags$div(
+                      tags$div(
+                        style = "font-weight:600; margin-bottom:6px;",
+                        "Metabolic Reaction Network (.rda)",
+                        build_info_icon(
+                          paste0(
+                            "Upload a single object in .rda/.RData format.<br><br>",
+                            "It should be an <code>igraph</code> metabolic reaction network.<br><br>",
+                            "Specific reference-format examples can be downloaded from our GitHub: ",
+                            "<a href='https://github.com/tidymass/featuremap_resources' target='_blank'>featuremap_resources</a>"
+                          )
+                        )
+                      ),
+                      fileInput(
+                        "mrn_file",
+                        NULL,
+                        accept = c(".rda", ".RData")
+                      )
                     )
                   )
                 ),
@@ -2161,7 +2312,17 @@ ui <- fluidPage(
                        "Data Preview"),
               tags$div(
                 class = "card-body",
-                DTOutput("data_preview"),
+                tabsetPanel(
+                  id = "upload_preview_tabs",
+                  tabPanel(
+                    "Feature Table",
+                    DTOutput("feature_preview")
+                  ),
+                  tabPanel(
+                    "MS2 Table",
+                    DTOutput("ms2_preview")
+                  )
+                ),
                 tags$hr(),
                 uiOutput("upload_status_ui")
               )
@@ -2899,16 +3060,45 @@ ui <- fluidPage(
                     )
                   ),
                   
-                  textInput(
-                    "func_embed_model",
-                    "Embedding model",
-                    value = "",
-                    placeholder = "e.g. text-embedding-3-small"
+                  conditionalPanel(
+                    condition = "input.func_use_pubmed",
+                    tags$div(
+                      style = "font-weight: 600; margin-bottom: 6px; display: flex; align-items: center; gap: 8px;",
+                      "Embedding model",
+                      build_info_icon(
+                        paste0(
+                          "Use the exact embedding-model ID supported by the selected provider.<br><br>",
+                          "You can look up available model names here:<br>",
+                          "<a href='https://platform.openai.com/docs/models' target='_blank'>OpenAI models</a><br>",
+                          "<a href='https://ai.google.dev/gemini-api/docs/models' target='_blank'>Gemini API models</a><br>",
+                          "<a href='https://siliconflow.cn/models' target='_blank'>SiliconFlow models</a>"
+                        )
+                      )
+                    ),
+                    textInput(
+                      "func_embed_model",
+                      NULL,
+                      value = "",
+                      placeholder = "e.g. text-embedding-3-small"
+                    )
                   ),
                   
+                  tags$div(
+                    style = "font-weight: 600; margin-bottom: 6px; display: flex; align-items: center; gap: 8px;",
+                    "LLM model",
+                    build_info_icon(
+                      paste0(
+                        "Use the exact chat/generation-model ID supported by the selected provider.<br><br>",
+                        "You can look up available model names here:<br>",
+                        "<a href='https://platform.openai.com/docs/models' target='_blank'>OpenAI models</a><br>",
+                        "<a href='https://ai.google.dev/gemini-api/docs/models' target='_blank'>Gemini API models</a><br>",
+                        "<a href='https://siliconflow.cn/models' target='_blank'>SiliconFlow models</a>"
+                      )
+                    )
+                  ),
                   textInput(
                     "func_llm_model",
-                    "LLM model",
+                    NULL,
                     placeholder = "e.g. gpt-4.1-mini"
                   ),
                   
@@ -3110,6 +3300,10 @@ server <- function(input, output, session) {
     function_result = NULL,
     function_status = "idle",
     function_pubmed_used = FALSE,
+    results_export_tables_touched = FALSE,
+    results_export_networks_touched = FALSE,
+    results_export_tables_updating = FALSE,
+    results_export_networks_updating = FALSE,
     ### Quickstart
     quickstart_active = FALSE,
     quickstart_prompt_shown = FALSE,
@@ -3214,6 +3408,10 @@ server <- function(input, output, session) {
     rv$quickstart_completed_pages <- character(0)
     rv$quickstart_prompt_shown <- FALSE
 
+    rv$results_export_tables_touched <- FALSE
+    rv$results_export_networks_touched <- FALSE
+    rv$results_export_tables_updating <- FALSE
+    rv$results_export_networks_updating <- FALSE
     updateCheckboxGroupInput(session, "export_items", selected = character(0))
     updateCheckboxGroupInput(session, "network_export_items", selected = character(0))
   }
@@ -3608,7 +3806,7 @@ server <- function(input, output, session) {
         missing <- c(missing, "Metabolic Reaction Network")
       }
       if (is.null(input$compound_db_file)) {
-        missing <- c(missing, "Merged Annotation Database")
+        missing <- c(missing, "MS1 Annotation Database")
       }
     }
     if (length(missing) > 0) {
@@ -3669,7 +3867,7 @@ server <- function(input, output, session) {
         e_ref <- new.env()
         req(input$compound_db_file)
         load(input$compound_db_file$datapath, envir = e_ref)
-        ref_label <- "Uploaded merged database"
+        ref_label <- "Uploaded MS1 annotation database"
         ref_db_obj <- e_ref[[ls(e_ref)[1]]]
       }
 
@@ -3741,6 +3939,11 @@ server <- function(input, output, session) {
     if (inherits(staged, "error")) {
       rv$upload_note <- paste("Demo prepare failed:", staged$message)
       rv$upload_note_type <- "error"
+      showNotification(
+        paste("Demo prepare failed:", staged$message),
+        type = "error",
+        duration = 4
+      )
       return()
     }
 
@@ -3749,68 +3952,115 @@ server <- function(input, output, session) {
 
     rv$upload_note <- "Demo data is prepared. Click Load to continue."
     rv$upload_note_type <- "info"
+    showNotification(
+      "Demo data is prepared. Click Load to continue.",
+      type = "message",
+      duration = 3
+    )
   })
   
   
   
-  # Placeholder outputs
   output$upload_status_ui <- renderUI({
-    upload_ready <- !is.null(rv$feature_data) &&
-      !is.null(rv$ref_database) &&
-      !is.null(rv$mrn)
-
-    note_ui <- NULL
-    if (!is.null(rv$upload_note) && nzchar(rv$upload_note)) {
-      note_icon <- switch(
-        rv$upload_note_type,
-        error = icon("triangle-exclamation"),
-        warning = icon("triangle-exclamation"),
-        success = icon("circle-check"),
-        info = icon("circle-info"),
-        icon("circle-info")
-      )
-      note_ui <- tags$div(
-        class = "param-card",
-        tags$h4(note_icon, "Load Message"),
-        tags$p(style = "margin-bottom:0;", rv$upload_note)
-      )
+    if (is.null(rv$feature_data)) {
+      return(NULL)
     }
 
-    status_ui <- NULL
-    if (upload_ready) {
-      ms2_txt <- if (is.null(rv$ms2_data)) {
-        "Not provided"
-      } else {
-        paste0(nrow(rv$ms2_data), " x ", ncol(rv$ms2_data))
+    ms2_supported_n <- 0L
+    if (!is.null(rv$ms2_data) && is.data.frame(rv$ms2_data) && "variable_id" %in% colnames(rv$ms2_data)) {
+      ms2_tbl <- rv$ms2_data
+
+      has_hmdb <- "HMDB.ID" %in% colnames(ms2_tbl)
+      has_kegg <- "KEGG.ID" %in% colnames(ms2_tbl)
+
+      if (has_hmdb || has_kegg) {
+        ms2_tbl <- ms2_tbl %>%
+          dplyr::mutate(
+            HMDB.ID = if (has_hmdb) HMDB.ID else NA_character_,
+            KEGG.ID = if (has_kegg) KEGG.ID else NA_character_
+          ) %>%
+          dplyr::filter(
+            (!is.na(HMDB.ID) & HMDB.ID != "") |
+              (!is.na(KEGG.ID) & KEGG.ID != "")
+          ) %>%
+          dplyr::distinct(variable_id)
+
+        ms2_supported_n <- nrow(ms2_tbl)
       }
-      status_ui <- tags$div(
-        class = "param-card",
-        tags$h4(icon("circle-check"), "Upload Status"),
-        tags$p(
-          style = "margin-bottom:6px;",
-          paste0("Reference: ", rv$ref_database_type)
-        ),
-        tags$p(
-          style = "margin-bottom:6px;",
-          paste0("Feature table: ", nrow(rv$feature_data), " x ", ncol(rv$feature_data))
-        ),
-        tags$p(
-          style = "margin-bottom:0;",
-          paste0("MS2 table: ", ms2_txt)
-        )
-      )
     }
 
-    if (is.null(note_ui) && is.null(status_ui)) return(NULL)
-    tagList(note_ui, status_ui)
+    tags$div(
+      class = "param-card",
+      tags$h4(icon("circle-check"), "Upload Status"),
+      tags$p(
+        style = "margin-bottom:6px;",
+        paste0("Features loaded: ", format(nrow(rv$feature_data), big.mark = ","))
+      ),
+      tags$p(
+        style = "margin-bottom:0;",
+        paste0("MS2-supported features: ", format(ms2_supported_n, big.mark = ","))
+      )
+    )
   })
 
-  output$data_preview <- renderDT({
+  output$feature_preview <- renderDT({
     if (is.null(rv$feature_data)) {
       return(render_table_message("No data loaded yet"))
     }
     datatable(
       rv$feature_data,
+      options = list(
+        pageLength = 10,
+        scrollX = TRUE
+      ),
+      rownames = FALSE
+    )
+  })
+
+  output$download_demo_data <- downloadHandler(
+    filename = function() {
+      paste0("featuremap_demo_data_", Sys.Date(), ".zip")
+    },
+    content = function(file) {
+      resolve_demo_file <- function(filename) {
+        candidate_paths <- c(
+          system.file(file.path("app", "www", filename), package = "featuremapshiny"),
+          system.file(file.path("www", filename), package = "featuremapshiny"),
+          file.path("www", filename),
+          file.path("inst", "app", "www", filename)
+        )
+        candidate_paths <- unique(candidate_paths[nzchar(candidate_paths)])
+        candidate_paths <- candidate_paths[file.exists(candidate_paths)]
+
+        if (length(candidate_paths) == 0) {
+          stop("Missing demo file: ", filename)
+        }
+
+        candidate_paths[1]
+      }
+
+      demo_files <- c(
+        resolve_demo_file("demo_feature_table.rda"),
+        resolve_demo_file("demo_ms2.rda")
+      )
+
+      tmpdir <- tempfile("featuremap_demo_")
+      dir.create(tmpdir)
+      file.copy(demo_files, file.path(tmpdir, basename(demo_files)), overwrite = TRUE)
+
+      old_wd <- getwd()
+      on.exit(setwd(old_wd), add = TRUE)
+      setwd(tmpdir)
+      utils::zip(zipfile = file, files = basename(demo_files))
+    }
+  )
+
+  output$ms2_preview <- renderDT({
+    if (is.null(rv$ms2_data)) {
+      return(render_table_message("No data loaded yet"))
+    }
+    datatable(
+      rv$ms2_data,
       options = list(
         pageLength = 10,
         scrollX = TRUE
@@ -5404,6 +5654,64 @@ server <- function(input, output, session) {
       module_table = rv$module_res$module_table,
       module_function = rv$function_result$module_function
     )
+  })
+
+  ready_export_items <- reactive({
+    payload <- export_payload()
+    names(payload)[vapply(payload, is_export_ready, logical(1))]
+  })
+
+  ready_network_export_items <- reactive({
+    c(
+      if (!is.null(pcsf_export_data())) "pcsf",
+      if (length(results_module_choices()) > 0) "module"
+    )
+  })
+
+  observeEvent(input$export_items, ignoreInit = TRUE, {
+    if (isTRUE(rv$results_export_tables_updating)) {
+      rv$results_export_tables_updating <- FALSE
+      return()
+    }
+    rv$results_export_tables_touched <- TRUE
+  })
+
+  observeEvent(input$network_export_items, ignoreInit = TRUE, {
+    if (isTRUE(rv$results_export_networks_updating)) {
+      rv$results_export_networks_updating <- FALSE
+      return()
+    }
+    rv$results_export_networks_touched <- TRUE
+  })
+
+  observe({
+    ready_items <- ready_export_items()
+    if (isTRUE(rv$results_export_tables_touched)) {
+      return()
+    }
+
+    current <- input$export_items
+    current <- if (is.null(current)) character(0) else current
+
+    if (!setequal(current, ready_items)) {
+      rv$results_export_tables_updating <- TRUE
+      updateCheckboxGroupInput(session, "export_items", selected = ready_items)
+    }
+  })
+
+  observe({
+    ready_networks <- ready_network_export_items()
+    if (isTRUE(rv$results_export_networks_touched)) {
+      return()
+    }
+
+    current <- input$network_export_items
+    current <- if (is.null(current)) character(0) else current
+
+    if (!setequal(current, ready_networks)) {
+      rv$results_export_networks_updating <- TRUE
+      updateCheckboxGroupInput(session, "network_export_items", selected = ready_networks)
+    }
   })
 
   results_module_choices <- reactive({
