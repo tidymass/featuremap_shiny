@@ -201,6 +201,11 @@ extract_subnetwork = function(res = NULL,
     tidygraph::activate(nodes) %>%
     as.data.frame()
 
+  mrn_compound_lookup <- mrn_nodes %>%
+    dplyr::filter(!is.na(INCHI_ID), INCHI_ID != "", INCHI_ID != "<NA>") %>%
+    dplyr::select(INCHI_ID, Compound_name) %>%
+    dplyr::distinct(INCHI_ID, .keep_all = TRUE)
+
   mrnref_hmdb <- mrn_nodes %>%
     dplyr::filter(!is.na(HMDB_ID), HMDB_ID != "", HMDB_ID != "<NA>") %>%
     dplyr::select(HMDB_ID, INCHI_ID, Compound_name) %>%
@@ -420,7 +425,11 @@ extract_subnetwork = function(res = NULL,
 
     pcsf_subnet <- pcsf_subnet %>%
       igraph::set_vertex_attr("prize", value = node_frequency$freq[match(igraph::V(.)$name, node_frequency$name)]) %>%
-      igraph::set_vertex_attr("type", value = "Steiner")
+      igraph::set_vertex_attr("type", value = "Steiner") %>%
+      igraph::set_vertex_attr(
+        "compound_name",
+        value = mrn_compound_lookup$Compound_name[match(igraph::V(.)$name, mrn_compound_lookup$INCHI_ID)]
+      )
 
     term_idx <- match(names(terminals), igraph::V(pcsf_subnet)$name)
     term_idx <- term_idx[!is.na(term_idx)]

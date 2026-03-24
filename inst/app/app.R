@@ -302,44 +302,343 @@ ui <- fluidPage(
           flex: 1;
         }
         
-        /* Let PCSF empty state panel fill the full card area */
+        #network_page .step-main-row {
+          align-items: flex-start;
+        }
+
+        #network_page .step-main-row > [class*='col-'] {
+          display: block;
+        }
+
+        #network_page .step-main-row > [class*='col-'] > .card {
+          display: block;
+        }
+
+        #network_page #network_result_card {
+          display: flex;
+          flex-direction: column;
+        }
+
+        #network_page #network_result_card > .card-body {
+          flex: 1;
+        }
+
         #network_page .card > .card-body {
           display: flex;
           flex-direction: column;
           min-height: 0;
         }
-        
+
         #network_page .card > .card-body > .tabbable {
           display: flex;
           flex-direction: column;
           flex: 1;
           min-height: 0;
         }
-        
+
         #network_page .card > .card-body > .tabbable > .tab-content {
           display: flex;
           flex: 1;
           min-height: 0;
         }
-        
+
         #network_page .card > .card-body > .tabbable > .tab-content > .tab-pane {
           flex: 1;
           min-width: 0;
         }
-        
+
         #network_page .card > .card-body > .tabbable > .tab-content > .active {
           display: flex;
           flex-direction: column;
           min-height: 0;
         }
-        
+
         #network_page #pcsf_network_container {
           display: flex;
           flex: 1;
           min-height: 0;
         }
+
+        #network_page .pcsf-network-shell {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          min-height: 0;
+        }
+
+        #network_page .pcsf-network-topbar {
+          display: flex;
+          gap: 12px;
+          align-items: center;
+          flex-wrap: wrap;
+        }
+
+        #network_page .pcsf-network-stage {
+          display: flex;
+          flex: 1;
+          min-height: 0;
+          width: 100%;
+        }
+
+        #network_page .pcsf-network-stage > .empty-panel-fill,
+        #network_page .pcsf-network-stage > .shiny-vis-network {
+          flex: 1;
+          min-height: 100%;
+          height: 100%;
+          width: 100%;
+        }
+
+        #network_page .pcsf-selector-row {
+          display: flex;
+          gap: 10px;
+          align-items: center;
+          margin-bottom: 0;
+          flex: 1 1 auto;
+        }
+
+        #network_page .pcsf-selector-item {
+          flex: 0 1 320px;
+          width: 320px;
+          max-width: 100%;
+        }
+
+        #network_page .pcsf-selector-input {
+          display: flex;
+          align-items: flex-start;
+          gap: 8px;
+        }
+
+        #network_page .pcsf-selector-field {
+          flex: 1;
+          min-width: 0;
+        }
+
+        #network_page .pcsf-selector-field .form-group,
+        #network_page .pcsf-selector-field .selectize-control {
+          margin-bottom: 0;
+        }
+
+        #network_page .pcsf-selector-input .inline-info-wrap {
+          margin-left: 0;
+          margin-top: 8px;
+          flex: 0 0 auto;
+        }
+
+        #network_page .pcsf-linked-table-card {
+          margin-top: 0;
+          flex: 0 0 220px;
+          min-height: 220px;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+        }
+
+        #network_page .pcsf-linked-table-card hr {
+          margin: 0 0 2px 0;
+          flex: 0 0 auto;
+        }
+
+        #network_page .pcsf-linked-table-card .annotation-table-wrap {
+          flex: 1 1 auto;
+          min-height: 0;
+          overflow: auto;
+        }
+
+        #network_page .pcsf-linked-table-card .dataTables_wrapper {
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+        }
+
+        #network_page .pcsf-linked-table-card .dataTables_scroll {
+          flex: 1 1 auto;
+          min-height: 0;
+        }
+
+        #network_page .pcsf-linked-table-card .dataTables_scrollBody {
+          max-height: 150px !important;
+        }
+
+        #network_page #pcsf_network_legend {
+          flex: 0 0 auto;
+          margin-left: auto;
+        }
+
+        #network_page[data-sync-panels='ready'] #network_result_card {
+          height: var(--network-panel-height);
+        }
+
+        #network_page[data-sync-panels='ready'] #network_result_card > .card-body {
+          min-height: 0;
+        }
+
+        #network_page[data-sync-panels='ready'] #network_result_card > .card-body {
+          overflow: hidden;
+        }
+
+        #network_page[data-sync-panels='ready'] #network_result_card > .card-body > .tabbable,
+        #network_page[data-sync-panels='ready'] #network_result_card > .card-body > .tabbable > .tab-content {
+          min-height: 0;
+          height: 100%;
+        }
+
+        #network_page[data-sync-panels='ready'] #network_result_card > .card-body > .tabbable > .tab-content > .tab-pane,
+        #network_page[data-sync-panels='ready'] #network_result_card > .card-body > .tabbable > .tab-content > .active {
+          min-height: 0;
+        }
+
+        #network_page[data-sync-panels='ready'] #network_result_card .pcsf-network-shell {
+          flex: 1;
+          height: 100%;
+          min-height: 0;
+          overflow: hidden;
+        }
+
+        #network_page[data-sync-panels='ready'] #network_result_card #pcsf_node_selectors,
+        #network_page[data-sync-panels='ready'] #network_result_card #pcsf_network_legend,
+        #network_page[data-sync-panels='ready'] #network_result_card #pcsf_tuning_summary,
+        #network_page[data-sync-panels='ready'] #network_result_card #pcsf_selected_annotation_ui {
+          flex: 0 0 auto;
+          min-height: 0;
+        }
+
+        #network_page[data-sync-panels='ready'] #network_result_card #pcsf_network_container {
+          display: flex;
+          flex: 1;
+          height: 100%;
+          min-height: 0;
+        }
+
+        #network_page[data-sync-panels='ready'] #network_result_card #pcsf_network_container > .pcsf-network-stage {
+          flex: 1;
+          min-height: 0;
+        }
+
+        #network_page[data-sync-panels='ready'] #network_result_card #pcsf_network_container .empty-panel-fill {
+          min-height: 100%;
+          height: 100%;
+        }
+
+        #network_page[data-sync-panels='ready'] #network_result_card .annotation-table-wrap,
+        #network_page[data-sync-panels='ready'] #network_result_card .pcsf-linked-table-card {
+          min-height: 0;
+          overflow-y: auto;
+          overflow-x: hidden;
+        }
+
+        /* Upload: keep left panel natural and lock right panel to the same height with internal scroll */
+        #upload_page .step-main-row {
+          align-items: flex-start;
+        }
+
+        #upload_page .step-main-row > [class*='col-'] {
+          display: block;
+        }
+
+        #upload_page .step-main-row > [class*='col-'] > .card {
+          width: 100%;
+        }
+
+        #upload_page .card > .card-body {
+          display: flex;
+          flex-direction: column;
+          min-height: 0;
+        }
+
+        #upload_page .card > .card-body > .tabbable {
+          display: flex;
+          flex-direction: column;
+          flex: 1;
+          min-height: 0;
+        }
+
+        #upload_page .card > .card-body > .tabbable > .tab-content {
+          display: flex;
+          flex: 1;
+          min-height: 0;
+        }
+
+        #upload_page .card > .card-body > .tabbable > .tab-content > .tab-pane {
+          flex: 1;
+          min-width: 0;
+        }
+
+        #upload_page .card > .card-body > .tabbable > .tab-content > .active {
+          display: flex;
+          flex-direction: column;
+          min-height: 0;
+        }
+
+        #upload_page[data-sync-panels='ready'] #upload_result_card {
+          height: var(--upload-panel-height);
+        }
+
+        #upload_page[data-sync-panels='ready'] #upload_result_card > .card-body {
+          min-height: 0;
+          overflow: hidden;
+        }
+
+        #upload_page .upload-preview-shell {
+          display: flex;
+          flex: 1 1 auto;
+          min-height: 0;
+          flex-direction: column;
+        }
+
+        #upload_page .upload-preview-shell > .tabbable {
+          display: flex;
+          flex: 1 1 auto;
+          min-height: 0;
+          flex-direction: column;
+        }
+
+        #upload_page .upload-preview-shell > .tabbable > .tab-content {
+          display: flex;
+          flex: 1 1 auto;
+          min-height: 0;
+        }
+
+        #upload_page .upload-preview-shell > .tabbable > .tab-content > .tab-pane {
+          flex: 1 1 auto;
+          min-height: 0;
+        }
+
+        #upload_page .upload-preview-shell > .tabbable > .tab-content > .active {
+          display: flex;
+          flex-direction: column;
+          min-height: 0;
+          overflow: hidden;
+        }
+
+        #upload_page .upload-preview-table {
+          flex: 1 1 auto;
+          min-height: 0;
+          overflow: auto;
+        }
+
+        #upload_page .upload-preview-table .dataTables_wrapper {
+          flex: 1 1 auto;
+          min-height: 0;
+          width: 100%;
+        }
+
+        #upload_page .upload-status-wrap {
+          flex: 0 0 auto;
+        }
         
-        /* Annotation: keep two summary blocks and let both stretch */
+        /* Annotation: lock row height to the left panel and scroll inside the right panel */
+        #annotation_page .step-main-row {
+          align-items: flex-start;
+        }
+
+        #annotation_page .step-main-row > [class*='col-'] {
+          display: block;
+        }
+
+        #annotation_page .step-main-row > [class*='col-'] > .card {
+          width: 100%;
+        }
+
         #annotation_page .card > .card-body {
           display: flex;
           flex-direction: column;
@@ -387,8 +686,48 @@ ui <- fluidPage(
           width: 100%;
           min-width: 0;
         }
+
+        #annotation_page[data-sync-panels='ready'] #annotation_param_card,
+        #annotation_page[data-sync-panels='ready'] #annotation_result_card {
+          height: var(--annotation-panel-height);
+        }
+
+        #annotation_page[data-sync-panels='ready'] #annotation_param_card > .card-body,
+        #annotation_page[data-sync-panels='ready'] #annotation_result_card > .card-body {
+          min-height: 0;
+        }
+
+        #annotation_page[data-sync-panels='ready'] #annotation_result_card > .card-body {
+          overflow: hidden;
+        }
+
+        #annotation_page[data-sync-panels='ready'] #annotation_result_card > .card-body > .tabbable,
+        #annotation_page[data-sync-panels='ready'] #annotation_result_card > .card-body > .tabbable > .tab-content {
+          min-height: 0;
+          height: 100%;
+        }
+
+        #annotation_page[data-sync-panels='ready'] #annotation_result_card > .card-body > .tabbable > .tab-content > .tab-pane,
+        #annotation_page[data-sync-panels='ready'] #annotation_result_card > .card-body > .tabbable > .tab-content > .active,
+        #annotation_page[data-sync-panels='ready'] #annotation_result_card .annotation-summary-stack {
+          min-height: 0;
+          overflow-y: auto;
+          overflow-x: hidden;
+        }
         
         /* Modules */
+        #modules_page .step-main-row {
+          align-items: flex-start;
+        }
+
+        #modules_page .step-main-row > [class*='col-'] {
+          display: block;
+        }
+
+        #modules_page .step-main-row > [class*='col-'] > .card {
+          width: 100%;
+        }
+
         #modules_page .card > .card-body {
           display: flex;
           flex-direction: column;
@@ -418,17 +757,168 @@ ui <- fluidPage(
           flex-direction: column;
           min-height: 0;
         }
+
+        #modules_page[data-sync-panels='ready'] #modules_result_card {
+          height: var(--modules-panel-height);
+        }
+
+        #modules_page[data-sync-panels='ready'] #modules_result_card > .card-body {
+          min-height: 0;
+          overflow: hidden;
+        }
+
+        #modules_page[data-sync-panels='ready'] #modules_result_card > .card-body > .tabbable,
+        #modules_page[data-sync-panels='ready'] #modules_result_card > .card-body > .tabbable > .tab-content {
+          min-height: 0;
+          height: 100%;
+        }
+
+        #modules_page[data-sync-panels='ready'] #modules_result_card > .card-body > .tabbable > .tab-content > .tab-pane,
+        #modules_page[data-sync-panels='ready'] #modules_result_card > .card-body > .tabbable > .tab-content > .active {
+          min-height: 0;
+        }
+
+        #modules_page .module-visual-shell,
+        #modules_page .module-table-shell {
+          display: flex;
+          flex-direction: column;
+          flex: 1 1 auto;
+          min-height: 0;
+        }
+
+        #modules_page .module-visual-filter-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          flex-wrap: nowrap;
+          margin-bottom: 8px;
+          width: 100%;
+        }
+
+        #modules_page .module-visual-shell > #module_selector_ui {
+          flex: 0 0 auto;
+          width: 100%;
+          margin-bottom: 8px;
+        }
+
+        #modules_page .module-visual-shell > #module_selector_ui .module-selector-wrap {
+          width: 100%;
+        }
+
+        #modules_page .module-visual-shell > #module_selector_ui .form-group {
+          margin-bottom: 0;
+        }
+
+        #modules_page .module-selector-divider {
+          margin: 0 0 8px 0;
+          flex: 0 0 auto;
+        }
+
+        #modules_page .module-visual-filter-row #module_node_selector_ui {
+          flex: 0 1 320px;
+          width: 320px;
+          max-width: 100%;
+          min-width: 0;
+          display: block;
+        }
+
+        #modules_page .module-visual-filter-row #module_node_selector_ui .pcsf-selector-item {
+          width: 100%;
+          max-width: 100%;
+        }
+
+        #modules_page .module-visual-filter-row #module_node_selector_ui .pcsf-selector-input {
+          display: flex;
+          align-items: flex-start;
+          gap: 8px;
+        }
+
+        #modules_page .module-visual-filter-row #module_node_selector_ui .pcsf-selector-field {
+          flex: 1;
+          min-width: 0;
+        }
+
+        #modules_page .module-visual-filter-row #module_node_selector_ui .pcsf-selector-field .form-group,
+        #modules_page .module-visual-filter-row #module_node_selector_ui .pcsf-selector-field .selectize-control {
+          margin-bottom: 0;
+        }
+
+        #modules_page .module-visual-filter-row #module_node_selector_ui .pcsf-selector-input .inline-info-wrap {
+          margin-left: 0;
+          margin-top: 8px;
+          flex: 0 0 auto;
+        }
+
+        #modules_page .module-visual-filter-row #module_network_legend {
+          flex: 0 0 auto;
+          margin-left: auto;
+        }
+
+        #modules_page .module-visual-shell > hr,
+        #modules_page .module-table-shell > hr {
+          margin: 0 0 8px 0;
+          flex: 0 0 auto;
+        }
+
+        #modules_page .module-table-wrap {
+          flex: 1 1 auto;
+          min-height: 0;
+          overflow: auto;
+        }
+
+        #modules_page .module-status-wrap {
+          flex: 0 0 auto;
+        }
         
         #modules_page #module_network_ui {
           display: flex;
           flex: 1;
           min-height: 0;
+          width: 100%;
+        }
+
+        #modules_page #module_network_ui > .shiny-vis-network,
+        #modules_page #module_network_ui > .html-widget,
+        #modules_page #module_network_ui .vis-network,
+        #modules_page #module_network_ui .vis-network > canvas {
+          flex: 1 1 auto;
+          min-height: 0;
+          width: 100% !important;
+          height: 100% !important;
         }
         
         /* Function */
+        #function_page .step-main-row {
+          align-items: flex-start;
+        }
+
+        #function_page .step-main-row > [class*='col-'] {
+          display: block;
+        }
+
+        #function_page .step-main-row > [class*='col-'] > .card {
+          width: 100%;
+        }
+
         #function_page .card > .card-body {
           display: flex;
           flex-direction: column;
+          min-height: 0;
+        }
+
+        #function_page[data-sync-panels='ready'] #function_result_card {
+          height: var(--function-panel-height);
+        }
+
+        #function_page[data-sync-panels='ready'] #function_result_card > .card-body {
+          min-height: 0;
+          overflow: hidden;
+        }
+
+        #function_page[data-sync-panels='ready'] #function_result_card > .card-body > .shiny-html-output {
+          display: flex;
+          flex: 1 1 auto;
           min-height: 0;
         }
         
@@ -438,6 +928,8 @@ ui <- fluidPage(
           min-height: 0;
           flex-direction: column;
           width: 100%;
+          overflow-y: auto;
+          overflow-x: hidden;
         }
       }
 
@@ -472,11 +964,12 @@ ui <- fluidPage(
 
       .network-legend-row {
         display: flex;
-        justify-content: center;
-        gap: 28px;
-        margin-top: 10px;
-        margin-bottom: 4px;
-        flex-wrap: wrap;
+        flex-direction: row;
+        align-items: center;
+        gap: 18px;
+        margin-top: 0;
+        margin-bottom: 0;
+        white-space: nowrap;
       }
 
       .network-legend-item {
@@ -1771,6 +2264,311 @@ ui <- fluidPage(
 	    
 	    tags$script(HTML("
 	      (function() {
+	        var resizeObserver = null;
+	        var resizeTimer = null;
+
+	        function applyUploadPanelHeight() {
+	          var page = document.getElementById('upload_page');
+	          var leftCard = document.getElementById('upload_param_card');
+	          if (!page || !leftCard) return;
+
+	          if (window.innerWidth < 992 || page.offsetParent === null) {
+	            page.removeAttribute('data-sync-panels');
+	            page.style.removeProperty('--upload-panel-height');
+	            return;
+	          }
+
+	          page.removeAttribute('data-sync-panels');
+	          page.style.removeProperty('--upload-panel-height');
+
+	          window.requestAnimationFrame(function() {
+	            var height = Math.ceil(leftCard.getBoundingClientRect().height);
+	            if (!height || height < 1) return;
+	            page.style.setProperty('--upload-panel-height', height + 'px');
+	            page.setAttribute('data-sync-panels', 'ready');
+	          });
+	        }
+
+	        function queueUploadPanelSync() {
+	          clearTimeout(resizeTimer);
+	          resizeTimer = setTimeout(applyUploadPanelHeight, 30);
+	        }
+
+	        function initUploadPanelSync() {
+	          var leftCard = document.getElementById('upload_param_card');
+	          if (!leftCard || typeof ResizeObserver === 'undefined') return;
+	          if (resizeObserver) {
+	            resizeObserver.disconnect();
+	          }
+	          resizeObserver = new ResizeObserver(function() {
+	            queueUploadPanelSync();
+	          });
+	          resizeObserver.observe(leftCard);
+	        }
+
+	        document.addEventListener('DOMContentLoaded', function() {
+	          initUploadPanelSync();
+	          queueUploadPanelSync();
+	        });
+
+	        document.addEventListener('shown.bs.tab', function() {
+	          queueUploadPanelSync();
+	        });
+
+	        window.addEventListener('resize', function() {
+	          queueUploadPanelSync();
+	        });
+
+	        window.syncUploadPanels = queueUploadPanelSync;
+	      })();
+	    ")),
+	    
+	    tags$script(HTML("
+	      (function() {
+	        var resizeObserver = null;
+	        var resizeTimer = null;
+
+	        function applyAnnotationPanelHeight() {
+	          var page = document.getElementById('annotation_page');
+	          var leftCard = document.getElementById('annotation_param_card');
+	          if (!page || !leftCard) return;
+
+	          if (window.innerWidth < 992 || page.offsetParent === null) {
+	            page.removeAttribute('data-sync-panels');
+	            page.style.removeProperty('--annotation-panel-height');
+	            return;
+	          }
+
+	          page.removeAttribute('data-sync-panels');
+	          page.style.removeProperty('--annotation-panel-height');
+
+	          window.requestAnimationFrame(function() {
+	            var height = Math.ceil(leftCard.getBoundingClientRect().height);
+	            if (!height || height < 1) return;
+	            page.style.setProperty('--annotation-panel-height', height + 'px');
+	            page.setAttribute('data-sync-panels', 'ready');
+	          });
+	        }
+
+	        function queueAnnotationPanelSync() {
+	          clearTimeout(resizeTimer);
+	          resizeTimer = setTimeout(applyAnnotationPanelHeight, 30);
+	        }
+
+	        function initAnnotationPanelSync() {
+	          var leftCard = document.getElementById('annotation_param_card');
+	          if (!leftCard || typeof ResizeObserver === 'undefined') return;
+	          if (resizeObserver) {
+	            resizeObserver.disconnect();
+	          }
+	          resizeObserver = new ResizeObserver(function() {
+	            queueAnnotationPanelSync();
+	          });
+	          resizeObserver.observe(leftCard);
+	        }
+
+	        document.addEventListener('DOMContentLoaded', function() {
+	          initAnnotationPanelSync();
+	          queueAnnotationPanelSync();
+	        });
+
+	        document.addEventListener('shown.bs.tab', function() {
+	          queueAnnotationPanelSync();
+	        });
+
+	        window.addEventListener('resize', function() {
+	          queueAnnotationPanelSync();
+	        });
+
+	        window.syncAnnotationPanels = queueAnnotationPanelSync;
+	      })();
+	    ")),
+	    
+	    tags$script(HTML("
+	      (function() {
+	        var resizeObserver = null;
+	        var resizeTimer = null;
+
+	        function applyNetworkPanelHeight() {
+	          var page = document.getElementById('network_page');
+	          var leftCard = document.getElementById('network_param_card');
+	          if (!page || !leftCard) return;
+
+	          if (window.innerWidth < 992 || page.offsetParent === null) {
+	            page.removeAttribute('data-sync-panels');
+	            page.style.removeProperty('--network-panel-height');
+	            return;
+	          }
+
+	          page.removeAttribute('data-sync-panels');
+	          page.style.removeProperty('--network-panel-height');
+
+	          window.requestAnimationFrame(function() {
+	            var height = Math.ceil(leftCard.getBoundingClientRect().height);
+	            if (!height || height < 1) return;
+	            page.style.setProperty('--network-panel-height', height + 'px');
+	            page.setAttribute('data-sync-panels', 'ready');
+	          });
+	        }
+
+	        function queueNetworkPanelSync() {
+	          clearTimeout(resizeTimer);
+	          resizeTimer = setTimeout(applyNetworkPanelHeight, 30);
+	        }
+
+	        function initNetworkPanelSync() {
+	          var leftCard = document.getElementById('network_param_card');
+	          if (!leftCard || typeof ResizeObserver === 'undefined') return;
+	          if (resizeObserver) {
+	            resizeObserver.disconnect();
+	          }
+	          resizeObserver = new ResizeObserver(function() {
+	            queueNetworkPanelSync();
+	          });
+	          resizeObserver.observe(leftCard);
+	        }
+
+	        document.addEventListener('DOMContentLoaded', function() {
+	          initNetworkPanelSync();
+	          queueNetworkPanelSync();
+	        });
+
+	        document.addEventListener('shown.bs.tab', function() {
+	          queueNetworkPanelSync();
+	        });
+
+	        window.addEventListener('resize', function() {
+	          queueNetworkPanelSync();
+	        });
+
+	        window.syncNetworkPanels = queueNetworkPanelSync;
+	      })();
+	    ")),
+
+	    tags$script(HTML("
+	      (function() {
+	        var resizeObserver = null;
+	        var resizeTimer = null;
+
+	        function applyModulesPanelHeight() {
+	          var page = document.getElementById('modules_page');
+	          var leftCard = document.getElementById('modules_param_card');
+	          if (!page || !leftCard) return;
+
+	          if (window.innerWidth < 992 || page.offsetParent === null) {
+	            page.removeAttribute('data-sync-panels');
+	            page.style.removeProperty('--modules-panel-height');
+	            return;
+	          }
+
+	          page.removeAttribute('data-sync-panels');
+	          page.style.removeProperty('--modules-panel-height');
+
+	          window.requestAnimationFrame(function() {
+	            var height = Math.ceil(leftCard.getBoundingClientRect().height);
+	            if (!height || height < 1) return;
+	            page.style.setProperty('--modules-panel-height', height + 'px');
+	            page.setAttribute('data-sync-panels', 'ready');
+	          });
+	        }
+
+	        function queueModulesPanelSync() {
+	          clearTimeout(resizeTimer);
+	          resizeTimer = setTimeout(applyModulesPanelHeight, 30);
+	        }
+
+	        function initModulesPanelSync() {
+	          var leftCard = document.getElementById('modules_param_card');
+	          if (!leftCard || typeof ResizeObserver === 'undefined') return;
+	          if (resizeObserver) {
+	            resizeObserver.disconnect();
+	          }
+	          resizeObserver = new ResizeObserver(function() {
+	            queueModulesPanelSync();
+	          });
+	          resizeObserver.observe(leftCard);
+	        }
+
+	        document.addEventListener('DOMContentLoaded', function() {
+	          initModulesPanelSync();
+	          queueModulesPanelSync();
+	        });
+
+	        document.addEventListener('shown.bs.tab', function() {
+	          queueModulesPanelSync();
+	        });
+
+	        window.addEventListener('resize', function() {
+	          queueModulesPanelSync();
+	        });
+
+	        window.syncModulesPanels = queueModulesPanelSync;
+	      })();
+	    ")),
+
+	    tags$script(HTML("
+	      (function() {
+	        var resizeObserver = null;
+	        var resizeTimer = null;
+
+	        function applyFunctionPanelHeight() {
+	          var page = document.getElementById('function_page');
+	          var leftCard = document.getElementById('function_param_card');
+	          if (!page || !leftCard) return;
+
+	          if (window.innerWidth < 992 || page.offsetParent === null) {
+	            page.removeAttribute('data-sync-panels');
+	            page.style.removeProperty('--function-panel-height');
+	            return;
+	          }
+
+	          page.removeAttribute('data-sync-panels');
+	          page.style.removeProperty('--function-panel-height');
+
+	          window.requestAnimationFrame(function() {
+	            var height = Math.ceil(leftCard.getBoundingClientRect().height);
+	            if (!height || height < 1) return;
+	            page.style.setProperty('--function-panel-height', height + 'px');
+	            page.setAttribute('data-sync-panels', 'ready');
+	          });
+	        }
+
+	        function queueFunctionPanelSync() {
+	          clearTimeout(resizeTimer);
+	          resizeTimer = setTimeout(applyFunctionPanelHeight, 30);
+	        }
+
+	        function initFunctionPanelSync() {
+	          var leftCard = document.getElementById('function_param_card');
+	          if (!leftCard || typeof ResizeObserver === 'undefined') return;
+	          if (resizeObserver) {
+	            resizeObserver.disconnect();
+	          }
+	          resizeObserver = new ResizeObserver(function() {
+	            queueFunctionPanelSync();
+	          });
+	          resizeObserver.observe(leftCard);
+	        }
+
+	        document.addEventListener('DOMContentLoaded', function() {
+	          initFunctionPanelSync();
+	          queueFunctionPanelSync();
+	        });
+
+	        document.addEventListener('shown.bs.tab', function() {
+	          queueFunctionPanelSync();
+	        });
+
+	        window.addEventListener('resize', function() {
+	          queueFunctionPanelSync();
+	        });
+
+	        window.syncFunctionPanels = queueFunctionPanelSync;
+	      })();
+	    ")),
+	    
+	    tags$script(HTML("
+	      (function() {
 	        function fallbackCopyText(text) {
 	          return new Promise(function(resolve, reject) {
 	            var textarea = document.createElement('textarea');
@@ -2312,19 +3110,31 @@ ui <- fluidPage(
                        "Data Preview"),
               tags$div(
                 class = "card-body",
-                tabsetPanel(
-                  id = "upload_preview_tabs",
-                  tabPanel(
-                    "Feature Table",
-                    DTOutput("feature_preview")
-                  ),
-                  tabPanel(
-                    "MS2 Table",
-                    DTOutput("ms2_preview")
+                tags$div(
+                  class = "upload-preview-shell",
+                  tabsetPanel(
+                    id = "upload_preview_tabs",
+                    tabPanel(
+                      "Feature Table",
+                      tags$div(
+                        class = "upload-preview-table",
+                        DTOutput("feature_preview")
+                      )
+                    ),
+                    tabPanel(
+                      "MS2 Table",
+                      tags$div(
+                        class = "upload-preview-table",
+                        DTOutput("ms2_preview")
+                      )
+                    )
                   )
                 ),
                 tags$hr(),
-                uiOutput("upload_status_ui")
+                tags$div(
+                  class = "upload-status-wrap",
+                  uiOutput("upload_status_ui")
+                )
               )
             )
           )
@@ -2671,9 +3481,17 @@ ui <- fluidPage(
                   # ---- Tab 1: Subnetwork ----
                   tabPanel(
                     title = tagList(icon("network-wired"), "Subnetwork"),
-                    uiOutput("pcsf_network_container"),
-                    uiOutput("pcsf_network_legend"),
-                    uiOutput("pcsf_tuning_summary")
+                    tags$div(
+                      class = "pcsf-network-shell",
+                      tags$div(
+                        class = "pcsf-network-topbar",
+                        uiOutput("pcsf_node_selectors"),
+                        uiOutput("pcsf_network_legend")
+                      ),
+                      uiOutput("pcsf_network_container"),
+                      uiOutput("pcsf_tuning_summary"),
+                      uiOutput("pcsf_selected_annotation_ui")
+                    )
                   ),
                   
                   # ---- Tab 2: Annotation Table 2 ----
@@ -2682,9 +3500,7 @@ ui <- fluidPage(
                     tags$div(
                       class = "annotation-table-wrap",
                       DTOutput("annotation_table2")
-                    ),
-                    tags$hr(),
-                    uiOutput("pcsf_annotation_status_ui")
+                    )
                   )
                 )
               )
@@ -2867,32 +3683,72 @@ ui <- fluidPage(
                   # ---- Tab 1: Visualization ----
                   tabPanel(
                     title = tagList(icon("network-wired"), "Visualization"),
-                    uiOutput("module_selector_ui"),
-                    tags$hr(),
-                    uiOutput("module_network_ui"),
-                    uiOutput("module_network_legend")
+                    tags$div(
+                      class = "module-visual-shell",
+                      uiOutput("module_selector_ui"),
+                      tags$hr(class = "module-selector-divider"),
+                      tags$div(
+                        class = "module-visual-filter-row",
+                        tags$div(
+                          id = "module_node_selector_ui",
+                          class = "pcsf-selector-item",
+                          tags$div(
+                            class = "pcsf-selector-input",
+                            tags$div(
+                              class = "pcsf-selector-field",
+                              selectizeInput(
+                                "module_metabolite_select",
+                                label = NULL,
+                                choices = character(0),
+                                selected = NULL,
+                                multiple = FALSE,
+                                width = "100%",
+                                options = list(
+                                  placeholder = "Metabolite"
+                                )
+                              )
+                            ),
+                            build_info_icon("Select a metabolite to highlight its directly connected metabolites in the network.")
+                          )
+                        ),
+                        uiOutput("module_network_legend")
+                      ),
+                      uiOutput("module_network_ui")
+                    )
                   ),
                   
                   # ---- Tab 2: Module Score ----
                   tabPanel(
                     title = tagList(icon("chart-line"), "Module Score"),
                     tags$div(
-                      class = "annotation-table-wrap",
-                      DTOutput("module_score")
-                    ),
-                    tags$hr(),
-                    uiOutput("module_score_status_ui")
+                      class = "module-table-shell",
+                      tags$div(
+                        class = "module-table-wrap annotation-table-wrap",
+                        DTOutput("module_score")
+                      ),
+                      tags$hr(),
+                      tags$div(
+                        class = "module-status-wrap",
+                        uiOutput("module_score_status_ui")
+                      )
+                    )
                   ),
                   
                   # ---- Tab 3: Module Table ----
                   tabPanel(
                     title = tagList(icon("table"), "Module Table"),
                     tags$div(
-                      class = "annotation-table-wrap",
-                      DTOutput("module_table")
-                    ),
-                    tags$hr(),
-                    uiOutput("module_table_status_ui")
+                      class = "module-table-shell",
+                      tags$div(
+                        class = "module-table-wrap annotation-table-wrap",
+                        DTOutput("module_table")
+                      ),
+                      tags$hr(),
+                      tags$div(
+                        class = "module-status-wrap",
+                        uiOutput("module_table_status_ui")
+                      )
+                    )
                   )
                 )
               )
@@ -3216,6 +4072,7 @@ ui <- fluidPage(
                       "Module network" = "module"
                     )
                   ),
+                  uiOutput("results_module_export_selector"),
                   selectInput(
                     "network_export_format",
                     "Network Format",
@@ -3224,8 +4081,7 @@ ui <- fluidPage(
                       "GraphML (.graphml)" = "graphml"
                     ),
                     selected = "html"
-                  ),
-                  uiOutput("results_module_export_selector")
+                  )
                 ),
                 tags$div(
                   class = "results-preview-wrap",
@@ -3293,8 +4149,10 @@ server <- function(input, output, session) {
     mrn = NULL,
     annotation_table2 = NULL,
     pcsf_status = "idle",
+    pcsf_selected_node = NULL,
     ### Step 4
     module_res    = NULL,
+    module_selected_node = NULL,
     module_status = "idle",
     ### Step 5
     function_result = NULL,
@@ -3359,14 +4217,29 @@ server <- function(input, output, session) {
     })
     shinyjs::addClass(paste0("nav_", page), "active")
 
-    shinyjs::runjs(
-      "setTimeout(function() {
-        window.dispatchEvent(new Event('resize'));
-        if (window.forcePlotlyResize) {
-          window.forcePlotlyResize();
-        } else if (window.Plotly && window.Plotly.Plots && window.Plotly.Plots.resize) {
-          document.querySelectorAll('.js-plotly-plot').forEach(function(el) {
-            try { window.Plotly.Plots.resize(el); } catch (e) {}
+	    shinyjs::runjs(
+	      "setTimeout(function() {
+	        window.dispatchEvent(new Event('resize'));
+	        if (window.syncUploadPanels) {
+	          window.syncUploadPanels();
+	        }
+	        if (window.syncAnnotationPanels) {
+	          window.syncAnnotationPanels();
+	        }
+	        if (window.syncNetworkPanels) {
+	          window.syncNetworkPanels();
+	        }
+	        if (window.syncModulesPanels) {
+	          window.syncModulesPanels();
+	        }
+	        if (window.syncFunctionPanels) {
+	          window.syncFunctionPanels();
+	        }
+	        if (window.forcePlotlyResize) {
+	          window.forcePlotlyResize();
+	        } else if (window.Plotly && window.Plotly.Plots && window.Plotly.Plots.resize) {
+	          document.querySelectorAll('.js-plotly-plot').forEach(function(el) {
+	            try { window.Plotly.Plots.resize(el); } catch (e) {}
           });
         }
       }, 140);"
@@ -3394,6 +4267,7 @@ server <- function(input, output, session) {
 
     rv$annotation_table2 <- NULL
     rv$pcsf_status <- "idle"
+    rv$pcsf_selected_node <- NULL
 
     rv$module_res <- NULL
     rv$module_status <- "idle"
@@ -3902,6 +4776,7 @@ server <- function(input, output, session) {
     rv$annotation_status <- "idle"
     rv$annotation_table2 <- NULL
     rv$pcsf_status <- "idle"
+    rv$pcsf_selected_node <- NULL
     rv$module_res <- NULL
     rv$module_status <- "idle"
     rv$function_result <- NULL
@@ -4416,6 +5291,7 @@ server <- function(input, output, session) {
     req(rv$annotation_object, rv$mrn)
     
     rv$pcsf_status <- "running"
+    rv$pcsf_selected_node <- NULL
     shinyjs::disable("run_pcsf")
     
     b_grid <- if (isTRUE(input$pcsf_grid_tune)) {
@@ -4491,6 +5367,7 @@ server <- function(input, output, session) {
         rv$annotation_object <- res
         rv$annotation_table2 <- res$anno_feature_table2
         rv$pcsf_status <- "finished"
+        rv$pcsf_selected_node <- NULL
         update_process_modal(
           "success",
           "Step 3 Completed",
@@ -4521,27 +5398,99 @@ server <- function(input, output, session) {
   })
   
   output$pcsf_network_container <- renderUI({
+    stage_style <- "display:flex; flex:1 1 auto; min-height:0; height:100%; width:100%;"
+    fill_style <- "display:flex; flex:1 1 auto; min-height:100%; height:100%; width:100%;"
+
     if (rv$pcsf_status == "running") {
       tags$div(
-        class = "empty-panel empty-panel-fill",
-        icon("spinner", class = "fa-spin"),
-        "Running PCSF subnetwork extraction..."
+        class = "pcsf-network-stage",
+        style = stage_style,
+        tags$div(
+          class = "empty-panel empty-panel-fill",
+          style = fill_style,
+          icon("spinner", class = "fa-spin"),
+          "Running PCSF subnetwork extraction..."
+        )
       )
     } else if (rv$pcsf_status == "finished" && isTRUE(input$pcsf_show_network)) {
-      visNetworkOutput("pcsf_network_plot", height = 760)
+      tags$div(
+        class = "pcsf-network-stage",
+        style = stage_style,
+        visNetworkOutput("pcsf_network_plot", height = 560)
+      )
     } else if (rv$pcsf_status == "finished") {
       tags$div(
-        class = "empty-panel empty-panel-fill",
-        icon("eye-slash"),
-        "Network visualization is disabled. Enable it in parameters."
+        class = "pcsf-network-stage",
+        style = stage_style,
+        tags$div(
+          class = "empty-panel empty-panel-fill",
+          style = fill_style,
+          icon("eye-slash"),
+          "Network visualization is disabled. Enable it in parameters."
+        )
       )
     } else {
       tags$div(
-        class = "empty-panel empty-panel-fill",
-        icon("network-wired"),
-        "Subnetwork has not been generated yet."
+        class = "pcsf-network-stage",
+        style = stage_style,
+        tags$div(
+          class = "empty-panel empty-panel-fill",
+          style = fill_style,
+          icon("network-wired"),
+          "Subnetwork has not been generated yet."
+        )
       )
     }
+  })
+
+  output$pcsf_node_selectors <- renderUI({
+    if (!(rv$pcsf_status == "finished" && isTRUE(input$pcsf_show_network))) {
+      return(NULL)
+    }
+
+    tags$div(
+      class = "pcsf-selector-row",
+      tags$div(
+        class = "pcsf-selector-item",
+          tags$div(
+            class = "pcsf-selector-input",
+            tags$div(
+              class = "pcsf-selector-field",
+            selectizeInput(
+              "pcsf_feature_select",
+              label = NULL,
+              choices = NULL,
+              selected = NULL,
+              multiple = FALSE,
+              options = list(
+                placeholder = "Feature"
+                )
+              )
+            ),
+          build_info_icon("Select a feature to highlight its directly connected metabolites in the network and update the linked rows shown below.")
+        )
+      ),
+      tags$div(
+        class = "pcsf-selector-item",
+          tags$div(
+            class = "pcsf-selector-input",
+            tags$div(
+              class = "pcsf-selector-field",
+            selectizeInput(
+              "pcsf_metabolite_select",
+              label = NULL,
+              choices = NULL,
+              selected = NULL,
+              multiple = FALSE,
+              options = list(
+                placeholder = "Metabolite"
+                )
+              )
+            ),
+          build_info_icon("Select a metabolite to highlight its directly connected features in the network and update the linked rows shown below.")
+        )
+      )
+    )
   })
 
   output$pcsf_network_legend <- renderUI({
@@ -4562,72 +5511,390 @@ server <- function(input, output, session) {
       )
     )
   })
-  
-  output$pcsf_network_plot <- renderVisNetwork({
+
+  observeEvent(list(rv$pcsf_status, input$pcsf_show_network), {
+    if (rv$pcsf_status == "finished" && isTRUE(input$pcsf_show_network)) {
+      rv$pcsf_selected_node <- NULL
+    }
+  }, ignoreInit = FALSE)
+
+  observeEvent(list(rv$pcsf_status, input$pcsf_show_network, rv$annotation_object$pcsf_subnet), {
     req(rv$pcsf_status == "finished")
     req(isTRUE(input$pcsf_show_network))
     req(rv$annotation_object$pcsf_subnet)
-    
+
+    lookup <- pcsf_node_lookup()
+    feature_lookup <- lookup[lookup$group == "Feature", , drop = FALSE]
+    metabolite_lookup <- lookup[lookup$group == "Metabolite", , drop = FALSE]
+
+    updateSelectizeInput(
+      session,
+      "pcsf_feature_select",
+      choices = stats::setNames(feature_lookup$id, feature_lookup$label),
+      selected = character(0),
+      server = TRUE
+    )
+
+    updateSelectizeInput(
+      session,
+      "pcsf_metabolite_select",
+      choices = stats::setNames(metabolite_lookup$id, metabolite_lookup$label),
+      selected = character(0),
+      server = TRUE
+    )
+  }, ignoreInit = FALSE)
+
+  pcsf_node_lookup <- reactive({
+    if (!(rv$pcsf_status == "finished") || is.null(rv$annotation_object$pcsf_subnet)) {
+      return(data.frame(
+        id = character(0),
+        type = character(0),
+        group = character(0),
+        label = character(0),
+        stringsAsFactors = FALSE
+      ))
+    }
+
     g <- rv$annotation_object$pcsf_subnet
-    
-    # --- nodes ---
     node_id <- as.character(igraph::V(g)$name)
-    
-    short_label <- ifelse(
-      nchar(node_id) > 28,
-      paste0(substr(node_id, 1, 25), "..."),
+    node_type <- as.character(igraph::V(g)$type)
+    if (length(node_type) != length(node_id) || all(is.na(node_type))) {
+      node_type <- rep("Node", length(node_id))
+    }
+    node_group <- ifelse(node_type == "Terminal", "Feature", "Metabolite")
+
+    node_compound_name <- igraph::V(g)$compound_name
+    if (is.null(node_compound_name) || length(node_compound_name) != length(node_id)) {
+      node_compound_name <- rep(NA_character_, length(node_id))
+    }
+    node_compound_name <- as.character(node_compound_name)
+
+    node_label <- ifelse(
+      node_group == "Metabolite" & !is.na(node_compound_name) & nzchar(node_compound_name),
+      node_compound_name,
       node_id
     )
-    
-    node_prize <- igraph::V(g)$prize
-    if (is.null(node_prize) || all(is.na(node_prize))) node_prize <- rep(1, length(node_id))
-    node_prize <- as.numeric(node_prize)
-    
-    node_type <- igraph::V(g)$type
-    if (is.null(node_type) || all(is.na(node_type))) node_type <- rep("Node", length(node_id))
-    node_type <- as.character(node_type)
-    
-    nodes <- data.frame(
-      id    = node_id,
-      label = short_label,
-      title = node_id,          
-      value = scales::rescale(node_prize, to = c(10, 40)),       
-      color = ifelse(
-        node_type == "Terminal",
-        "#fc8d58",  
-        "#4474b3"    
-      ),
-      color.border = ifelse(
-        node_type == "Terminal",
-        "#fc8d58",
-        "#4474b3"
-      ),
+
+    data.frame(
+      id = node_id,
+      type = node_type,
+      group = node_group,
+      label = node_label,
       stringsAsFactors = FALSE
     )
-    # --- edges ---
+  })
+
+  pcsf_selected_node_info <- reactive({
+    lookup <- pcsf_node_lookup()
+    selected_id <- rv$pcsf_selected_node
+
+    if (is.null(selected_id) || !nzchar(selected_id)) {
+      return(NULL)
+    }
+
+    hit <- match(selected_id, lookup$id)
+    if (is.na(hit)) {
+      return(NULL)
+    }
+
+    as.list(lookup[hit, , drop = FALSE])
+  })
+
+  pcsf_selected_annotation_data <- reactive({
+    tbl <- rv$annotation_table2
+    selected <- pcsf_selected_node_info()
+
+    if (is.null(tbl) || nrow(tbl) == 0 || is.null(selected)) {
+      return(NULL)
+    }
+
+    feature_col <- pick_first_col(
+      tbl,
+      c("variable_id", "feature_id", "feature", "feature_name", "id")
+    )
+    metabolite_col <- pick_first_col(
+      tbl,
+      c("INCHI_ID", "inchi_id", "InChI_ID", "compound_id", "Compound_ID")
+    )
+
+    if (identical(selected$group, "Feature") && !is.null(feature_col)) {
+      return(tbl[tbl[[feature_col]] == selected$id, , drop = FALSE])
+    }
+
+    if (identical(selected$group, "Metabolite") && !is.null(metabolite_col)) {
+      return(tbl[tbl[[metabolite_col]] == selected$id, , drop = FALSE])
+    }
+
+    tbl[0, , drop = FALSE]
+  })
+
+  pcsf_network_base_data <- reactive({
+    req(rv$pcsf_status == "finished")
+    req(isTRUE(input$pcsf_show_network))
+    req(rv$annotation_object$pcsf_subnet)
+
+    g <- rv$annotation_object$pcsf_subnet
+    lookup <- pcsf_node_lookup()
+
+    node_id <- lookup$id
+    node_prize <- igraph::V(g)$prize
+    if (is.null(node_prize) || all(is.na(node_prize))) {
+      node_prize <- rep(1, length(node_id))
+    }
+    node_prize <- as.numeric(node_prize)
+
+    feature_fill <- "#fc8d58"
+    metabolite_fill <- "#4474b3"
+
+    nodes <- data.frame(
+      id = node_id,
+      label = lookup$label,
+      size = scales::rescale(node_prize, to = c(10, 40)),
+      color.background = ifelse(lookup$group == "Feature", feature_fill, metabolite_fill),
+      color.border = ifelse(lookup$group == "Feature", feature_fill, metabolite_fill),
+      color.highlight.background = ifelse(lookup$group == "Feature", feature_fill, metabolite_fill),
+      color.highlight.border = ifelse(lookup$group == "Feature", feature_fill, metabolite_fill),
+      color.hover.background = ifelse(lookup$group == "Feature", feature_fill, metabolite_fill),
+      color.hover.border = ifelse(lookup$group == "Feature", feature_fill, metabolite_fill),
+      font.color = "#475467",
+      font.face = "Arial",
+      font.size = 14,
+      borderWidth = 0,
+      stringsAsFactors = FALSE
+    )
+
     edges_df <- igraph::as_data_frame(g, what = "edges")
     edges_df$from <- as.character(edges_df$from)
-    edges_df$to   <- as.character(edges_df$to)
+    edges_df$to <- as.character(edges_df$to)
 
     edge_freq <- igraph::E(g)$freq
-    if (is.null(edge_freq) || all(is.na(edge_freq))) edge_freq <- rep(1, nrow(edges_df))
+    if (is.null(edge_freq) || all(is.na(edge_freq))) {
+      edge_freq <- rep(1, nrow(edges_df))
+    }
     edge_freq <- as.numeric(edge_freq)
-    
+
     edges <- data.frame(
-      from  = edges_df$from,
-      to    = edges_df$to,
-      value = scales::rescale(edge_freq, to = c(1, 6)),              
+      id = seq_len(nrow(edges_df)),
+      from = edges_df$from,
+      to = edges_df$to,
+      value = scales::rescale(edge_freq, to = c(1, 6)),
       title = paste0("freq: ", round(edge_freq, 3)),
       color = "rgba(120,120,120,0.5)",
       stringsAsFactors = FALSE
     )
-    
-    visNetwork(nodes, edges, width = "100%", height = "700px") %>%
-      visOptions(
-        highlightNearest = TRUE,
-        nodesIdSelection = TRUE
+
+    list(nodes = nodes, edges = edges)
+  })
+
+  pcsf_network_styled_data <- reactive({
+    base <- pcsf_network_base_data()
+    nodes <- base$nodes
+    edges <- base$edges
+
+    selected_id <- rv$pcsf_selected_node
+    if (is.null(selected_id) || !nzchar(selected_id) || !(selected_id %in% nodes$id)) {
+      return(list(nodes = nodes, edges = edges, selected_id = NULL))
+    }
+
+    g <- rv$annotation_object$pcsf_subnet
+    neighbor_ids <- names(igraph::neighbors(g, selected_id, mode = "all"))
+    active_ids <- unique(c(selected_id, neighbor_ids))
+
+    is_selected <- nodes$id == selected_id
+    is_active <- nodes$id %in% active_ids
+
+    inactive_fill <- "#d0d5dd"
+    nodes$font.color <- ifelse(
+      is_selected,
+      "#8b1e1e",
+      ifelse(
+        is_active,
+        "#475467",
+        "#b8c1cc"
+      )
+    )
+    nodes$font.face <- ifelse(is_selected, "Arial Black", "Arial")
+    nodes$font.size <- 14
+    nodes$color.background <- ifelse(is_active, nodes$color.background, inactive_fill)
+    nodes$color.border <- ifelse(
+      is_selected,
+      "#111111",
+      ifelse(is_active, nodes$color.border, inactive_fill)
+    )
+    nodes$borderWidth <- ifelse(is_selected, 4, 0)
+    nodes$color.highlight.background <- nodes$color.background
+    nodes$color.highlight.border <- nodes$color.border
+    nodes$color.hover.background <- nodes$color.background
+    nodes$color.hover.border <- nodes$color.border
+
+    active_edges <- (edges$from == selected_id & edges$to %in% neighbor_ids) |
+      (edges$to == selected_id & edges$from %in% neighbor_ids)
+    edges$color <- ifelse(active_edges, "rgba(120,120,120,0.65)", "rgba(200,200,200,0.12)")
+
+    list(nodes = nodes, edges = edges, selected_id = selected_id)
+  })
+
+  output$pcsf_network_plot <- renderVisNetwork({
+    graph_data <- pcsf_network_base_data()
+
+    visNetwork(graph_data$nodes, graph_data$edges, width = "100%", height = "520px") %>%
+      visNodes(
+        labelHighlightBold = TRUE,
+        borderWidth = 0,
+        borderWidthSelected = 0,
+        font = list(
+          size = 14,
+          face = "Arial",
+          color = "#475467"
+        ),
+        scaling = list(
+          min = 10,
+          max = 40,
+          label = list(
+            enabled = FALSE,
+            min = 14,
+            max = 14
+          )
+        )
+      ) %>%
+      visInteraction(
+        hoverConnectedEdges = FALSE,
+        selectConnectedEdges = FALSE
+      ) %>%
+      visEvents(
+        click = "function(params) {
+          var selected = params.nodes && params.nodes.length ? params.nodes[0] : null;
+          Shiny.setInputValue('pcsf_network_selected_node', selected, {priority: 'event'});
+        }"
       ) %>%
       visPhysics(stabilization = FALSE)
+  })
+
+  observeEvent(list(rv$pcsf_selected_node, rv$pcsf_status, input$pcsf_show_network), {
+    if (!(rv$pcsf_status == "finished" && isTRUE(input$pcsf_show_network))) {
+      return()
+    }
+
+    graph_data <- pcsf_network_styled_data()
+    proxy <- visNetworkProxy("pcsf_network_plot")
+
+    visUpdateNodes(proxy, graph_data$nodes) %>%
+      visUpdateEdges(graph_data$edges)
+
+    visUnselectAll(proxy)
+  }, ignoreInit = FALSE)
+
+  observeEvent(input$pcsf_network_selected_node, {
+    selected_id <- input$pcsf_network_selected_node
+
+    rv$pcsf_selected_node <- selected_id
+  }, ignoreNULL = FALSE)
+
+  observeEvent(rv$pcsf_selected_node, {
+    if (!(rv$pcsf_status == "finished" && isTRUE(input$pcsf_show_network))) {
+      return()
+    }
+
+    selected <- pcsf_selected_node_info()
+
+    freezeReactiveValue(input, "pcsf_feature_select")
+    freezeReactiveValue(input, "pcsf_metabolite_select")
+
+    if (is.null(selected)) {
+      updateSelectizeInput(session, "pcsf_feature_select", selected = character(0))
+      updateSelectizeInput(session, "pcsf_metabolite_select", selected = character(0))
+      return()
+    }
+
+    if (identical(selected$group, "Feature")) {
+      updateSelectizeInput(session, "pcsf_feature_select", selected = selected$id)
+      updateSelectizeInput(session, "pcsf_metabolite_select", selected = character(0))
+      return()
+    }
+
+    if (identical(selected$group, "Metabolite")) {
+      updateSelectizeInput(session, "pcsf_feature_select", selected = character(0))
+      updateSelectizeInput(session, "pcsf_metabolite_select", selected = selected$id)
+      return()
+    }
+
+    updateSelectizeInput(session, "pcsf_feature_select", selected = character(0))
+    updateSelectizeInput(session, "pcsf_metabolite_select", selected = character(0))
+  }, ignoreInit = FALSE)
+
+  observeEvent(input$pcsf_feature_select, {
+    selected_id <- input$pcsf_feature_select
+
+    if (is.null(selected_id) || !nzchar(selected_id)) {
+      current_selected <- pcsf_selected_node_info()
+      if (!is.null(current_selected) && identical(current_selected$group, "Metabolite")) {
+        return()
+      }
+
+      if (!is.null(rv$pcsf_selected_node)) {
+        rv$pcsf_selected_node <- NULL
+      }
+      return()
+    }
+
+    rv$pcsf_selected_node <- as.character(selected_id)
+  }, ignoreInit = TRUE)
+
+  observeEvent(input$pcsf_metabolite_select, {
+    selected_id <- input$pcsf_metabolite_select
+
+    if (is.null(selected_id) || !nzchar(selected_id)) {
+      current_selected <- pcsf_selected_node_info()
+      if (!is.null(current_selected) && identical(current_selected$group, "Feature")) {
+        return()
+      }
+
+      if (!is.null(rv$pcsf_selected_node)) {
+        rv$pcsf_selected_node <- NULL
+      }
+      return()
+    }
+
+    rv$pcsf_selected_node <- as.character(selected_id)
+  }, ignoreInit = TRUE)
+
+  output$pcsf_selected_annotation_ui <- renderUI({
+    tags$div(
+      class = "pcsf-linked-table-card",
+      tags$hr(),
+      tags$div(
+        class = "annotation-table-wrap",
+        DTOutput("pcsf_selected_annotation_table")
+      )
+    )
+  })
+
+  output$pcsf_selected_annotation_table <- renderDT({
+    if (rv$pcsf_status != "finished") {
+      return(render_table_message("Select a node, and the corresponding annotation results will be shown here."))
+    }
+
+    selected <- pcsf_selected_node_info()
+    if (is.null(selected)) {
+      return(render_table_message("Select a node, and the corresponding annotation results will be shown here."))
+    }
+
+    filtered <- pcsf_selected_annotation_data()
+    if (is.null(filtered) || nrow(filtered) == 0) {
+      return(render_table_message("No Annotation Table 2 rows linked to the selected node."))
+    }
+
+    datatable(
+      filtered,
+      options = list(
+        dom = "tip",
+        pageLength = 3,
+        lengthChange = FALSE,
+        scrollX = TRUE,
+        scrollY = "150px"
+      ),
+      rownames = FALSE
+    )
   })
   
   output$annotation_table2 <- renderDT({
@@ -4638,80 +5905,13 @@ server <- function(input, output, session) {
     datatable(
       rv$annotation_table2,
       options = list(
-        pageLength = 5,
+        pageLength = 10,
         scrollX = TRUE
       ),
       rownames = FALSE
     )
   })
 
-  output$pcsf_annotation_status_ui <- renderUI({
-    if (rv$pcsf_status == "running") {
-      return(
-        tags$div(
-          class = "param-card",
-          tags$h4(icon("spinner", class = "fa-spin"), "Annotation Status"),
-          tags$p(style = "margin-bottom:0;", "PCSF is running...")
-        )
-      )
-    }
-
-    if (is.null(rv$annotation_table2) || nrow(rv$annotation_table2) == 0) {
-      return(
-        tags$div(
-          class = "param-card",
-          tags$h4(icon("circle-info"), "Annotation Status"),
-          tags$p(style = "margin-bottom:0;", "No annotation table 2 results yet.")
-        )
-      )
-    }
-
-    tbl <- rv$annotation_table2
-    n_entries <- nrow(tbl)
-    feature_col <- pick_first_col(
-      tbl,
-      c("variable_id", "feature_id", "feature", "feature_name", "id")
-    )
-
-    n_matched_features <- if (!is.null(feature_col)) {
-      length(unique(stats::na.omit(tbl[[feature_col]])))
-    } else {
-      n_entries
-    }
-
-    n_total_features <- if (!is.null(rv$feature_data)) nrow(rv$feature_data) else NA_integer_
-    coverage_txt <- if (!is.na(n_total_features) && n_total_features > 0) {
-      sprintf("%.1f%%", 100 * n_matched_features / n_total_features)
-    } else {
-      "NA"
-    }
-    avg_txt <- if (n_matched_features > 0) {
-      sprintf("%.2f", n_entries / n_matched_features)
-    } else {
-      "NA"
-    }
-
-    tags$div(
-      class = "param-card",
-      tags$h4(icon("circle-check"), "Annotation Status"),
-      tags$p(
-        style = "margin-bottom:6px;",
-        paste0(
-          "Matched features: ", n_matched_features,
-          if (!is.na(n_total_features)) paste0(" / ", n_total_features, " (", coverage_txt, ")") else ""
-        )
-      ),
-      tags$p(
-        style = "margin-bottom:6px;",
-        paste0("Feature-metabolite entries: ", n_entries)
-      ),
-      tags$p(
-        style = "margin-bottom:0;",
-        paste0("Avg entries per matched feature: ", avg_txt)
-      )
-    )
-  })
-  
   observeEvent(input$next_to_modules, {
     req(rv$pcsf_status == "finished")
     switch_page("modules")
@@ -4782,7 +5982,7 @@ server <- function(input, output, session) {
         "Identifying modules..."
       )
     } else if (rv$module_status == "finished" && !is.null(input$selected_module)) {
-      visNetworkOutput("module_network", height = 760)
+      visNetworkOutput("module_network", height = "100%", width = "100%")
     } else {
       tags$div(
         class = "empty-panel empty-panel-fill",
@@ -4800,14 +6000,51 @@ server <- function(input, output, session) {
       class = "network-legend-row",
       tags$span(
         class = "network-legend-item",
-        tags$span(class = "network-legend-dot", style = "background:#fc8d58;"),
+        tags$span(class = "network-legend-dot", style = "background:#2a9d8f;"),
         "Annotated"
       ),
       tags$span(
         class = "network-legend-item",
-        tags$span(class = "network-legend-dot", style = "background:#4474b3;"),
+        tags$span(class = "network-legend-dot", style = "background:#b56576;"),
         "Hidden"
       )
+    )
+  })
+
+  module_node_lookup <- reactive({
+    if (!(rv$module_status == "finished") ||
+        is.null(rv$module_res) ||
+        is.null(rv$module_res$module_table) ||
+        is.null(input$selected_module)) {
+      return(data.frame(
+        id = character(0),
+        label = character(0),
+        stringsAsFactors = FALSE
+      ))
+    }
+
+    tbl <- rv$module_res$module_table %>%
+      dplyr::filter(Module == input$selected_module) %>%
+      dplyr::distinct(INCHI_ID, Compound_name)
+
+    if (nrow(tbl) == 0) {
+      return(data.frame(
+        id = character(0),
+        label = character(0),
+        stringsAsFactors = FALSE
+      ))
+    }
+
+    node_label <- ifelse(
+      !is.na(tbl$Compound_name) & nzchar(tbl$Compound_name),
+      as.character(tbl$Compound_name),
+      as.character(tbl$INCHI_ID)
+    )
+
+    data.frame(
+      id = as.character(tbl$INCHI_ID),
+      label = node_label,
+      stringsAsFactors = FALSE
     )
   })
   
@@ -4816,7 +6053,9 @@ server <- function(input, output, session) {
     req(rv$module_res)
     req(rv$module_res$module_score)
     
-    mods <- sort(unique(rv$module_res$module_score$Module))
+    mods <- unique(as.character(rv$module_res$module_score$Module))
+    mod_num <- suppressWarnings(as.numeric(gsub("[^0-9]+", "", mods)))
+    mods <- mods[order(is.na(mod_num), mod_num, mods)]
     req(length(mods) > 0)
     current_selected <- input$selected_module
     selected_mod <- if (!is.null(current_selected) && current_selected %in% mods) {
@@ -4836,61 +6075,253 @@ server <- function(input, output, session) {
       )
     )
   })
-  
-  output$module_network <- renderVisNetwork({
+
+  observeEvent(list(rv$module_status, input$selected_module, rv$module_res$module_table), {
+    if (rv$module_status != "finished" || is.null(input$selected_module)) {
+      updateSelectizeInput(
+        session,
+        "module_metabolite_select",
+        choices = character(0),
+        selected = character(0),
+        server = TRUE
+      )
+      return()
+    }
+
+    lookup <- module_node_lookup()
+
+    updateSelectizeInput(
+      session,
+      "module_metabolite_select",
+      choices = if (nrow(lookup) > 0) stats::setNames(lookup$id, lookup$label) else character(0),
+      selected = character(0),
+      server = TRUE
+    )
+  }, ignoreInit = FALSE)
+
+  observeEvent(input$selected_module, {
+    rv$module_selected_node <- NULL
+
+    if ("module_metabolite_select" %in% names(input)) {
+      freezeReactiveValue(input, "module_metabolite_select")
+      updateSelectizeInput(session, "module_metabolite_select", selected = character(0))
+    }
+
+    if (rv$module_status == "finished") {
+      visUnselectAll(visNetworkProxy("module_network"))
+    }
+  }, ignoreInit = TRUE)
+
+  module_network_base_data <- reactive({
     req(rv$module_res)
     req(input$selected_module)
-    
+
     tbl <- rv$module_res$module_table %>%
       dplyr::filter(Module == input$selected_module)
-    
+
     req(nrow(tbl) > 1)
-    
+
     g <- igraph::induced_subgraph(
       rv$mrn,
       vids = tbl$INCHI_ID
     )
-    
+
     node_id <- igraph::V(g)$name
     node_type <- rv$module_res$module_table %>%
       dplyr::filter(Module == input$selected_module) %>%
-      dplyr::select(INCHI_ID, Type)
-    
+      dplyr::select(INCHI_ID, Type, Compound_name)
+
     type_map <- setNames(node_type$Type, node_type$INCHI_ID)
-    
+    label_map <- setNames(node_type$Compound_name, node_type$INCHI_ID)
+    node_label_full <- ifelse(
+      !is.na(label_map[node_id]) & nzchar(label_map[node_id]),
+      label_map[node_id],
+      node_id
+    )
+
     nodes <- data.frame(
-      id    = node_id,
+      id = node_id,
       label = ifelse(
-        nchar(node_id) > 28,
-        paste0(substr(node_id, 1, 25), "..."),
-        node_id
+        nchar(node_label_full) > 28,
+        paste0(substr(node_label_full, 1, 25), "..."),
+        node_label_full
       ),
-      title = node_id,
-      color = ifelse(
+      title = node_label_full,
+      color.background = ifelse(
         type_map[node_id] == "annotated",
-        "#fc8d58",
-        "#4474b3"
+        "#2a9d8f",
+        "#b56576"
       ),
+      color.border = ifelse(
+        type_map[node_id] == "annotated",
+        "#2a9d8f",
+        "#b56576"
+      ),
+      color.highlight.background = ifelse(
+        type_map[node_id] == "annotated",
+        "#2a9d8f",
+        "#b56576"
+      ),
+      color.highlight.border = ifelse(
+        type_map[node_id] == "annotated",
+        "#2a9d8f",
+        "#b56576"
+      ),
+      color.hover.background = ifelse(
+        type_map[node_id] == "annotated",
+        "#2a9d8f",
+        "#b56576"
+      ),
+      color.hover.border = ifelse(
+        type_map[node_id] == "annotated",
+        "#2a9d8f",
+        "#b56576"
+      ),
+      font.color = "#475467",
+      font.face = "Arial",
+      font.size = 14,
+      borderWidth = 0,
       stringsAsFactors = FALSE
     )
-    
+
     edges_df <- igraph::as_data_frame(g, what = "edges")
-    
+    edge_from <- as.character(edges_df$from)
+    edge_to <- as.character(edges_df$to)
+    edge_id <- paste(pmin(edge_from, edge_to), pmax(edge_from, edge_to), sep = "__")
+
     edges <- data.frame(
-      from  = as.character(edges_df$from),
-      to    = as.character(edges_df$to),
+      id = edge_id,
+      from = edge_from,
+      to = edge_to,
       color = "rgba(120,120,120,0.5)",
       stringsAsFactors = FALSE
     )
-    
-    visNetwork(nodes, edges, width = "100%", height = "700px") %>%
-      visOptions(
-        highlightNearest = TRUE,
-        nodesIdSelection = TRUE
+
+    list(nodes = nodes, edges = edges)
+  })
+
+  module_network_styled_data <- reactive({
+    base <- module_network_base_data()
+    nodes <- base$nodes
+    edges <- base$edges
+    selected_id <- rv$module_selected_node
+
+    if (is.null(selected_id) || !nzchar(selected_id) || !(selected_id %in% nodes$id)) {
+      return(list(nodes = nodes, edges = edges))
+    }
+
+    tbl <- rv$module_res$module_table %>%
+      dplyr::filter(Module == input$selected_module)
+    g <- igraph::induced_subgraph(
+      rv$mrn,
+      vids = tbl$INCHI_ID
+    )
+    neighbor_ids <- names(igraph::neighbors(g, selected_id, mode = "all"))
+    active_ids <- unique(c(selected_id, neighbor_ids))
+
+    is_selected <- nodes$id == selected_id
+    is_active <- nodes$id %in% active_ids
+    inactive_fill <- "#d0d5dd"
+
+    nodes$color.background <- ifelse(is_active, nodes$color.background, inactive_fill)
+    nodes$color.border <- ifelse(is_active, nodes$color.border, inactive_fill)
+    nodes$color.highlight.background <- nodes$color.background
+    nodes$color.highlight.border <- nodes$color.border
+    nodes$color.hover.background <- nodes$color.background
+    nodes$color.hover.border <- nodes$color.border
+    nodes$font.color <- ifelse(
+      is_selected,
+      "#8b1e1e",
+      ifelse(is_active, "#475467", "#b8c1cc")
+    )
+    nodes$font.color <- ifelse(is_selected, "#8b1e1e", nodes$font.color)
+    nodes$font.face <- ifelse(is_selected, "Arial Black", nodes$font.face)
+    nodes$color.border <- ifelse(is_selected, "#111111", nodes$color.border)
+    nodes$color.highlight.border <- nodes$color.border
+    nodes$color.hover.border <- nodes$color.border
+    nodes$borderWidth <- ifelse(is_selected, 4, 0)
+
+    active_edges <- (edges$from == selected_id & edges$to %in% neighbor_ids) |
+      (edges$to == selected_id & edges$from %in% neighbor_ids)
+    edges$color <- ifelse(active_edges, "rgba(120,120,120,0.65)", "rgba(200,200,200,0.12)")
+
+    list(nodes = nodes, edges = edges)
+  })
+  
+  output$module_network <- renderVisNetwork({
+    graph_data <- module_network_base_data()
+
+    visNetwork(graph_data$nodes, graph_data$edges, width = "100%", height = "700px") %>%
+      visNodes(
+        borderWidth = 0,
+        borderWidthSelected = 0,
+        font = list(size = 14, face = "Arial", color = "#475467"),
+        scaling = list(
+          label = list(enabled = FALSE)
+        )
+      ) %>%
+      visInteraction(
+        hoverConnectedEdges = FALSE,
+        selectConnectedEdges = FALSE
+      ) %>%
+      visEvents(
+        click = "function(params) {
+          var selected = params.nodes && params.nodes.length ? params.nodes[0] : null;
+          Shiny.setInputValue('module_network_selected_node', selected, {priority: 'event'});
+        }"
       ) %>%
       visPhysics(stabilization = FALSE)
     
   })
+
+  observeEvent(input$module_network_selected_node, {
+    rv$module_selected_node <- input$module_network_selected_node
+  }, ignoreNULL = FALSE)
+
+  observeEvent(input$module_metabolite_select, {
+    selected_id <- input$module_metabolite_select
+
+    if (is.null(selected_id) || !nzchar(selected_id)) {
+      if (!is.null(rv$module_selected_node)) {
+        rv$module_selected_node <- NULL
+      }
+      return()
+    }
+
+    rv$module_selected_node <- as.character(selected_id)
+  }, ignoreInit = TRUE)
+
+  observeEvent(rv$module_selected_node, {
+    if (!(rv$module_status == "finished" && !is.null(input$selected_module))) {
+      return()
+    }
+
+    freezeReactiveValue(input, "module_metabolite_select")
+
+    lookup <- module_node_lookup()
+    if (is.null(rv$module_selected_node) || !(rv$module_selected_node %in% lookup$id)) {
+      updateSelectizeInput(session, "module_metabolite_select", selected = character(0))
+      visUnselectAll(visNetworkProxy("module_network"))
+      return()
+    }
+
+    updateSelectizeInput(session, "module_metabolite_select", selected = rv$module_selected_node)
+    visNetworkProxy("module_network") %>%
+      visSelectNodes(id = rv$module_selected_node)
+  }, ignoreInit = FALSE)
+
+  observeEvent(list(rv$module_selected_node, rv$module_status, input$selected_module), {
+    if (!(rv$module_status == "finished" && !is.null(input$selected_module))) {
+      return()
+    }
+
+    graph_data <- module_network_styled_data()
+    proxy <- visNetworkProxy("module_network")
+
+    visUpdateNodes(proxy, graph_data$nodes) %>%
+      visUpdateEdges(graph_data$edges)
+    visUnselectAll(proxy)
+  }, ignoreInit = FALSE)
   
   output$module_score <- renderDT({
     if (is.null(rv$module_res) ||
@@ -4902,7 +6333,7 @@ server <- function(input, output, session) {
     datatable(
       rv$module_res$module_score,
       options = list(
-        pageLength = 15,
+        pageLength = 20,
         scrollX = TRUE
       ),
       rownames = FALSE
@@ -5716,7 +7147,9 @@ server <- function(input, output, session) {
 
   results_module_choices <- reactive({
     if (is.null(rv$module_res) || is.null(rv$module_res$module_score)) return(character(0))
-    mods <- sort(unique(as.character(rv$module_res$module_score$Module)))
+    mods <- unique(as.character(rv$module_res$module_score$Module))
+    mod_num <- suppressWarnings(as.numeric(gsub("[^0-9]+", "", mods)))
+    mods <- mods[order(is.na(mod_num), mod_num, mods)]
     mods[!is.na(mods) & nzchar(mods)]
   })
 
@@ -5788,10 +7221,20 @@ server <- function(input, output, session) {
     }
     node_group <- ifelse(node_type == "Terminal", "Feature", "Metabolite")
 
+    node_compound_name <- igraph::V(g)$compound_name
+    if (is.null(node_compound_name) || length(node_compound_name) != length(node_id)) {
+      node_compound_name <- rep(NA_character_, length(node_id))
+    }
+    node_compound_name <- as.character(node_compound_name)
+    node_label <- ifelse(
+      node_group == "Metabolite" & !is.na(node_compound_name) & nzchar(node_compound_name),
+      node_compound_name,
+      node_id
+    )
+
     nodes <- data.frame(
       id = node_id,
-      label = ifelse(nchar(node_id) > 28, paste0(substr(node_id, 1, 25), "..."), node_id),
-      title = node_id,
+      label = node_label,
       value = scales::rescale(node_prize, to = c(10, 40)),
       color = ifelse(node_group == "Feature", "#fc8d58", "#4474b3"),
       color.border = ifelse(node_group == "Feature", "#fc8d58", "#4474b3"),
@@ -5848,9 +7291,19 @@ server <- function(input, output, session) {
 
     nodes <- data.frame(
       id = node_id,
-      label = ifelse(nchar(node_id) > 28, paste0(substr(node_id, 1, 25), "..."), node_id),
-      title = node_id,
-      color = ifelse(node_group == "Annotated", "#fc8d58", "#4474b3"),
+      label = ifelse(
+        !is.na(tbl$Compound_name[match(node_id, tbl$INCHI_ID)]) &
+          nzchar(tbl$Compound_name[match(node_id, tbl$INCHI_ID)]),
+        tbl$Compound_name[match(node_id, tbl$INCHI_ID)],
+        node_id
+      ),
+      title = ifelse(
+        !is.na(tbl$Compound_name[match(node_id, tbl$INCHI_ID)]) &
+          nzchar(tbl$Compound_name[match(node_id, tbl$INCHI_ID)]),
+        tbl$Compound_name[match(node_id, tbl$INCHI_ID)],
+        node_id
+      ),
+      color = ifelse(node_group == "Annotated", "#2a9d8f", "#b56576"),
       stringsAsFactors = FALSE
     )
 
