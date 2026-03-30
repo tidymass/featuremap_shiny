@@ -2156,6 +2156,7 @@ ui <- fluidPage(
         document.addEventListener('click', function(event) {
           var trigger = event.target.closest('.inline-info-wrap');
           if (trigger) {
+            event.preventDefault();
             event.stopPropagation();
             var shouldPin = !trigger.classList.contains('is-pinned');
             clearPinnedInfo(trigger);
@@ -3839,14 +3840,24 @@ ui <- fluidPage(
                 # ================= Metabolite class database =================
                 tags$div(
                   class = "param-card",
-                  tags$h4("Reference Database"),
+                  tags$h4(
+                    "Reference Database",
+                    build_info_icon(
+                      paste0(
+                        "Choose <code>Use default database (recommended)</code> to use the built-in metabolite ",
+                        "class annotations provided by FeatureMAP, based on HMDB and KEGG reference data.<br><br>",
+                        "If you want to use your own class annotation file, select ",
+                        "<code>Upload your own dataset</code> and upload it below."
+                      )
+                    )
+                  ),
                   
                   radioButtons(
                     "func_class_source",
                     "Class annotation",
                     choices = c(
                       "Use default database" = "default",
-                      "Upload new dataset" = "upload"
+                      "Upload your own dataset" = "upload"
                     ),
                     selected = "default"
                   ),
@@ -3855,7 +3866,17 @@ ui <- fluidPage(
                     condition = "input.func_class_source == 'upload'",
                     fileInput(
                       "func_class_file",
-                      "Choose reference dataset (.rda / .csv)",
+                      tags$span(
+                        "Choose your reference",
+                        build_info_icon(
+                          paste0(
+                            "Each reference table must contain these columns:<br>",
+                            "<code>id</code>, <code>name</code>, <code>synonyms</code>, and <code>class</code>.<br><br>",
+                            "Reference-format examples are available on our GitHub: ",
+                            "<a href='https://github.com/tidymass/featuremap_resources' target='_blank'>featuremap_resources</a>"
+                          )
+                        )
+                      ),
                       accept = c(".rda", ".RData", ".csv")
                     )
                   )
@@ -6841,6 +6862,18 @@ server <- function(input, output, session) {
       if (!is.list(mod_pub)) return(list())
       mod_names <- names(mod_pub)
       out <- list()
+      
+      first_scalar_text <- function(x, fallback = "") {
+        if (is.null(x)) return(fallback)
+        if (is.data.frame(x)) {
+          x <- unlist(x, recursive = TRUE, use.names = FALSE)
+        } else if (is.list(x)) {
+          x <- unlist(x, recursive = TRUE, use.names = FALSE)
+        }
+        x <- trimws(as.character(x))
+        x <- unique(x[!is.na(x) & nzchar(x)])
+        if (length(x) == 0) fallback else x[1]
+      }
 
       for (i in seq_along(mod_pub)) {
         ent <- mod_pub[[i]]
@@ -6852,13 +6885,11 @@ server <- function(input, output, session) {
 
         ent_id <- ""
         if (!is.null(mod_names) && length(mod_names) >= i && !is.na(mod_names[i])) {
-          ent_id <- trimws(as.character(mod_names[i]))
+          ent_id <- first_scalar_text(mod_names[i], fallback = "")
         }
         if (!nzchar(ent_id)) ent_id <- as.character(i)
 
-        ent_name <- trimws(as.character(ent$met_name %||% ""))
-        ent_name <- ent_name[!is.na(ent_name) & nzchar(ent_name)]
-        ent_name <- if (length(ent_name) > 0) ent_name[1] else ent_id
+        ent_name <- first_scalar_text(ent$met_name %||% "", fallback = ent_id)
 
         out[[length(out) + 1]] <- list(
           compound_id = ent_id,
@@ -6868,7 +6899,28 @@ server <- function(input, output, session) {
         )
       }
 
-      out
+      if (length(out) == 0) return(out)
+
+      merged <- list()
+      for (entry in out) {
+        key <- if (!is.null(entry$compound_id) && nzchar(entry$compound_id)) {
+          entry$compound_id
+        } else {
+          entry$compound_name
+        }
+
+        if (!key %in% names(merged)) {
+          merged[[key]] <- entry
+        } else {
+          merged[[key]]$pmids <- unique(c(merged[[key]]$pmids, entry$pmids))
+          merged[[key]]$n_pmids <- length(merged[[key]]$pmids)
+          if (!nzchar(merged[[key]]$compound_name) && nzchar(entry$compound_name)) {
+            merged[[key]]$compound_name <- entry$compound_name
+          }
+        }
+      }
+
+      unname(merged)
     }
 
     compound_pmids <- collect_compound_pmids(mod_pub)

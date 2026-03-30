@@ -163,17 +163,17 @@ annotate_module = function(res = NULL,
     if (!is.data.frame(ref_df)) {
       stop("[Error] ", label, " functional reference must be a data.frame.")
     }
-    if (!"id" %in% colnames(ref_df)) {
-      stop("[Error] ", label, " functional reference must contain an 'id' column.")
+    required_cols <- c("id", "name", "synonyms", "class")
+    missing_cols <- setdiff(required_cols, colnames(ref_df))
+    if (length(missing_cols) > 0) {
+      stop(
+        "[Error] ", label, " functional reference must contain columns: ",
+        paste(required_cols, collapse = ", "),
+        ". Missing: ", paste(missing_cols, collapse = ", "), "."
+      )
     }
 
     ref_df <- tibble::as_tibble(ref_df)
-    optional_cols <- c("name", "class", "synonyms")
-    missing_cols <- setdiff(optional_cols, colnames(ref_df))
-    for (nm in missing_cols) {
-      ref_df[[nm]] <- NA_character_
-    }
-
     ref_df
   }
 
@@ -302,7 +302,16 @@ annotate_module = function(res = NULL,
     module2 <- module %>%
       dplyr::mutate(weighted_score = 0.7 * Importance + 0.3 * Robustness) %>%
       dplyr::filter(is.finite(weighted_score)) %>%
-      dplyr::arrange(dplyr::desc(weighted_score))
+      dplyr::arrange(dplyr::desc(weighted_score)) %>%
+      dplyr::mutate(
+        .compound_key = dplyr::coalesce(
+          as.character(Compound_ID),
+          as.character(INCHI_ID),
+          as.character(Compound_name)
+        )
+      ) %>%
+      dplyr::distinct(.compound_key, .keep_all = TRUE) %>%
+      dplyr::select(-.compound_key)
 
     s <- module2$weighted_score
     n <- length(s)
