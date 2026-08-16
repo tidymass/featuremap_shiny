@@ -60,6 +60,7 @@
 #' }
 #'
 #' @export
+
 annotate_feature <- function(feature_table,
                              ms2_table = NULL,
                              metabolite_database = NULL,
@@ -69,27 +70,6 @@ annotate_feature <- function(feature_table,
                              isotope_number = 3,
                              workers = 4
 ){
-  notify_step <- function(type = c("info", "success"), text) {
-    type <- match.arg(type)
-    if (requireNamespace("cli", quietly = TRUE)) {
-      if (type == "info") {
-        cli::cli_alert_info(text)
-      } else {
-        cli::cli_alert_success(text)
-      }
-    } else {
-      message(text)
-    }
-  }
-
-  notify_title <- function(text) {
-    if (requireNamespace("cli", quietly = TRUE)) {
-      cli::cli_h2(text)
-    } else {
-      message("\n", text)
-    }
-  }
-
   load_bundled_metabolite_database <- function() {
     candidate_paths <- c(
       system.file("app/www/featuremap_compound.rda", package = "featuremapshiny"),
@@ -115,16 +95,15 @@ annotate_feature <- function(feature_table,
   column <- match.arg(column)
   has_user_database <- !is.null(metabolite_database)
   start_time <- Sys.time()
-
-  notify_title("Step 1: Feature Annotation")
-  notify_step("info", "[1/3] Loading annotation references.")
+  cli::cli_h2("Step 1: Feature Annotation")
+  cli::cli_alert_info("[1/3] Loading annotation references.")
   if (is.null(metabolite_database)) {
     metabolite_database <- load_bundled_metabolite_database()
   }
   if (has_user_database) {
-    notify_step("success", "Using user-supplied annotation references.")
+    cli::cli_alert_success("Using user-supplied annotation references.")
   } else {
-    notify_step("success", "No user-supplied annotation references detected; loaded built-in resources.")
+    cli::cli_alert_success("No user-supplied annotation references detected; loaded built-in resources.")
   }
 
   res <- R6Class(
@@ -134,10 +113,11 @@ annotate_feature <- function(feature_table,
   )$new()
   res <- set_featuremap_stage(res, "initialized")
 
-  res$feature_table <- feature_table
-  res$refdata <- "all"
+  res$feature_table = feature_table
+  res$refdata = "all"
 
-  notify_step("info", "[2/3] Annotating metabolite features.")
+
+  cli::cli_alert_info("[2/3] Annotating metabolite features.")
   res$anno_feature_table1 <-
     annotate_feature_table(
       feature_table = feature_table,
@@ -149,48 +129,37 @@ annotate_feature <- function(feature_table,
       isotope_number = isotope_number,
       workers = workers
     )
-
-  notify_step(
-    "success",
-    paste0(
-      "Prepared ", nrow(res$anno_feature_table1), " annotation rows for ",
-      dplyr::n_distinct(res$anno_feature_table1$variable_id),
-      " features before redundancy filtering."
-    )
+  cli::cli_alert_success(
+    "Prepared {.val {nrow(res$anno_feature_table1)}} annotation rows for {.val {dplyr::n_distinct(res$anno_feature_table1$variable_id)}} features before redundancy filtering."
   )
 
-  notify_step("info", "[3/3] Removing low-confidence redundant annotations.")
-  rr1 <- calculate_redundancy(annotation_table = res$anno_feature_table1)
+  cli::cli_alert_info("[3/3] Removing low-confidence redundant annotations.")
+  rr1 = calculate_redundancy(annotation_table = res$anno_feature_table1)
 
-  res$anno_feature_table1 <-
+  res$anno_feature_table1 =
     remove_redundancy(annotation_table = res$anno_feature_table1)
 
-  rr2 <- calculate_redundancy(annotation_table = res$anno_feature_table1)
+  rr2 = calculate_redundancy(annotation_table = res$anno_feature_table1)
 
-  res$anno_feature_table1 <-
-    res$anno_feature_table1 %>%
+  res$anno_feature_table1 %>%
     dplyr::mutate(score_norm = score / max(res$anno_feature_table1$score, na.rm = TRUE)) %>%
-    dplyr::arrange(variable_id, dplyr::desc(score))
+    dplyr::arrange(variable_id, dplyr::desc(score)) -> res$anno_feature_table1
 
-  res$anno_redundancy <- data.frame(
+  res$anno_redundancy = data.frame(
     mfc_per_metabolite = as.numeric(c(rr1[1], rr2[1])),
     metabolite_per_feature = as.numeric(c(rr1[2], rr2[2]))
   )
 
-  rownames(res$anno_redundancy) <- c("before", "after")
+  rownames(res$anno_redundancy) = c("before", "after")
   res <- set_featuremap_stage(res, "feature_annotated")
 
   end_time <- Sys.time()
   elapsed_min <- round(as.numeric(end_time - start_time, units = "mins"), 2)
-  notify_step(
-    "success",
-    paste0(
-      "Retained ", nrow(res$anno_feature_table1), " annotation rows for ",
-      dplyr::n_distinct(res$anno_feature_table1$variable_id),
-      " features."
-    )
+  cli::cli_alert_success(
+    "Retained {.val {nrow(res$anno_feature_table1)}} annotation rows for {.val {dplyr::n_distinct(res$anno_feature_table1$variable_id)}} features."
   )
-  notify_step("info", paste0("Elapsed time: ", elapsed_min, " minutes."))
+  cli::cli_alert_info("Elapsed time: {.val {elapsed_min}} minutes.")
 
   return(res)
+
 }

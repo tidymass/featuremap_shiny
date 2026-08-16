@@ -50,14 +50,15 @@ Imports:
     scales,
     massdataset,
     metid,
-    PCSF2,
+    pcsf2featuremap,
     Rdisop,
     masstools,
-    rlang
+    rlang,
+    cli
 Remotes:
     tidymass/massdataset,
     tidymass/metid,
-    ytwangZero/PCSF2,
+    tidymass/pcsf2featuremap,
     gitlab::tidymass/masstools
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3

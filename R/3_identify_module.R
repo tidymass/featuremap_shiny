@@ -31,7 +31,9 @@
 #'   \item \code{module_table}: node-to-module assignments with node type,
 #'         node frequency, aggregated importance, and both HMDB/KEGG identifiers.
 #'         The \code{Module} column stores character module IDs such as
-#'         \code{"M1"}, \code{"M2"}, ...
+#'         \code{"M1"}, \code{"M2"}, ... The \code{Use_for_annotation}
+#'         column is \code{FALSE} for non-annotated terminal nodes removed by
+#'         iterative within-module pruning, and \code{TRUE} otherwise.
 #'   \item \code{module_score}: module activity scores with permutation-based
 #'         \code{p} and \code{fdr}. The \code{Module} column uses the same
 #'         character IDs as \code{module_table}
@@ -64,6 +66,7 @@
 #' }
 #'
 #' @export
+
 identify_module = function(res = NULL,
                            method = c("louvain","leading_eigen","fast_greedy","walktrap"),
                            min_size = 3,
@@ -74,29 +77,6 @@ identify_module = function(res = NULL,
                            node_freq = 0.05,
                            louvain_resolution = 1,
                            walktrap_steps = 4){
-  notify_step <- function(type = c("info", "success", "warning"), text) {
-    type <- match.arg(type)
-    if (requireNamespace("cli", quietly = TRUE)) {
-      if (type == "info") {
-        cli::cli_alert_info(text)
-      } else if (type == "success") {
-        cli::cli_alert_success(text)
-      } else {
-        cli::cli_alert_warning(text)
-      }
-    } else {
-      message(text)
-    }
-  }
-
-  notify_title <- function(text) {
-    if (requireNamespace("cli", quietly = TRUE)) {
-      cli::cli_h2(text)
-    } else {
-      message("\n", text)
-    }
-  }
-
   method <- match.arg(method)
 
   if (is.null(res)){
@@ -106,38 +86,44 @@ identify_module = function(res = NULL,
     res,
     expected_stages = c("subnetwork_extracted", "module_identified", "module_annotated")
   )
-  notify_title("Step 3: Module Identification")
+  cli::cli_h2("Step 3: Module Identification")
 
   start_time <- Sys.time()
-  notify_step("info", "[1/3] Detecting modules.")
+  cli::cli_alert_info("[1/3] Detecting modules.")
 
   set.seed(seed)
 
+  # prepare node of sub-network for community detection ------------------------
+  ## annotated metabolites INCHI IDs---
   res$edge_frequency %>%
-    dplyr::filter(!stringr::str_detect(to, "InChI")) %>%
-    dplyr::pull(from) -> annotated_ID1
+    filter(!str_detect(to, "InChI")) %>%
+    pull(from) -> annotated_ID1
 
   res$edge_frequency %>%
-    dplyr::filter(!stringr::str_detect(from, "InChI")) %>%
-    dplyr::pull(to) -> annotated_ID2
+    filter(!str_detect(from, "InChI")) %>%
+    pull(to) -> annotated_ID2
 
   c(annotated_ID1, annotated_ID2) -> annotated_ID
 
+  ## All metabolites INCHI ID from MRN---
   mrn_node <- as.data.frame(igraph::as_data_frame(res$mrn, what = "vertices"))
 
+  ## Steiner_nodes without low frequency---
   res$node_frequency %>%
-    dplyr::filter(type == "metabolite") %>%
-    dplyr::filter(freq > node_freq) %>%
-    dplyr::pull(name) -> res_node
+    filter(type == "metabolite") %>%
+    filter(freq > node_freq) %>%
+    pull(name) -> res_node
 
-  steiner_nodes <- igraph::V(res$pcsf_subnet)[igraph::V(res$pcsf_subnet)$type == "Steiner"]$name
+  steiner_nodes <- V(res$pcsf_subnet)[V(res$pcsf_subnet)$type == "Steiner"]$name
   steiner_nodes <- steiner_nodes[steiner_nodes %in% res_node]
 
-  steiner_subnet <- igraph::induced_subgraph(res$mrn, vids = steiner_nodes)
-  igraph::V(steiner_subnet)$type = ifelse(igraph::V(steiner_subnet)$name %in% annotated_ID, "annotated", "hidden")
+  ## Induced subgraph based on steiner nodes---
+  steiner_subnet <- induced_subgraph(res$mrn, vids = steiner_nodes)
+  V(steiner_subnet)$type = ifelse(V(steiner_subnet)$name %in% annotated_ID, "annotated", "hidden")
 
+  # prepare edge weights for community detection -------------------------------
   res$edge_frequency %>%
-    dplyr::filter(stringr::str_detect(from, "InChI") & stringr::str_detect(to, "InChI")) %>%
+    filter(str_detect(from, "InChI") & str_detect(to, "InChI")) %>%
     dplyr::rename(weight = freq) -> edge_weight
 
   g_edges <- igraph::as_data_frame(steiner_subnet, what = "edges")
@@ -155,32 +141,36 @@ identify_module = function(res = NULL,
   mean_w <- mean(edge_weight$weight, na.rm = TRUE)
   w[is.na(w)] <- mean_w
 
+  # E(steiner_subnet)$weight <- w
+  # ---- HUB PENALTY USING FULL MRN DEGREE ----
   mrn_deg <- igraph::degree(res$mrn)
   edge_ends <- igraph::ends(steiner_subnet, igraph::E(steiner_subnet))
   w_adj <- w / sqrt(mrn_deg[edge_ends[,1]] * mrn_deg[edge_ends[,2]])
   w_adj[!is.finite(w_adj)] <- min(w_adj[is.finite(w_adj)], na.rm = TRUE)
-  igraph::E(steiner_subnet)$weight <- w_adj
+  E(steiner_subnet)$weight <- w_adj
 
 
+  # module detection -----------------------------------------------------------
   if (method == "louvain") {
-    comm <- igraph::cluster_louvain(steiner_subnet, weights = igraph::E(steiner_subnet)$weight, resolution = louvain_resolution)
+    comm <- igraph::cluster_louvain(steiner_subnet, weights = E(steiner_subnet)$weight, resolution = louvain_resolution)
   } else if (method == "fast_greedy") {
-    comm <- igraph::cluster_fast_greedy(igraph::as_undirected(steiner_subnet), weights = igraph::E(steiner_subnet)$weight)
+    comm <- igraph::cluster_fast_greedy(igraph::as_undirected(steiner_subnet), weights = E(steiner_subnet)$weight)
   } else if (method == "walktrap") {
-    comm <- igraph::cluster_walktrap(steiner_subnet, weights = igraph::E(steiner_subnet)$weight, steps = walktrap_steps)
+    comm <- igraph::cluster_walktrap(steiner_subnet, weights = E(steiner_subnet)$weight, steps = walktrap_steps)
   } else if (method == "leading_eigen") {
-    comm <- igraph::cluster_leading_eigen(steiner_subnet, weights = igraph::E(steiner_subnet)$weight)
+    comm <- igraph::cluster_leading_eigen(steiner_subnet, weights = E(steiner_subnet)$weight)
   }
 
   member <- igraph::membership(comm)
 
+  # construct the module table ---
   res$module_table <- data.frame(
     name = names(member),
     module = as.integer(member)
   ) %>%
     dplyr::arrange(module) %>%
     dplyr::group_by(module) %>%
-    dplyr::filter(dplyr::n() >= min_size & dplyr::n() <= min(max_size, igraph::vcount(steiner_subnet))) %>%
+    dplyr::filter(dplyr::n() >= min_size & dplyr::n() <= min(max_size, vcount(steiner_subnet))) %>%
     dplyr::ungroup() %>%
     dplyr::left_join(
       mrn_node[, c("HMDB_ID", "KEGG_ID", "INCHI_ID", "Compound_name")] %>%
@@ -191,8 +181,8 @@ identify_module = function(res = NULL,
     dplyr::rename(INCHI_ID = name, Module = module, Node_freq = freq) %>%
     dplyr::left_join(
       data.frame(
-        INCHI_ID = igraph::V(steiner_subnet)$name,
-        Type = igraph::V(steiner_subnet)$type
+        INCHI_ID = V(steiner_subnet)$name,
+        Type = V(steiner_subnet)$type
       ),
       by = "INCHI_ID"
     )
@@ -236,13 +226,43 @@ identify_module = function(res = NULL,
       Importance = Importance
     )
 
-  notify_step(
-    "success",
-    paste0("Detected ", length(unique(res$module_table$Module)), " modules using the ", method, " method.")
+  annotation_flag <- res$module_table %>%
+    dplyr::group_by(Module) %>%
+    dplyr::group_modify(function(.x, .y) {
+      module_graph <- igraph::induced_subgraph(steiner_subnet, vids = .x$INCHI_ID)
+      keep_nodes <- igraph::V(module_graph)$name
+
+      repeat {
+        module_degree <- igraph::degree(module_graph)
+        terminal_hidden <- igraph::V(module_graph)$name[
+          module_degree <= 1 &
+            igraph::V(module_graph)$type != "annotated"
+        ]
+
+        if (length(terminal_hidden) == 0) break
+
+        module_graph <- igraph::delete_vertices(module_graph, terminal_hidden)
+        keep_nodes <- igraph::V(module_graph)$name
+      }
+
+      .x %>%
+        dplyr::mutate(
+          Use_for_annotation = INCHI_ID %in% keep_nodes
+        ) %>%
+        dplyr::select(INCHI_ID, Use_for_annotation)
+    }) %>%
+    dplyr::ungroup()
+
+  res$module_table <- res$module_table %>%
+    dplyr::left_join(annotation_flag, by = c("Module", "INCHI_ID"))
+
+  cli::cli_alert_success(
+    "Detected {.val {length(unique(res$module_table$Module))}} modules using the {.val {method}} method."
   )
 
 
-  notify_step("info", "[2/3] Calculating module activity scores.")
+  ## Calculate module activity scores ----
+  cli::cli_alert_info("[2/3] Calculating module activity scores.")
 
   read_importance_tbl<- res$module_table %>%
     dplyr::filter(Type == "annotated", is.finite(Importance)) %>%
@@ -254,12 +274,12 @@ identify_module = function(res = NULL,
     annotated_ID = annotated_ID,
     mrn = res$mrn,
     importance_tbl = read_importance_tbl)
-  notify_step(
-    "success",
-    paste0("Calculated activity scores for ", nrow(res$module_score), " modules.")
+  cli::cli_alert_success(
+    "Calculated activity scores for {.val {nrow(res$module_score)}} modules."
   )
 
-  notify_step("info", "[3/3] Estimating module significance.")
+  ## Calculate p values for each module via permutation test ---
+  cli::cli_alert_info("[3/3] Estimating module significance.")
 
   perm_p <- permutation_test_gamma(
     subnet = steiner_subnet,
@@ -278,7 +298,7 @@ identify_module = function(res = NULL,
     dplyr::select(Module, Module_size, Annotated_nodes, Module_score, p, fdr)
 
   if(nrow(res$module_score) == 0){
-    notify_step("warning", "No modules passed the identification step.")
+    cli::cli_alert_warning("No modules passed the identification step.")
   }
   res <- set_featuremap_stage(res, "module_identified")
 
@@ -286,12 +306,12 @@ identify_module = function(res = NULL,
   elapsed_min <- round(as.numeric(end_time - start_time, units = "mins"), 2)
   n_modules <- dplyr::n_distinct(res$module_table$Module)
   n_sig_modules <- sum(res$module_score$p < 0.05, na.rm = TRUE)
-  notify_step(
-    "success",
-    paste0("Identified ", n_sig_modules, " modules with p < 0.05 among ", n_modules, " detected modules.")
+  cli::cli_alert_success(
+    "Identified {.val {n_sig_modules}} modules with p < 0.05 among {.val {n_modules}} detected modules."
   )
-  notify_step("info", paste0("Elapsed time: ", elapsed_min, " minutes."))
+  cli::cli_alert_info("Elapsed time: {.val {elapsed_min}} minutes.")
 
 
   return(res)
+
 }

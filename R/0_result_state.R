@@ -4,11 +4,11 @@ ensure_featuremap_object <- function(res,
   if (!is.null(res$object_type) && !identical(res$object_type, "featuremap_result")) {
     stop("[Error] Input object type is invalid. Expected object_type = 'featuremap_result'.")
   }
-  
+
   if (is.null(res$object_type)) {
     res$object_type <- "featuremap_result"
   }
-  
+
   if (!is.null(expected_stages)) {
     if (is.null(res$stage)) {
       if (!allow_missing_stage) {
@@ -22,7 +22,7 @@ ensure_featuremap_object <- function(res,
       )
     }
   }
-  
+
   res
 }
 

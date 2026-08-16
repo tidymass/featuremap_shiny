@@ -20,18 +20,20 @@
 #'   }
 #' @param pcutoff Numeric. Significance threshold used only when
 #'   \code{feature = "sig"} to filter \code{res$feature_table$pvalue}.
-#' @param mrn An \code{igraph} object for the metabolic reaction network.
-#'   If \code{NULL}, shiny loads the built-in
+#' @param mrn An \code{igraph}/\code{tidygraph::tbl_graph} object for the
+#'   metabolic reaction network. If \code{NULL}, shiny loads the built-in
 #'   \code{metabolic_reaction_network.rda}.
 #' @param workers Integer. Number of parallel workers used in repeated PCSF runs.
 #' @param times Integer. Number of PCSF repeats for final subnetwork construction.
 #'   Larger values usually improve robustness but increase runtime.
 #' @param b Numeric. Prize scaling factor for terminal nodes in PCSF.
-#' @param mu Numeric. Hub penalty coefficient. Larger values penalize high-degree
-#'   nodes more strongly.
+#' @param mu Numeric. Hub penalty coefficient. Non-terminal nodes receive a
+#'   negative prize proportional to their network degree; larger values penalize
+#'   high-degree nodes more strongly.
 #' @param w Numeric. Dummy edge cost in PCSF.
-#' @param r Numeric. Random perturbation magnitude applied to edge weights across
-#'   repeats (robustness resampling factor).
+#' @param r Numeric. Relative Gaussian edge-cost noise applied across repeated
+#'   PCSF runs. For example, \code{r = 0.20} perturbs each edge cost by a
+#'   multiplicative factor sampled from \code{N(1, 0.20)}.
 #' @param grid_tune Logical. Whether to tune \code{b} and \code{w} on a grid
 #'   before the final run.
 #' @param b_grid Numeric vector of candidate \code{b} values when
@@ -47,20 +49,31 @@
 #'   \item \code{pcsf_subnet}: final PCSF-derived subnetwork (\code{igraph})
 #'   \item \code{node_frequency}: node appearance frequency across repeats
 #'   \item \code{edge_frequency}: edge appearance frequency across repeats
-#'   \item \code{anno_feature_table2}: network-refined feature-metabolite table
+#'   \item \code{anno_feature_table2}: network-supported feature-metabolite
+#'         annotation table including \code{INCHI_ID}, \code{edge_freq},
+#'         \code{weighted_anno_score}, and feature-level \code{importance}
 #'   \item \code{tuning_grid} and \code{tuning_best}: (if \code{grid_tune = TRUE})
 #'         tuning summary
 #'   \item \code{stage}: updated to \code{"subnetwork_extracted"}
 #' }
 #'
 #' @details
+#' Annotation rows are projected to the MRN at the metabolite-node level using
+#' \code{HMDB.ID} first and \code{KEGG.ID} as fallback when no HMDB-based match
+#' is available. Only annotation rows supported by the final PCSF subnetwork are
+#' retained in \code{anno_feature_table2}.
+#'
 #' Feature importance scores are derived from effects value and p-value.
-#' The PCSF algorithm is executed multiple times with randomized edge
-#' perturbation to ensure robustness. Final subnetworks are constructed
-#' based on node and edge frequency across runs.
+#' The PCSF algorithm is executed multiple times with relative Gaussian
+#' perturbation of edge costs to estimate robustness. Final subnetworks are
+#' constructed based on node and edge frequency across runs.
+#' Network-supported annotation confidence combines normalized annotation score
+#' and edge frequency with a global adaptive edge-frequency weight bounded
+#' between 0.1 and 0.3.
 #'
 #' @examples
 #' \dontrun{
+#' # res should be generated from annotate_feature() first
 #' res <- extract_subnetwork(
 #'   res = res,
 #'   feature = "sig",
@@ -68,50 +81,30 @@
 #'   mrn = NULL,
 #'   workers = 4,
 #'   times = 100,
-#'   b = 40,
+#'   b = 20,
 #'   mu = 1e-4,
-#'   w = 35,
-#'   r = 0.30,
+#'   w = 25,
+#'   r = 0.20,
 #'   grid_tune = FALSE
 #' )
 #' }
 #'
 #' @export
+
 extract_subnetwork = function(res = NULL,
                               feature = c("all", "sig"),
                               pcutoff = 0.05,
                               mrn = NULL,
                               workers = 4,
                               times = 100,
-                              b = 40,
+                              b = 20,
                               mu = 1e-4,
-                              w = 30,
-                              r = 0.30,
+                              w = 25,
+                              r = 0.20,
                               grid_tune = FALSE,
                               b_grid = seq(20, 40, by = 5),
-                              w_grid = seq(25, 40, by = 5),
+                              w_grid = seq(20, 40, by = 5),
                               times_tune = 10){
-  notify_step <- function(type = c("info", "success"), text) {
-    type <- match.arg(type)
-    if (requireNamespace("cli", quietly = TRUE)) {
-      if (type == "info") {
-        cli::cli_alert_info(text)
-      } else {
-        cli::cli_alert_success(text)
-      }
-    } else {
-      message(text)
-    }
-  }
-
-  notify_title <- function(text) {
-    if (requireNamespace("cli", quietly = TRUE)) {
-      cli::cli_h2(text)
-    } else {
-      message("\n", text)
-    }
-  }
-
   load_bundled_mrn <- function() {
     candidate_paths <- c(
       system.file("app/www/metabolic_reaction_network.rda", package = "featuremapshiny"),
@@ -144,18 +137,20 @@ extract_subnetwork = function(res = NULL,
   if (!"feature_table" %in% names(res)){
     stop("[Error] res$feature_table is missing.")
   }
-
-  notify_title("Step 2: Subnetwork Extraction")
+  cli::cli_h2("Step 2: Subnetwork Extraction")
   has_user_mrn <- !is.null(mrn)
   start_time <- Sys.time()
-  notify_step("info", "[1/3] Loading the metabolic reaction network.")
+  total_steps <- if (isTRUE(grid_tune)) 4 else 3
+  step_label <- function(step_id) sprintf("[%d/%d]", step_id, total_steps)
+
+  cli::cli_alert_info("{step_label(1)} Loading the metabolic reaction network.")
   if (is.null(mrn)){
     mrn <- load_bundled_mrn()
   }
   if (has_user_mrn) {
-    notify_step("success", "Using a user-supplied metabolic reaction network.")
+    cli::cli_alert_success("Using a user-supplied metabolic reaction network.")
   } else {
-    notify_step("success", "Loaded built-in metabolic reaction network.")
+    cli::cli_alert_success("Loaded built-in metabolic reaction network.")
   }
 
   res$mrn = mrn
@@ -166,12 +161,17 @@ extract_subnetwork = function(res = NULL,
         (fc - min(fc, na.rm = TRUE)) /
           (max(fc, na.rm = TRUE) - min(fc, na.rm = TRUE))
       },
-      score_p = -log10(pvalue),
+      score_p = {
+        sp <- -log10(pvalue)
+        (sp - min(sp, na.rm = TRUE)) /
+          (max(sp, na.rm = TRUE) - min(sp, na.rm = TRUE))
+      },
       importance = sqrt(score_fc * score_p)
     ) %>%
     as.data.frame() -> res$feature_table
 
 
+  ## prepare data for pcsf analysis ---
   if(feature == "all"){
     feature_sig <- res$feature_table
   }else if(feature == "sig"){
@@ -180,8 +180,9 @@ extract_subnetwork = function(res = NULL,
     if (nrow(feature_sig) == 0)
       stop("[Error] No significant features found under pcutoff = ", pcutoff)
   }
-  notify_step("info", "[2/3] Preparing subnetwork extraction.")
+  cli::cli_alert_info("{step_label(2)} Preparing subnetwork extraction.")
 
+  ## build FMpair + mrnref ----
   anno_feature_table1_sub <- res$anno_feature_table1 %>%
     dplyr::filter(variable_id %in% feature_sig$variable_id) %>%
     dplyr::mutate(annotation_row_id = dplyr::row_number()) %>%
@@ -200,11 +201,6 @@ extract_subnetwork = function(res = NULL,
   mrn_nodes <- mrn %>%
     tidygraph::activate(nodes) %>%
     as.data.frame()
-
-  mrn_compound_lookup <- mrn_nodes %>%
-    dplyr::filter(!is.na(INCHI_ID), INCHI_ID != "", INCHI_ID != "<NA>") %>%
-    dplyr::select(INCHI_ID, Compound_name) %>%
-    dplyr::distinct(INCHI_ID, .keep_all = TRUE)
 
   mrnref_hmdb <- mrn_nodes %>%
     dplyr::filter(!is.na(HMDB_ID), HMDB_ID != "", HMDB_ID != "<NA>") %>%
@@ -240,12 +236,8 @@ extract_subnetwork = function(res = NULL,
   anno_mapped <- dplyr::bind_rows(anno_hmdb, anno_kegg) %>%
     dplyr::arrange(variable_id, dplyr::desc(score_norm), mapping_source, INCHI_ID)
 
-  notify_step(
-    "success",
-    paste0(
-      "Using ", nrow(feature_sig), " features with ",
-      nrow(anno_mapped), " mapped annotation rows for subnetwork extraction."
-    )
+  cli::cli_alert_success(
+    "Using {.val {nrow(feature_sig)}} features with {.val {nrow(anno_mapped)}} mapped annotation rows for subnetwork extraction."
   )
 
   c_min = 0.02
@@ -268,6 +260,7 @@ extract_subnetwork = function(res = NULL,
 
   imrn = igraph::graph_from_data_frame(dplyr::bind_rows(FMpair, MMpair), directed = FALSE)
 
+  ## prepare node weights (parts independent of b) ---
   terminals <- feature_sig %>%
     dplyr::filter(variable_id %in% FMpair$from) %>%
     dplyr::select(variable_id, importance) %>%
@@ -286,9 +279,10 @@ extract_subnetwork = function(res = NULL,
     name = node_names,
     degree = igraph::degree(imrn)
   ) %>%
-    dplyr::mutate(penalty = -mu * sqrt(degree)) %>%
+    dplyr::mutate(penalty = -mu * degree) %>%
     dplyr::pull(penalty)
 
+  ## set dummy edge endpoints (independent of b, w) ---
   dummies = names(terminals)
   edges_df <- igraph::ends(imrn, es = igraph::E(imrn)) %>%
     as.data.frame(stringsAsFactors = FALSE) %>%
@@ -300,12 +294,14 @@ extract_subnetwork = function(res = NULL,
   from <- final_edges$from
   to <- final_edges$to
 
+  # prepare parallel computation ----
   if (workers > 1) {
     future::plan(future::multisession, workers = workers)
     on.exit(future::plan(future::sequential), add = TRUE)
   }
 
-  run_pcsf_once <- function(b_val, w_val, times_val){
+  # define run pcsf once function ---
+  run_pcsf_once <- function(b_val, w_val, times_val, show_progress = TRUE){
 
     node_prizes <- tibble::tibble(
       name = node_names,
@@ -321,10 +317,13 @@ extract_subnetwork = function(res = NULL,
         function(i) {
           cost <- c(
             rep(w_val, length(dummies)),
-            igraph::E(imrn)$weight + igraph::E(imrn)$weight *
-              stats::runif(length(igraph::E(imrn)), 0, max(r, stats::sd(igraph::E(imrn)$weight)))
+            pmax(
+              igraph::E(imrn)$weight *
+                stats::rnorm(length(igraph::E(imrn)), mean = 1, sd = r),
+              1e-4
+            )
           )
-          output <- PCSF2::call_sr(from, to, cost, node_names, node_prizes)
+          output <- pcsf2featuremap::call_sr(from, to, cost, node_names, node_prizes)
           edge <- data.frame(
             source = as.character(output[[1]]),
             target = as.character(output[[2]]),
@@ -348,7 +347,7 @@ extract_subnetwork = function(res = NULL,
             node_names = node_names, node_prz = node_prz, hub_penalty = hub_penalty
           )
         ),
-        .progress = TRUE
+        .progress = show_progress
       )
     }else{
       results_list <- purrr::map(
@@ -356,10 +355,13 @@ extract_subnetwork = function(res = NULL,
         function(i) {
           cost <- c(
             rep(w_val, length(dummies)),
-            igraph::E(imrn)$weight + igraph::E(imrn)$weight *
-              stats::runif(length(igraph::E(imrn)), 0, max(r, stats::sd(igraph::E(imrn)$weight)))
+            pmax(
+              igraph::E(imrn)$weight *
+                stats::rnorm(length(igraph::E(imrn)), mean = 1, sd = r),
+              1e-4
+            )
           )
-          output <- PCSF2::call_sr(from, to, cost, node_names, node_prizes)
+          output <- pcsf2featuremap::call_sr(from, to, cost, node_names, node_prizes)
           edge <- data.frame(
             source = as.character(output[[1]]),
             target = as.character(output[[2]]),
@@ -425,17 +427,14 @@ extract_subnetwork = function(res = NULL,
 
     pcsf_subnet <- pcsf_subnet %>%
       igraph::set_vertex_attr("prize", value = node_frequency$freq[match(igraph::V(.)$name, node_frequency$name)]) %>%
-      igraph::set_vertex_attr("type", value = "Steiner") %>%
-      igraph::set_vertex_attr(
-        "compound_name",
-        value = mrn_compound_lookup$Compound_name[match(igraph::V(.)$name, mrn_compound_lookup$INCHI_ID)]
-      )
+      igraph::set_vertex_attr("type", value = "Steiner")
 
     term_idx <- match(names(terminals), igraph::V(pcsf_subnet)$name)
     term_idx <- term_idx[!is.na(term_idx)]
     igraph::V(pcsf_subnet)$type[term_idx] <- "Terminal"
     class(pcsf_subnet) <- c("PCSF", "igraph")
 
+    ## tidy pcsf results -> anno_feature_table2 ---
     feature_nodes <- igraph::V(pcsf_subnet)[igraph::V(pcsf_subnet)$type == "Terminal"]$name
 
     feature2metabolite <- list()
@@ -494,18 +493,14 @@ extract_subnetwork = function(res = NULL,
 
     if(from_is_inchi){
       anno_feature_table2_extra <- anno_feature_table2_extra %>%
-        dplyr::left_join(
-          edge_frequency %>%
-            dplyr::filter(to %in% anno_feature_table2_extra$variable_id),
-          by = c("variable_id" = "to", "INCHI_ID" = "from")
-        )
+        dplyr::left_join(edge_frequency %>%
+                           dplyr::filter(to %in% anno_feature_table2_extra$variable_id),
+                         by = c("variable_id" = "to", "INCHI_ID" = "from"))
     }else if(to_is_inchi){
       anno_feature_table2_extra <- anno_feature_table2_extra %>%
-        dplyr::left_join(
-          edge_frequency %>%
-            dplyr::filter(from %in% anno_feature_table2_extra$variable_id),
-          by = c("variable_id" = "from", "INCHI_ID" = "to")
-        )
+        dplyr::left_join(edge_frequency %>%
+                           dplyr::filter(from %in% anno_feature_table2_extra$variable_id),
+                         by = c("variable_id" = "from", "INCHI_ID" = "to"))
     }
 
     anno_feature_table2_extra <- anno_feature_table2_extra %>%
@@ -524,8 +519,15 @@ extract_subnetwork = function(res = NULL,
       dplyr::rename(edge_freq = freq) %>%
       dplyr::arrange(variable_id, dplyr::desc(score_norm), dplyr::desc(edge_freq))
 
+    edge_info <- stats::sd(anno_feature_table2_extra$edge_freq, na.rm = TRUE)
+    if (is.na(edge_info) || !is.finite(edge_info)) edge_info <- 0
+    edge_weight <- 0.1 + 0.2 * pmin(edge_info / 0.25, 1)
+    score_weight <- 1 - edge_weight
+
     anno_feature_table2_extra <- anno_feature_table2_extra %>%
-      dplyr::mutate(weighted_anno_score = 0.7*score_norm + 0.3*edge_freq) %>%
+      dplyr::mutate(
+        weighted_anno_score = score_weight * score_norm + edge_weight * edge_freq
+      ) %>%
       dplyr::group_by(variable_id) %>%
       dplyr::mutate(confidence_rank = dplyr::dense_rank(dplyr::desc(weighted_anno_score))) %>%
       dplyr::ungroup()
@@ -561,55 +563,110 @@ extract_subnetwork = function(res = NULL,
     )
   }
 
+  # ---- optional grid tuning ----
   best_b <- b
   best_w <- w
 
   if (isTRUE(grid_tune)) {
+    cli::cli_alert_info("{step_label(3)} Tuning PCSF parameters on the grid.")
+
     grid <- tidyr::expand_grid(b = b_grid, w = w_grid)
     grid$unique_variable_id <- NA_integer_
     grid$mean_weighted_score <- NA_real_
+    grid$tuning_success <- FALSE
+    grid$tuning_error <- NA_character_
+
+    safe_cli_progress_update <- function(...) {
+      try(cli::cli_progress_update(...), silent = TRUE)
+      invisible(NULL)
+    }
+    safe_cli_progress_done <- function(id) {
+      try(cli::cli_progress_done(id = id), silent = TRUE)
+      invisible(NULL)
+    }
+
+    tuning_progress_id <- cli::cli_progress_bar(
+      name = "Grid tuning",
+      total = nrow(grid),
+      format = "{cli::pb_name} [{cli::pb_current}/{cli::pb_total}] {cli::pb_bar} {cli::pb_percent} | {cli::pb_status}",
+      current = FALSE,
+      auto_terminate = FALSE,
+      .auto_close = FALSE
+    )
+    on.exit(safe_cli_progress_done(tuning_progress_id), add = TRUE)
 
     for (i in seq_len(nrow(grid))) {
       bb <- grid$b[i]
       ww <- grid$w[i]
-
-      out <- tryCatch(
-        run_pcsf_once(b_val = bb, w_val = ww, times_val = times_tune),
-        error = function(e) NULL
+      safe_cli_progress_update(
+        id = tuning_progress_id,
+        status = paste("Evaluating b =", bb, ", w =", ww)
       )
 
-      if (!is.null(out)) {
+      out <- tryCatch(
+        run_pcsf_once(
+          b_val = bb,
+          w_val = ww,
+          times_val = times_tune,
+          show_progress = FALSE
+        ),
+        error = function(e) e
+      )
+
+      if (!inherits(out, "error")) {
         grid$unique_variable_id[i] <- dplyr::n_distinct(out$anno_feature_table2$variable_id)
-        grid$mean_weighted_score[i] <- mean(out$anno_feature_table2$weighted_anno_score, na.rm = TRUE)
+        grid$mean_weighted_score[i] <- if (nrow(out$anno_feature_table2) > 0) {
+          mean(out$anno_feature_table2$weighted_anno_score, na.rm = TRUE)
+        } else {
+          NA_real_
+        }
+        grid$tuning_success[i] <- TRUE
       } else {
         grid$unique_variable_id[i] <- 0L
         grid$mean_weighted_score[i] <- NA_real_
+        grid$tuning_error[i] <- conditionMessage(out)
       }
+
+      safe_cli_progress_update(id = tuning_progress_id, set = i)
     }
 
+    safe_cli_progress_done(tuning_progress_id)
+
     grid2 <- grid %>%
-      dplyr::arrange(dplyr::desc(unique_variable_id), dplyr::desc(mean_weighted_score))
+      dplyr::arrange(
+        dplyr::desc(tuning_success),
+        dplyr::desc(unique_variable_id),
+        dplyr::desc(mean_weighted_score),
+        b,
+        w
+      )
+
+    if (!any(grid2$tuning_success)) {
+      stop("[Error] Grid tuning failed for all candidate (b, w) pairs.")
+    }
 
     best_b <- grid2$b[1]
     best_w <- grid2$w[1]
 
     res$tuning_grid <- grid2
-    res$tuning_best <- list(
-      b = best_b,
-      w = best_w,
-      unique_variable_id = grid2$unique_variable_id[1],
-      mean_weighted_score = grid2$mean_weighted_score[1],
-      times_tune = times_tune
-    )
+    res$tuning_best <- list(b = best_b, w = best_w,
+                            unique_variable_id = grid2$unique_variable_id[1],
+                            mean_weighted_score = grid2$mean_weighted_score[1],
+                            times_tune = times_tune)
 
-    notify_step(
-      "success",
-      paste0("Selected tuned PCSF parameters b = ", best_b, " and w = ", best_w, ".")
+    cli::cli_alert_info(
+      paste(
+        "Grid tuning evaluated", nrow(grid2), "candidate (b, w) pairs;",
+        sum(grid2$tuning_success), "succeeded.",
+        "Selected b =", best_b, "and w =", best_w,
+        "for the final run based on retained feature count and mean weighted annotation score."
+      )
     )
   }
 
 
-  notify_step("info", "[3/3] Finalizing network-supported annotations.")
+  # ---- final run with (best_b, best_w) and full times/workers ----
+  cli::cli_alert_info("{step_label(total_steps)} Finalizing network-supported annotations.")
   final_out <- run_pcsf_once(b_val = best_b, w_val = best_w, times_val = times)
 
   res$pcsf_subnet <- final_out$pcsf_subnet
@@ -621,21 +678,13 @@ extract_subnetwork = function(res = NULL,
 
   end_time <- Sys.time()
   elapsed_min <- round(as.numeric(end_time - start_time, units = "mins"), 2)
-  notify_step(
-    "success",
-    paste0(
-      "Constructed a subnetwork with ", igraph::gorder(res$pcsf_subnet),
-      " nodes and ", igraph::gsize(res$pcsf_subnet), " edges."
-    )
+  cli::cli_alert_success(
+    "Constructed a subnetwork with {.val {igraph::gorder(res$pcsf_subnet)}} nodes and {.val {igraph::gsize(res$pcsf_subnet)}} edges."
   )
-  notify_step(
-    "success",
-    paste0(
-      "Retained ", nrow(res$anno_feature_table2), " network-supported annotation rows for ",
-      dplyr::n_distinct(res$anno_feature_table2$variable_id), " features."
-    )
+  cli::cli_alert_success(
+    "Retained {.val {nrow(res$anno_feature_table2)}} network-supported annotation rows for {.val {dplyr::n_distinct(res$anno_feature_table2$variable_id)}} features."
   )
-  notify_step("info", paste0("Elapsed time: ", elapsed_min, " minutes."))
+  cli::cli_alert_info("Elapsed time: {.val {elapsed_min}} minutes.")
 
   return(res)
 }

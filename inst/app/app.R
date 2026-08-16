@@ -3812,7 +3812,47 @@ ui <- fluidPage(
                   
                   helpText("Only significant modules will be annotated.")
                 ),
-                
+
+                # ================= Annotation mode =================
+                tags$div(
+                  class = "param-card",
+                  tags$h4(
+                    "Annotation Mode",
+                    build_info_icon(
+                      paste0(
+                        "<b>Fast</b>: single-hypothesis pipeline with pathway coverage, ",
+                        "origin profiling, and directed confidence scoring.<br><br>",
+                        "<b>Advanced</b>: multi-agent debate pipeline &mdash; a Proposer drafts 1-3 ",
+                        "candidate hypotheses, a Skeptic challenges them (up to 2 rounds), and an ",
+                        "Arbiter delivers final accepted/rejected verdicts with confidence scores."
+                      )
+                    )
+                  ),
+
+                  radioButtons(
+                    "func_mode",
+                    NULL,
+                    choices = c("Fast" = "fast", "Advanced (multi-agent debate)" = "advanced"),
+                    selected = "fast"
+                  ),
+
+                  conditionalPanel(
+                    condition = "input.func_mode == 'advanced'",
+
+                    checkboxInput(
+                      "func_synthesize",
+                      "Run cross-module synthesis after annotation",
+                      value = FALSE
+                    ),
+
+                    checkboxInput(
+                      "func_debate_html",
+                      "Export per-module debate transcript (HTML)",
+                      value = FALSE
+                    )
+                  )
+                ),
+
                 # ================= Study context =================
                 tags$div(
                   class = "param-card",
@@ -3901,20 +3941,9 @@ ui <- fluidPage(
                       "Years to search",
                       value = 5, min = 1, max = 20
                     ),
-                    
-                    numericInput(
-                      "func_top_paper",
-                      "Top papers retained",
-                      value = 3, min = 1, max = 10
-                    ),
-                    
-                    sliderInput(
-                      "func_min_similarity",
-                      "Minimum semantic similarity",
-                      min = 0.3, max = 1,
-                      value = 0.6, step = 0.05
-                    ),
-                    
+
+                    helpText("Up to three deduplicated papers per query are retained automatically."),
+
                   passwordInput(
                     "func_ncbi_key",
                     "NCBI API Key"
@@ -3934,29 +3963,6 @@ ui <- fluidPage(
                       "OpenAI" = "openai",
                       "Google Gemini" = "gemini",
                       "SiliconFlow" = "siliconflow"
-                    )
-                  ),
-                  
-                  conditionalPanel(
-                    condition = "input.func_use_pubmed",
-                    tags$div(
-                      style = "font-weight: 600; margin-bottom: 6px; display: flex; align-items: center; gap: 8px;",
-                      "Embedding model",
-                      build_info_icon(
-                        paste0(
-                          "Use the exact embedding-model ID supported by the selected provider.<br><br>",
-                          "You can look up available model names here:<br>",
-                          "<a href='https://platform.openai.com/docs/models' target='_blank'>OpenAI models</a><br>",
-                          "<a href='https://ai.google.dev/gemini-api/docs/models' target='_blank'>Gemini API models</a><br>",
-                          "<a href='https://siliconflow.cn/models' target='_blank'>SiliconFlow models</a>"
-                        )
-                      )
-                    ),
-                    textInput(
-                      "func_embed_model",
-                      NULL,
-                      value = "",
-                      placeholder = "e.g. text-embedding-3-small"
                     )
                   ),
                   
@@ -6540,7 +6546,6 @@ server <- function(input, output, session) {
     }
     
     if (isTRUE(input$func_use_pubmed)) {
-      req(nzchar(input$func_embed_model))
       ncbi_key <- trimws(input$func_ncbi_key)
       if (!nzchar(ncbi_key)) {
         ncbi_key <- trimws(Sys.getenv("FEATUREMAP_NCBI_API_KEY", unset = ""))
@@ -6600,6 +6605,20 @@ server <- function(input, output, session) {
       return()
     }
 
+    func_mode <- if (identical(input$func_mode, "advanced")) "advanced" else "fast"
+    func_synthesize  <- func_mode == "advanced" && isTRUE(input$func_synthesize)
+    func_debate_html <- func_mode == "advanced" && isTRUE(input$func_debate_html)
+
+    debate_html_dir <- NULL
+    if (func_debate_html) {
+      debate_html_dir <- file.path(
+        tempdir(), "featuremap_debate_html",
+        format(Sys.time(), "%Y%m%d_%H%M%S")
+      )
+      dir.create(debate_html_dir, recursive = TRUE, showWarnings = FALSE)
+    }
+    rv$function_debate_html_dir <- debate_html_dir
+
     show_process_modal(
       title = "Step 5 Running",
       text = "Module annotation is in progress. Please wait."
@@ -6608,6 +6627,8 @@ server <- function(input, output, session) {
     # ---- set status ----
     rv$function_status <- "running"
     rv$function_pubmed_used <- isTRUE(input$func_use_pubmed)
+    rv$function_mode_used <- func_mode
+    rv$function_debate_html_used <- func_debate_html
     shinyjs::disable("run_function_annotation")
     
     shinyjs::delay(100, {
@@ -6632,15 +6653,17 @@ server <- function(input, output, session) {
             x <- trimws(input$func_phenotype)
             if (nzchar(x)) x else ""
           },
+          mode          = func_mode,
           pubmed        = input$func_use_pubmed,
           years         = input$func_pubmed_years,
-          top_paper     = input$func_top_paper,
-          min_similarity= input$func_min_similarity,
           provider      = input$func_provider,
-          embed_model   = input$func_embed_model,
           llm_model     = input$func_llm_model,
           NCBI_api_key  = ncbi_key,
-          llm_api_key   = llm_key
+          llm_api_key   = llm_key,
+          synthesize      = func_synthesize,
+          synthesis_model = input$func_llm_model,
+          debate_html     = func_debate_html,
+          debate_html_dir = if (is.null(debate_html_dir)) getwd() else debate_html_dir
         )
         
         result
@@ -6737,6 +6760,7 @@ server <- function(input, output, session) {
         class = "function-result-shell",
         uiOutput("function_module_selector"),
         uiOutput("function_module_output"),
+        uiOutput("function_debate_ui"),
         uiOutput("function_literature_ui"),
         uiOutput("function_result_status_ui")
       )
@@ -6780,9 +6804,8 @@ server <- function(input, output, session) {
   output$function_literature_ui <- renderUI({
     if (rv$function_status != "finished") return(NULL)
     if (is.null(input$selected_function_module)) return(NULL)
-    if (is.null(rv$function_result)) return(NULL)
+    if (is.null(rv$function_result) || is.null(rv$function_result$module_function)) return(NULL)
 
-    pubmed_res <- rv$function_result$module_pubmed_embed_refined
     if (!isTRUE(rv$function_pubmed_used)) {
       return(
         tags$div(
@@ -6795,224 +6818,35 @@ server <- function(input, output, session) {
         )
       )
     }
-    if (is.null(pubmed_res) || length(pubmed_res) == 0) {
+
+    mod_df <- rv$function_result$module_function %>%
+      dplyr::filter(as.character(module_id) == as.character(input$selected_function_module))
+
+    if (nrow(mod_df) == 0 || !"pubmed_pmids" %in% names(mod_df)) {
       return(
         tags$div(
           class = "param-card function-annotation-card",
           tags$h4(icon("book"), "Literature Evidence (PMID)"),
           tags$p(
             class = "function-annotation-note",
-            "No literature evidence object found. Please re-run Step 5 with Literature-based Annotation enabled."
+            "No literature evidence found. Please re-run Step 5 with Literature-based Annotation enabled."
           )
         )
       )
     }
 
-    module_id_txt <- as.character(input$selected_function_module)
-    module_id_num <- suppressWarnings(as.integer(gsub("[^0-9]", "", module_id_txt)))
-    key_candidates <- unique(c(
-      module_id_txt,
-      paste0("module", module_id_txt),
-      gsub("^module", "", module_id_txt, ignore.case = TRUE),
-      paste0("module", gsub("^module", "", module_id_txt, ignore.case = TRUE)),
-      if (is.finite(module_id_num)) as.character(module_id_num) else character(0),
-      if (is.finite(module_id_num)) paste0("module", module_id_num) else character(0)
-    ))
+    split_pmids <- function(x) {
+      if (is.na(x) || !nzchar(trimws(x))) return(character(0))
+      parts <- trimws(strsplit(as.character(x), "[;,]\\s*")[[1]])
+      unique(parts[nzchar(parts)])
+    }
 
-    mod_pub <- NULL
-    if (!is.null(names(pubmed_res))) {
-      hit <- intersect(key_candidates, names(pubmed_res))
-      if (length(hit) > 0) mod_pub <- pubmed_res[[hit[1]]]
-      if (is.null(mod_pub) && is.finite(module_id_num)) {
-        suffix_num <- suppressWarnings(as.integer(gsub("[^0-9]", "", names(pubmed_res))))
-        idx2 <- which(!is.na(suffix_num) & suffix_num == module_id_num)
-        if (length(idx2) > 0) mod_pub <- pubmed_res[[idx2[1]]]
+    has_hypotheses <- "hypothesis_id" %in% names(mod_df) && nrow(mod_df) > 1
+
+    make_pmid_chips <- function(pmids) {
+      if (length(pmids) == 0) {
+        return(tags$p(class = "function-annotation-note", "No retained PubMed references."))
       }
-    }
-    if (is.null(mod_pub)) {
-      idx <- if (is.finite(module_id_num)) module_id_num else suppressWarnings(as.integer(module_id_txt))
-      if (is.finite(idx) && idx >= 1 && idx <= length(pubmed_res)) {
-        mod_pub <- pubmed_res[[idx]]
-      }
-    }
-
-    if (is.null(mod_pub) || length(mod_pub) == 0) {
-      return(
-        tags$div(
-          class = "param-card function-annotation-card",
-          tags$h4(icon("book"), "Literature Evidence (PMID)"),
-          tags$p(
-            class = "function-annotation-note",
-            "No PubMed evidence matched to the selected module."
-          )
-        )
-      )
-    }
-
-    collect_pmids <- function(x) {
-      out <- character(0)
-      if (is.list(x)) {
-        if (!is.null(x$pmids)) out <- c(out, as.character(x$pmids))
-        for (i in seq_along(x)) out <- c(out, collect_pmids(x[[i]]))
-      }
-      out
-    }
-
-    collect_compound_pmids <- function(mod_pub) {
-      if (!is.list(mod_pub)) return(list())
-      mod_names <- names(mod_pub)
-      out <- list()
-      
-      first_scalar_text <- function(x, fallback = "") {
-        if (is.null(x)) return(fallback)
-        if (is.data.frame(x)) {
-          x <- unlist(x, recursive = TRUE, use.names = FALSE)
-        } else if (is.list(x)) {
-          x <- unlist(x, recursive = TRUE, use.names = FALSE)
-        }
-        x <- trimws(as.character(x))
-        x <- unique(x[!is.na(x) & nzchar(x)])
-        if (length(x) == 0) fallback else x[1]
-      }
-
-      for (i in seq_along(mod_pub)) {
-        ent <- mod_pub[[i]]
-        if (!is.list(ent) || (is.null(ent$pmids) && is.null(ent$met_name))) next
-
-        pmids_i <- as.character(ent$pmids %||% character(0))
-        pmids_i <- unique(trimws(pmids_i))
-        pmids_i <- pmids_i[!is.na(pmids_i) & nzchar(pmids_i)]
-
-        ent_id <- ""
-        if (!is.null(mod_names) && length(mod_names) >= i && !is.na(mod_names[i])) {
-          ent_id <- first_scalar_text(mod_names[i], fallback = "")
-        }
-        if (!nzchar(ent_id)) ent_id <- as.character(i)
-
-        ent_name <- first_scalar_text(ent$met_name %||% "", fallback = ent_id)
-
-        out[[length(out) + 1]] <- list(
-          compound_id = ent_id,
-          compound_name = ent_name,
-          pmids = pmids_i,
-          n_pmids = length(pmids_i)
-        )
-      }
-
-      if (length(out) == 0) return(out)
-
-      merged <- list()
-      for (entry in out) {
-        key <- if (!is.null(entry$compound_id) && nzchar(entry$compound_id)) {
-          entry$compound_id
-        } else {
-          entry$compound_name
-        }
-
-        if (!key %in% names(merged)) {
-          merged[[key]] <- entry
-        } else {
-          merged[[key]]$pmids <- unique(c(merged[[key]]$pmids, entry$pmids))
-          merged[[key]]$n_pmids <- length(merged[[key]]$pmids)
-          if (!nzchar(merged[[key]]$compound_name) && nzchar(entry$compound_name)) {
-            merged[[key]]$compound_name <- entry$compound_name
-          }
-        }
-      }
-
-      unname(merged)
-    }
-
-    compound_pmids <- collect_compound_pmids(mod_pub)
-    pmids <- if (length(compound_pmids) > 0) {
-      unique(unlist(lapply(compound_pmids, `[[`, "pmids"), use.names = FALSE))
-    } else {
-      unique(collect_pmids(mod_pub))
-    }
-    pmids <- pmids[!is.na(pmids) & nzchar(trimws(pmids))]
-
-    if (length(pmids) == 0) {
-      return(
-        tags$div(
-          class = "param-card function-annotation-card",
-          tags$h4(icon("book"), "Literature Evidence (PMID)"),
-          tags$p(class = "function-annotation-note", "No retained PubMed references for this module.")
-        )
-      )
-    }
-
-    if (length(compound_pmids) > 0) {
-      n_compounds <- length(compound_pmids)
-      n_compounds_with_hits <- sum(vapply(compound_pmids, function(x) x$n_pmids > 0, logical(1)))
-      ord <- order(vapply(compound_pmids, function(x) x$n_pmids, integer(1)), decreasing = TRUE)
-      compound_pmids <- compound_pmids[ord]
-
-      make_pmid_cell <- function(pmids_vec) {
-        if (length(pmids_vec) == 0) return(tags$span("-"))
-        if (length(pmids_vec) == 1) {
-          x <- pmids_vec[1]
-          return(tags$a(href = paste0("https://pubmed.ncbi.nlm.nih.gov/", x, "/"), target = "_blank", rel = "noopener noreferrer", x))
-        }
-        parts <- list()
-        for (i in seq_along(pmids_vec)) {
-          x <- pmids_vec[i]
-          parts[[length(parts) + 1]] <- tags$a(href = paste0("https://pubmed.ncbi.nlm.nih.gov/", x, "/"), target = "_blank", rel = "noopener noreferrer", x)
-          if (i < length(pmids_vec)) parts[[length(parts) + 1]] <- tags$span(", ")
-        }
-        do.call(tagList, parts)
-      }
-
-      return(
-        tags$div(
-          class = "param-card function-annotation-card",
-          tags$h4(icon("book"), "Literature Evidence (PMID)"),
-          tags$p(
-            class = "function-annotation-note",
-            paste0(
-              "Top compounds with retained references: ",
-              n_compounds_with_hits, "/", n_compounds,
-              " | Unique PMIDs: ", length(pmids)
-            )
-          ),
-          tags$div(
-            class = "table-responsive",
-            tags$table(
-              class = "table table-sm table-striped table-bordered",
-              style = "margin-bottom:0;",
-              tags$thead(
-                tags$tr(
-                  tags$th("Top Compound"),
-                  tags$th("Compound ID"),
-                  tags$th("PMID Count"),
-                  tags$th("PMIDs")
-                )
-              ),
-              tags$tbody(
-                lapply(compound_pmids, function(cp) {
-                  tags$tr(
-                    tags$td(cp$compound_name),
-                    tags$td(cp$compound_id),
-                    tags$td(as.character(cp$n_pmids)),
-                    tags$td(
-                      style = "min-width:280px; white-space:normal; word-break:break-word;",
-                      make_pmid_cell(cp$pmids)
-                    )
-                  )
-                })
-              )
-            )
-          )
-        )
-      )
-    }
-
-    tags$div(
-      class = "param-card function-annotation-card",
-      tags$h4(icon("book"), "Literature Evidence (PMID)"),
-      tags$p(
-        class = "function-annotation-note",
-        paste0("Retained references for this module: ", length(pmids))
-      ),
       tags$div(
         class = "function-pmid-list",
         lapply(pmids, function(x) {
@@ -7025,42 +6859,182 @@ server <- function(input, output, session) {
           )
         })
       )
+    }
+
+    if (has_hypotheses) {
+      blocks <- lapply(seq_len(nrow(mod_df)), function(i) {
+        pmids <- split_pmids(mod_df$pubmed_pmids[i])
+        hyp_label <- paste(
+          na.omit(c(
+            if ("hypothesis_id" %in% names(mod_df)) as.character(mod_df$hypothesis_id[i]) else NA,
+            if ("hypothesis_type" %in% names(mod_df)) as.character(mod_df$hypothesis_type[i]) else NA
+          )),
+          collapse = " — "
+        )
+        tags$div(
+          style = "margin-bottom: 10px;",
+          if (nzchar(hyp_label)) tags$div(style = "font-weight:600; margin-bottom:4px;", hyp_label),
+          make_pmid_chips(pmids)
+        )
+      })
+
+      return(
+        tags$div(
+          class = "param-card function-annotation-card",
+          tags$h4(icon("book"), "Literature Evidence (PMID)"),
+          blocks
+        )
+      )
+    }
+
+    pmids <- unique(unlist(lapply(mod_df$pubmed_pmids, split_pmids)))
+
+    tags$div(
+      class = "param-card function-annotation-card",
+      tags$h4(icon("book"), "Literature Evidence (PMID)"),
+      tags$p(
+        class = "function-annotation-note",
+        paste0("Retained references for this module: ", length(pmids))
+      ),
+      make_pmid_chips(pmids)
     )
   })
   output$function_module_output <- renderUI({
     if (rv$function_status != "finished") return(NULL)
     if (is.null(rv$function_result) || is.null(rv$function_result$module_function)) return(NULL)
     if (is.null(input$selected_function_module)) return(NULL)
-    
+
     mod_df <- rv$function_result$module_function %>%
       dplyr::filter(as.character(module_id) == as.character(input$selected_function_module))
-    
-    req(nrow(mod_df) == 1)
-    
+
+    req(nrow(mod_df) >= 1)
+
+    get_field <- function(row, field, fallback = NULL) {
+      if (field %in% names(row) && !is.na(row[[field]][1]) && nzchar(trimws(as.character(row[[field]][1])))) {
+        as.character(row[[field]][1])
+      } else {
+        fallback
+      }
+    }
+
+    is_advanced <- nrow(mod_df) > 1 || "hypothesis_id" %in% names(mod_df)
+
+    render_hypothesis <- function(row) {
+      verdict <- get_field(row, "verdict_status")
+      hyp_label <- if (is_advanced) {
+        paste(
+          na.omit(c(
+            get_field(row, "hypothesis_id"),
+            get_field(row, "hypothesis_type")
+          )),
+          collapse = " — "
+        )
+      } else {
+        NULL
+      }
+
+      tags$div(
+        class = "function-annotation-grid",
+        if (!is.null(hyp_label) && nzchar(hyp_label)) {
+          tags$div(
+            class = "function-annotation-hypothesis-header",
+            style = "grid-column: 1 / -1; display:flex; align-items:center; gap:8px; font-weight:600;",
+            icon("flask"), hyp_label,
+            if (!is.null(verdict)) {
+              tags$span(
+                class = if (identical(tolower(verdict), "accepted")) "badge bg-success" else "badge bg-secondary",
+                style = "margin-left:6px;",
+                verdict
+              )
+            }
+          )
+        },
+
+        tags$div(
+          class = "param-card function-annotation-card",
+          tags$h4(icon("tag"), "Module Title"),
+          tags$p(class = "function-annotation-title", get_field(row, "title", "–"))
+        ),
+
+        tags$div(
+          class = "param-card function-annotation-card",
+          tags$h4(icon("align-left"), "Functional Summary"),
+          tags$p(class = "function-annotation-text", get_field(row, "functional_summary", "–"))
+        ),
+
+        tags$div(
+          class = "param-card function-annotation-card",
+          tags$h4(icon("chart-simple"), "Confidence"),
+          tags$p(class = "function-annotation-confidence", get_field(row, "confidence_label", "–"))
+        ),
+
+        tags$div(
+          class = "param-card function-annotation-card",
+          tags$h4(icon("think-peaks"), "Rationale"),
+          tags$p(class = "function-annotation-text", get_field(row, "rationale", "–"))
+        )
+      )
+    }
+
+    tagList(
+      lapply(seq_len(nrow(mod_df)), function(i) render_hypothesis(mod_df[i, , drop = FALSE]))
+    )
+  })
+
+  #### ---- Debate transcript (advanced mode) ----
+  output$function_debate_ui <- renderUI({
+    if (rv$function_status != "finished") return(NULL)
+    if (!identical(rv$function_mode_used, "advanced")) return(NULL)
+    if (is.null(input$selected_function_module)) return(NULL)
+
+    if (!isTRUE(rv$function_debate_html_used)) {
+      return(
+        tags$div(
+          class = "param-card function-annotation-card",
+          tags$h4(icon("messages"), "Debate Transcript"),
+          tags$p(
+            class = "function-annotation-note",
+            "Debate transcript export was disabled for this run. Re-run Step 5 in Advanced mode with ",
+            tags$em("Export per-module debate transcript"), " enabled to see the Proposer / Skeptic / Arbiter exchange here."
+          )
+        )
+      )
+    }
+
+    debate_dir <- rv$function_debate_html_dir
+    if (is.null(debate_dir) || !dir.exists(debate_dir)) return(NULL)
+
+    module_id <- as.character(input$selected_function_module)
+    fname <- paste0("debate_", gsub("[^A-Za-z0-9._-]", "_", module_id), ".html")
+    fpath <- file.path(debate_dir, fname)
+
+    if (!file.exists(fpath)) {
+      return(
+        tags$div(
+          class = "param-card function-annotation-card",
+          tags$h4(icon("messages"), "Debate Transcript"),
+          tags$p(class = "function-annotation-note", "No debate transcript found for this module.")
+        )
+      )
+    }
+
+    debate_html <- tryCatch(
+      paste(readLines(fpath, warn = FALSE, encoding = "UTF-8"), collapse = "\n"),
+      error = function(e) NULL
+    )
+    if (is.null(debate_html)) return(NULL)
+
     tags$div(
-      class = "function-annotation-grid",
-      tags$div(
-        class = "param-card function-annotation-card",
-        tags$h4(icon("tag"), "Module Title"),
-        tags$p(class = "function-annotation-title", mod_df$title)
+      class = "param-card function-annotation-card",
+      tags$h4(icon("messages"), "Debate Transcript"),
+      tags$p(
+        class = "function-annotation-note",
+        "Proposer / Skeptic / Arbiter exchange for this module."
       ),
-      
-      tags$div(
-        class = "param-card function-annotation-card",
-        tags$h4(icon("align-left"), "Functional Summary"),
-        tags$p(class = "function-annotation-text", mod_df$summary)
-      ),
-      
-      tags$div(
-        class = "param-card function-annotation-card",
-        tags$h4(icon("chart-simple"), "Confidence"),
-        tags$p(class = "function-annotation-confidence", mod_df$confidence_label)
-      ),
-      
-      tags$div(
-        class = "param-card function-annotation-card",
-        tags$h4(icon("think-peaks"), "Rationale"),
-        tags$p(class = "function-annotation-text", mod_df$rationale)
+      tags$iframe(
+        srcdoc = debate_html,
+        style = "width:100%; height:820px; border:1px solid #dee2e6; border-radius:8px;",
+        sandbox = "allow-same-origin"
       )
     )
   })
@@ -7078,21 +7052,29 @@ server <- function(input, output, session) {
       nrow(mf)
     }
 
-    n_summary_ready <- if ("summary" %in% names(mf)) {
-      sum(!is.na(mf$summary) & nzchar(trimws(mf$summary)))
+    n_summary_ready <- if ("functional_summary" %in% names(mf)) {
+      sum(!is.na(mf$functional_summary) & nzchar(trimws(mf$functional_summary)))
     } else {
       n_modules
     }
 
-    has_literature <- !is.null(rv$function_result$module_pubmed_embed_refined) &&
-      length(rv$function_result$module_pubmed_embed_refined) > 0
+    has_literature <- isTRUE(rv$function_pubmed_used) &&
+      "pubmed_pmids" %in% names(mf) &&
+      any(!is.na(mf$pubmed_pmids) & nzchar(trimws(mf$pubmed_pmids)))
+
+    debate_dir <- rv$function_debate_html_dir
+    debate_files <- if (!is.null(debate_dir) && dir.exists(debate_dir)) {
+      list.files(debate_dir, pattern = "\\.html?$", full.names = TRUE)
+    } else {
+      character(0)
+    }
 
     tags$div(
       class = "param-card",
       tags$h4(icon("circle-check"), "Functional Annotation Status"),
       tags$p(
         style = "margin-bottom:6px;",
-        paste0("Annotated modules: ", n_modules)
+        paste0("Annotated modules: ", n_modules, " (mode: ", rv$function_mode_used %||% input$func_mode, ")")
       ),
       tags$p(
         style = "margin-bottom:6px;",
@@ -7101,6 +7083,20 @@ server <- function(input, output, session) {
           if (has_literature) "Enabled" else "Disabled"
         )
       ),
+      if (length(debate_files) > 0) {
+        tags$p(
+          style = "margin-bottom:6px;",
+          downloadButton("download_debate_html", paste0("Download debate transcripts (", length(debate_files), ")"),
+                          class = "btn-outline-secondary btn-sm")
+        )
+      },
+      if (!is.null(rv$function_result$module_synthesis)) {
+        tags$p(
+          style = "margin-bottom:6px;",
+          icon("diagram-project"),
+          " Cross-module synthesis completed (see synthesis_network.html in Results)."
+        )
+      },
       tags$p(
         style = "margin-bottom:0; font-weight:600;",
         "Congratulations! Functional annotation is complete. You can go to Results to download outputs."
@@ -7620,6 +7616,24 @@ server <- function(input, output, session) {
     )
   })
   
+  output$download_debate_html <- downloadHandler(
+    filename = function() {
+      paste0("featuremap_debate_html_", Sys.Date(), ".zip")
+    },
+    content = function(file) {
+      debate_dir <- rv$function_debate_html_dir
+      req(!is.null(debate_dir), dir.exists(debate_dir))
+
+      debate_files <- list.files(debate_dir, pattern = "\\.html?$", full.names = TRUE)
+      req(length(debate_files) > 0)
+
+      old_wd <- getwd()
+      on.exit(setwd(old_wd), add = TRUE)
+      setwd(debate_dir)
+      utils::zip(zipfile = file, files = basename(debate_files))
+    }
+  )
+
   output$download_results <- downloadHandler(
     filename = function() {
       paste0("featuremap_results_", Sys.Date(), ".zip")
@@ -7862,6 +7876,7 @@ server <- function(input, output, session) {
         tags$p("Functional annotation: Skipped")
       } else {
         tags$ul(
+          tags$li(paste("Annotation mode:", input$func_mode)),
           tags$li(
             paste(
               "Significance cutoff:",
@@ -7872,7 +7887,19 @@ server <- function(input, output, session) {
           tags$li(
             if (input$func_use_pubmed) "PubMed literature: Enabled"
             else "PubMed literature: Disabled"
-          )
+          ),
+          if (identical(input$func_mode, "advanced")) {
+            tags$li(
+              if (isTRUE(input$func_synthesize)) "Cross-module synthesis: Enabled"
+              else "Cross-module synthesis: Disabled"
+            )
+          },
+          if (identical(input$func_mode, "advanced")) {
+            tags$li(
+              if (isTRUE(input$func_debate_html)) "Debate transcript export: Enabled"
+              else "Debate transcript export: Disabled"
+            )
+          }
         )
       }
     )

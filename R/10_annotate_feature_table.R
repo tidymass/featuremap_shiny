@@ -58,6 +58,66 @@
 #' @importFrom furrr future_map
 #' @importFrom data.table as.data.table rbindlist
 #'
+#' @noRd
+build_isotope_rows <- function(temp_iso_input,
+                               feature_table_mode,
+                               annotation_row,
+                               template_cols,
+                               ms1_match_ppm,
+                               mfc_rt_tol) {
+  temp_iso <-
+    feature_table_mode[temp_iso_input$peakIndex, , drop = FALSE]
+
+  temp_iso$mz.error <- as.numeric(temp_iso_input$mzError.ppm)
+  temp_iso$isotope <- temp_iso_input$isotopes
+  temp_iso$RT.error <- as.numeric(temp_iso_input$rtError.s)
+  temp_iso$Compound.name <- annotation_row$Compound.name
+  temp_iso$Lab.ID <- annotation_row$Lab.ID
+  temp_iso$Adduct <- annotation_row$Adduct
+  temp_iso$Formula <- annotation_row$Formula
+  temp_iso$Submitter <- annotation_row$Submitter
+  temp_iso$rt <- annotation_row$rt
+  temp_iso$CAS.ID <- annotation_row$CAS.ID
+  temp_iso$HMDB.ID <- annotation_row$HMDB.ID
+  temp_iso$KEGG.ID <- annotation_row$KEGG.ID
+  temp_iso$Database <- annotation_row$Database
+  temp_iso$SS <- annotation_row$SS
+  temp_iso$Total.score <- annotation_row$Total.score
+  temp_iso$Level <- annotation_row$Level
+  temp_iso$ms2_confirmed <- annotation_row$ms2_confirmed
+  temp_iso$CE <- annotation_row$CE
+  temp_iso$mz.match.score <-
+    (ms1_match_ppm - temp_iso$mz.error) / ms1_match_ppm
+  temp_iso$RT.match.score <-
+    (mfc_rt_tol - temp_iso$RT.error) / mfc_rt_tol
+
+  dplyr::select(temp_iso, dplyr::all_of(template_cols))
+}
+
+score_annotation_group <- function(x, mfc_rt_tol) {
+  x <- x %>%
+    dplyr::arrange(rt)
+
+  rt_class <-
+    group_peaks_rt(rt = x$rt, rt.tol = mfc_rt_tol) %>%
+    dplyr::arrange(rt)
+
+  rt_class <- paste(x$Lab.ID[1], rt_class$class, sep = "@")
+
+  x$metabolite_feature_cluster <-
+    rt_class
+
+  unique(x$metabolite_feature_cluster) %>%
+    purrr::map(function(y) {
+      z <- x[x$metabolite_feature_cluster == y, , drop = FALSE]
+      score <- score_mfc(z)
+      z$score <- score
+      z
+    }) %>%
+    do.call(rbind, .) %>%
+    as.data.frame()
+}
+
 annotate_feature_table <-
   function(feature_table,
            ms2_table,
@@ -107,32 +167,46 @@ annotate_feature_table <-
       feature_table %>%
       dplyr::filter(polarity == "negative")
 
+    cli::cli_alert_info(
+      "Detected {nrow(feature_table_pos)} positive-mode features and {nrow(feature_table_neg)} negative-mode features."
+    )
 
-    ############metabolite database matching for feature_table
-    if (nrow(feature_table_pos) == 0) {
-      annotation_table_ms1_pos <- NULL
-    } else{
+    run_ms1_annotation <- function(feature_table_mode, polarity_mode) {
+      n_features <- nrow(feature_table_mode)
+
+      if (n_features == 0) {
+        cli::cli_bullets(c(
+          ">" = "Skipping {polarity_mode}-mode feature annotation because no features were detected in this mode."
+        ))
+        return(NULL)
+      }
+
+      cli::cli_bullets(c(
+        ">" = "Annotating {polarity_mode}-mode features."
+      ))
+
       expression_data <-
-        data.frame(sample_1 = rep(1, nrow(feature_table_pos)))
+        data.frame(sample_1 = rep(1, n_features))
       sample_info <-
         data.frame(sample_id = "sample_1", class = "Subject")
-      rownames(expression_data) <- feature_table_pos$variable_id
-      object_pos <-
+      rownames(expression_data) <- feature_table_mode$variable_id
+
+      object_mode <-
         massdataset::create_mass_dataset(
           expression_data = expression_data,
           sample_info = sample_info,
-          variable_info = feature_table_pos
+          variable_info = feature_table_mode
         )
 
-      object_pos <-
+      object_mode <-
         metid::annotate_metabolites(
-          object = object_pos,
+          object = object_mode,
           based_on = "ms1",
           ms1.match.ppm = ms1_match_ppm,
           column = column,
-          polarity = "positive",
+          polarity = polarity_mode,
           adduct.table = featuremap_load_metid_adduct_table(
-            polarity = "positive",
+            polarity = polarity_mode,
             column = column
           ),
           database = metabolite_database,
@@ -140,46 +214,23 @@ annotate_feature_table <-
           threads = max(1L, as.integer(workers))
         )
 
-      annotation_table_ms1_pos <-
-        object_pos@annotation_table
-      annotation_table_ms1_pos$polarity <- "positive"
+      annotation_table_mode <- object_mode@annotation_table
+      annotation_table_mode$polarity <- polarity_mode
+
+      annotation_table_mode
     }
 
-    if (nrow(feature_table_neg) == 0) {
-      annotation_table_ms1_neg <- NULL
-    } else{
-      expression_data <-
-        data.frame(sample_1 = rep(1, nrow(feature_table_neg)))
-      sample_info = data.frame(sample_id = "sample_1", class = "Subject")
-      rownames(expression_data) <- feature_table_neg$variable_id
 
-      object_neg <-
-        massdataset::create_mass_dataset(
-          expression_data = expression_data,
-          sample_info = sample_info,
-          variable_info = feature_table_neg
-        )
+    ############metabolite database matching for feature_table
+    annotation_table_ms1_pos <- run_ms1_annotation(
+      feature_table_mode = feature_table_pos,
+      polarity_mode = "positive"
+    )
 
-      object_neg <-
-        metid::annotate_metabolites(
-          object = object_neg,
-          based_on = "ms1",
-          ms1.match.ppm = ms1_match_ppm,
-          column = column,
-          polarity = "negative",
-          adduct.table = featuremap_load_metid_adduct_table(
-            polarity = "negative",
-            column = column
-          ),
-          database = metabolite_database,
-          candidate.num = 1000,
-          threads = max(1L, as.integer(workers))
-        )
-
-      annotation_table_ms1_neg <-
-        object_neg@annotation_table
-      annotation_table_ms1_neg$polarity <- "negative"
-    }
+    annotation_table_ms1_neg <- run_ms1_annotation(
+      feature_table_mode = feature_table_neg,
+      polarity_mode = "negative"
+    )
 
     annotation_table_ms1 <-
       rbind(annotation_table_ms1_pos, annotation_table_ms1_neg) %>%
@@ -244,47 +295,19 @@ annotate_feature_table <-
 
     ###positive
 
-    build_isotope_rows <- function(temp_iso_input,
-                                   feature_table_mode,
-                                   annotation_row,
-                                   template_cols) {
-      temp_iso <-
-        feature_table_mode[temp_iso_input$peakIndex, , drop = FALSE]
-
-      temp_iso$mz.error <- as.numeric(temp_iso_input$mzError.ppm)
-      temp_iso$isotope <- temp_iso_input$isotopes
-      temp_iso$RT.error <- as.numeric(temp_iso_input$rtError.s)
-      temp_iso$Compound.name <- annotation_row$Compound.name
-      temp_iso$Lab.ID <- annotation_row$Lab.ID
-      temp_iso$Adduct <- annotation_row$Adduct
-      temp_iso$Formula <- annotation_row$Formula
-      temp_iso$Submitter <- annotation_row$Submitter
-      temp_iso$rt <- annotation_row$rt
-      temp_iso$CAS.ID <- annotation_row$CAS.ID
-      temp_iso$HMDB.ID <- annotation_row$HMDB.ID
-      temp_iso$KEGG.ID <- annotation_row$KEGG.ID
-      temp_iso$Database <- annotation_row$Database
-      temp_iso$SS <- annotation_row$SS
-      temp_iso$Total.score <- annotation_row$Total.score
-      temp_iso$Level <- annotation_row$Level
-      temp_iso$ms2_confirmed <- annotation_row$ms2_confirmed
-      temp_iso$CE <- annotation_row$CE
-      temp_iso$mz.match.score <-
-        (ms1_match_ppm - temp_iso$mz.error) / ms1_match_ppm
-      temp_iso$RT.match.score <-
-        (mfc_rt_tol - temp_iso$RT.error) / mfc_rt_tol
-
-      temp_iso %>%
-        dplyr::select(dplyr::all_of(template_cols))
-    }
-
     old_plan <- future::plan()
     future::plan(multisession, workers = workers)
     on.exit(future::plan(old_plan), add = TRUE)
 
     if (nrow(annotation_table_final_pos) == 0) {
+      cli::cli_bullets(c(
+        ">" = "Skipping positive-mode isotope annotation because no positive-mode feature candidates were retained."
+      ))
       isotope_pos <- NULL
     } else{
+      cli::cli_bullets(c(
+        ">" = "Matching isotopes for positive-mode annotations."
+      ))
       system.time(
         isotope_pos <-
           furrr::future_map(
@@ -326,11 +349,24 @@ annotate_feature_table <-
                 temp_iso_input = temp_iso,
                 feature_table_mode = feature_table_pos,
                 annotation_row = annotation_row,
-                template_cols = colnames(annotation_table_final_pos)
+                template_cols = colnames(annotation_table_final_pos),
+                ms1_match_ppm = ms1_match_ppm,
+                mfc_rt_tol = mfc_rt_tol
               )
               temp_iso
             },
-            .progress = TRUE
+            .progress = TRUE,
+            .options = furrr::furrr_options(
+              globals = list(
+                annotation_table_final_pos = annotation_table_final_pos,
+                feature_table_pos = feature_table_pos,
+                build_isotope_rows = build_isotope_rows,
+                annotate_isotope = annotate_isotope,
+                isotope_number = isotope_number,
+                mfc_rt_tol = mfc_rt_tol,
+                ms1_match_ppm = ms1_match_ppm
+              )
+            )
           ) %>%
           do.call(rbind, .) %>%
           as.data.frame()
@@ -344,8 +380,14 @@ annotate_feature_table <-
       dplyr::arrange(Compound.name, isotope, rt)
 
     if (nrow(annotation_table_final_neg) == 0) {
+      cli::cli_bullets(c(
+        ">" = "Skipping negative-mode isotope annotation because no negative-mode feature candidates were retained."
+      ))
       isotope_neg <- NULL
     } else {
+      cli::cli_bullets(c(
+        ">" = "Matching isotopes for negative-mode annotations."
+      ))
       system.time(
         isotope_neg <-
           furrr::future_map(
@@ -386,11 +428,24 @@ annotate_feature_table <-
                 temp_iso_input = temp_iso,
                 feature_table_mode = feature_table_neg,
                 annotation_row = annotation_row,
-                template_cols = colnames(annotation_table_final_neg)
+                template_cols = colnames(annotation_table_final_neg),
+                ms1_match_ppm = ms1_match_ppm,
+                mfc_rt_tol = mfc_rt_tol
               )
               temp_iso
             },
-            .progress = TRUE
+            .progress = TRUE,
+            .options = furrr::furrr_options(
+              globals = list(
+                annotation_table_final_neg = annotation_table_final_neg,
+                feature_table_neg = feature_table_neg,
+                build_isotope_rows = build_isotope_rows,
+                annotate_isotope = annotate_isotope,
+                isotope_number = isotope_number,
+                mfc_rt_tol = mfc_rt_tol,
+                ms1_match_ppm = ms1_match_ppm
+              )
+            )
           ) %>%
           do.call(rbind, .) %>%
           as.data.frame()
@@ -446,6 +501,9 @@ annotate_feature_table <-
     }
 
     ####combine peaks to metabolite feature cluster (MFC)
+    cli::cli_bullets(c(
+      ">" = "Scoring metabolite feature clusters."
+    ))
     annotation_table_final <-
       score_annotation_table(annotation_table = annotation_table_final, mfc_rt_tol = mfc_rt_tol)
 
@@ -495,38 +553,23 @@ annotate_feature_table <-
 score_annotation_table <-
   function(annotation_table, mfc_rt_tol) {
     ##calculate the score for each metabolite feature cluster
+    annotation_groups <- split(annotation_table, annotation_table$Lab.ID)
+
     annotation_table <-
-      unique(annotation_table$Lab.ID) %>%
       furrr::future_map(
+        .x = annotation_groups,
         .f = function(temp_id) {
-          x <- annotation_table %>%
-            dplyr::filter(Lab.ID == temp_id)
-
-          x <- x %>%
-            dplyr::arrange(rt)
-
-          rt_class <-
-            group_peaks_rt(rt = x$rt, rt.tol = mfc_rt_tol) %>%
-            dplyr::arrange(rt)
-
-          rt_class <- paste(x$Lab.ID[1], rt_class$class, sep = "@")
-
-          x$metabolite_feature_cluster <-
-            rt_class
-
-          x <-
-            unique(x$metabolite_feature_cluster) %>%
-            purrr::map(function(y) {
-              z = x[x$metabolite_feature_cluster == y, , drop = FALSE]
-              score <- score_mfc(z)
-              z$score <- score
-              z
-            }) %>%
-            do.call(rbind, .) %>%
-            as.data.frame()
-          x
+          score_annotation_group(x = temp_id, mfc_rt_tol = mfc_rt_tol)
         },
-        .progress = TRUE
+        .progress = TRUE,
+        .options = furrr::furrr_options(
+          globals = list(
+            score_annotation_group = score_annotation_group,
+            group_peaks_rt = group_peaks_rt,
+            score_mfc = score_mfc,
+            mfc_rt_tol = mfc_rt_tol
+          )
+        )
       ) %>%
       do.call(rbind, .) %>%
       as.data.frame()
