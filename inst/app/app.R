@@ -59,12 +59,6 @@ load_featuremap_functions <- function() {
 
 load_featuremap_functions()
 
-citation_text <- paste(
-  "FeatureMAP: A Comprehensive Pipeline for Metabolite Feature-based",
-  "Functional Module Identification and Annotation.",
-  "Journal Name, Year;Volume:Pages."
-)
-
 build_info_icon <- function(content) {
   tags$span(
     class = "inline-info-wrap",
@@ -96,6 +90,33 @@ ui <- fluidPage(
     
     tags$style(HTML("
     
+    #shiny-notification-panel {
+        position: fixed !important;
+        top: auto !important;
+        left: auto !important;
+        right: 24px !important;
+        bottom: 24px !important;
+        transform: none !important;
+        width: auto !important;
+        min-width: 280px !important;
+        max-width: min(680px, calc(100vw - 48px)) !important;
+        z-index: 3000 !important;
+      }
+
+    #shiny-notification-panel .shiny-notification {
+        display: inline-block !important;
+        width: auto !important;
+        min-width: 280px !important;
+        max-width: min(680px, calc(100vw - 48px)) !important;
+        margin: 0 0 12px 0 !important;
+        padding: 14px 18px !important;
+        border-radius: 12px;
+        border: 1px solid rgba(190, 207, 224, 0.92);
+        box-shadow: 0 22px 54px rgba(31, 54, 82, 0.26);
+        white-space: normal !important;
+        overflow-wrap: break-word;
+      }
+
     .empty-panel {
         min-height: 560px;
         border: 1px dashed #dee2e6;
@@ -789,30 +810,19 @@ ui <- fluidPage(
         #modules_page .module-visual-filter-row {
           display: flex;
           align-items: center;
-          justify-content: space-between;
+          justify-content: flex-start;
           gap: 12px;
           flex-wrap: nowrap;
           margin-bottom: 8px;
           width: 100%;
         }
 
-        #modules_page .module-visual-shell > #module_selector_ui {
-          flex: 0 0 auto;
-          width: 100%;
-          margin-bottom: 8px;
-        }
-
-        #modules_page .module-visual-shell > #module_selector_ui .module-selector-wrap {
-          width: 100%;
-        }
-
-        #modules_page .module-visual-shell > #module_selector_ui .form-group {
-          margin-bottom: 0;
-        }
-
-        #modules_page .module-selector-divider {
-          margin: 0 0 8px 0;
-          flex: 0 0 auto;
+        #modules_page .module-visual-filter-row #module_selector_ui {
+          flex: 0 1 200px;
+          width: 200px;
+          max-width: 100%;
+          min-width: 0;
+          display: block;
         }
 
         #modules_page .module-visual-filter-row #module_node_selector_ui {
@@ -823,36 +833,120 @@ ui <- fluidPage(
           display: block;
         }
 
+        #modules_page .module-visual-filter-row #module_selector_ui .pcsf-selector-item,
         #modules_page .module-visual-filter-row #module_node_selector_ui .pcsf-selector-item {
           width: 100%;
           max-width: 100%;
         }
 
+        #modules_page .module-visual-filter-row #module_selector_ui .pcsf-selector-input,
         #modules_page .module-visual-filter-row #module_node_selector_ui .pcsf-selector-input {
           display: flex;
           align-items: flex-start;
           gap: 8px;
         }
 
+        #modules_page .module-visual-filter-row #module_selector_ui .pcsf-selector-field,
         #modules_page .module-visual-filter-row #module_node_selector_ui .pcsf-selector-field {
           flex: 1;
           min-width: 0;
         }
 
+        #modules_page .module-visual-filter-row #module_selector_ui .pcsf-selector-field .form-group,
+        #modules_page .module-visual-filter-row #module_selector_ui .pcsf-selector-field .selectize-control,
         #modules_page .module-visual-filter-row #module_node_selector_ui .pcsf-selector-field .form-group,
         #modules_page .module-visual-filter-row #module_node_selector_ui .pcsf-selector-field .selectize-control {
           margin-bottom: 0;
         }
 
+        #modules_page .module-visual-filter-row #module_selector_ui .pcsf-selector-input .inline-info-wrap,
         #modules_page .module-visual-filter-row #module_node_selector_ui .pcsf-selector-input .inline-info-wrap {
           margin-left: 0;
           margin-top: 8px;
           flex: 0 0 auto;
         }
 
+        #modules_page .module-visual-filter-row #module_selector_ui .selectize-input,
+        #modules_page .module-visual-filter-row #module_node_selector_ui .selectize-input {
+          height: 38px;
+          min-height: 38px;
+          max-height: 38px;
+          overflow: hidden;
+          display: flex;
+          align-items: center;
+          flex-wrap: nowrap;
+        }
+
+        #modules_page .module-visual-filter-row #module_selector_ui .selectize-input > .item,
+        #modules_page .module-visual-filter-row #module_node_selector_ui .selectize-input > .item {
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 100%;
+        }
+
         #modules_page .module-visual-filter-row #module_network_legend {
-          flex: 0 0 auto;
+          flex: 1 1 260px;
           margin-left: auto;
+          min-width: 260px;
+          display: flex;
+          justify-content: flex-end;
+          padding-right: 12px;
+        }
+
+        #modules_page .module-visual-filter-row #module_network_legend .network-legend-row {
+          justify-content: flex-end;
+        }
+
+        #function_page .function-visual-filter-row {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 20px;
+          flex-wrap: nowrap;
+          margin-bottom: 14px;
+          width: 100%;
+        }
+
+        #function_page .function-visual-filter-row #function_module_selector_ui,
+        #function_page .function-visual-filter-row #function_hypothesis_selector_ui {
+          flex: 0 1 200px;
+          width: 200px;
+          max-width: 100%;
+          min-width: 0;
+        }
+
+        #function_page .function-visual-filter-row .pcsf-selector-input {
+          display: flex;
+          align-items: flex-start;
+          gap: 8px;
+        }
+
+        #function_page .function-visual-filter-row .pcsf-selector-field {
+          flex: 1;
+          min-width: 0;
+        }
+
+        #function_page .function-visual-filter-row .pcsf-selector-field .form-group,
+        #function_page .function-visual-filter-row .pcsf-selector-field .selectize-control {
+          margin-bottom: 0;
+        }
+
+        #function_page .function-visual-filter-row .selectize-input {
+          height: 38px;
+          min-height: 38px;
+          max-height: 38px;
+          overflow: hidden;
+          display: flex;
+          align-items: center;
+          flex-wrap: nowrap;
+        }
+
+        #function_page .function-visual-filter-row .selectize-input > .item {
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 100%;
         }
 
         #modules_page .module-visual-shell > hr,
@@ -992,7 +1086,7 @@ ui <- fluidPage(
       /* Top Navigation Bar */
       .top-navbar {
         background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
-        padding: 15px 30px;
+        padding: 15px 28px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         margin-bottom: 0;
       }
@@ -1048,7 +1142,7 @@ ui <- fluidPage(
           radial-gradient(920px 380px at 10% -10%, rgba(92, 142, 209, 0.16), transparent 65%),
           radial-gradient(840px 360px at 96% 0%, rgba(73, 170, 162, 0.14), transparent 62%),
           #f4f7fb;
-        padding: 0 0 54px 0;
+        padding: 0;
         overflow-x: hidden;
       }
 
@@ -1327,38 +1421,180 @@ ui <- fluidPage(
         color: #5b7085;
       }
 
-      #home_page .workflow-section,
-      #home_page .citation-section {
+      #home_page .workflow-section {
         background: transparent;
-        padding: 0;
-        margin-top: 20px;
+        padding: 30px 0 32px 0;
+        margin: 46px auto 0 auto;
+        width: calc(100% - 96px);
+        max-width: 1520px;
+        border-top: 1px solid #d3dfeb;
+        border-bottom: 1px solid #d3dfeb;
       }
 
-      #home_page .workflow-card,
-      #home_page .citation-card {
-        border-radius: 16px;
-        border: 1px solid #d8e2ee;
-        background: #ffffff;
-        padding: 22px;
-        box-shadow: 0 10px 22px rgba(43, 67, 92, 0.12);
+      #home_page .workflow-section .section-title {
+        font-size: 38px;
+        line-height: 1.15;
       }
 
-      #home_page .citation-card {
-        background: linear-gradient(125deg, #1f4065 0%, #2e5e8e 52%, #3f7f8c 100%);
-        border: none;
-        color: #edf5ff;
-        box-shadow: 0 15px 28px rgba(31, 64, 101, 0.28);
+      #home_page .workflow-panel {
+        width: 100%;
+        max-width: none;
+        margin: 0;
+        display: grid;
+        grid-template-columns: minmax(360px, 0.44fr) minmax(520px, 0.56fr);
+        gap: 0;
+        align-items: stretch;
       }
 
-      #home_page .citation-text {
+      #home_page .workflow-copy {
+        padding: 18px 28px 18px 0;
+        border-right: none;
+        background: transparent;
+        display: flex;
+        align-items: center;
+      }
+
+      #home_page .workflow-copy-grid {
+        display: block;
+        max-width: 620px;
+      }
+
+      #home_page .workflow-kicker {
+        margin: 0 0 8px 0;
+        color: #3c7898;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      #home_page .workflow-lede-title {
+        margin: 0;
+        color: #213d58;
+        font-size: 32px;
+        font-weight: 750;
+        line-height: 1.25;
+      }
+
+      #home_page .workflow-lede {
+        margin: 0;
+        color: #41566b;
         font-size: 16px;
-        line-height: 1.7;
+        line-height: 1.52;
+        max-width: none;
       }
 
-      #home_page .citation-card .btn {
+      #home_page .workflow-copy-grid > div + div {
+        margin-top: 18px;
+      }
+
+      #home_page .workflow-lede + .workflow-lede {
+        margin-top: 10px;
+      }
+
+      #home_page .workflow-credit {
+        margin: 18px 0 0 0;
+        padding: 16px 18px;
+        border: 1px solid #cfdce8;
+        border-left: 4px solid #2f7894;
         border-radius: 10px;
-        padding: 9px 14px;
-        font-weight: 600;
+        background: rgba(255, 255, 255, 0.56);
+        color: #52687e;
+        font-size: 14px;
+        line-height: 1.55;
+      }
+
+      #home_page .workflow-credit strong {
+        display: block;
+        color: #25496b;
+        font-size: 15px;
+        margin-bottom: 5px;
+      }
+
+      #home_page .workflow-figure {
+        padding: 12px 0 12px 28px;
+        border-left: 1px solid #d3dfeb;
+        background: transparent;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 0;
+      }
+
+      #home_page .workflow-image {
+        display: block;
+        width: 100%;
+        max-width: 100%;
+        max-height: 600px;
+        height: auto;
+        object-fit: contain;
+      }
+
+      .app-footer {
+        margin-top: 0;
+        border-top: 1px solid #d9e3ef;
+        background: #eef2f8;
+        border-radius: 0 0 18px 18px;
+        padding: 28px 44px;
+      }
+
+      .app-footer-inner {
+        display: grid;
+        grid-template-columns: minmax(240px, 0.95fr) minmax(280px, 0.85fr) minmax(240px, 0.75fr);
+        gap: 26px;
+        align-items: center;
+        width: min(1180px, 100%);
+        margin: 0 auto;
+      }
+
+      .footer-logo {
+        display: block;
+        width: min(320px, 100%);
+        height: auto;
+      }
+
+      .footer-links {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(120px, 1fr));
+        gap: 14px 28px;
+        justify-self: center;
+        width: min(320px, 100%);
+      }
+
+      .footer-link {
+        color: #53617d;
+        font-size: 15px;
+        font-weight: 700;
+        text-decoration: none;
+        cursor: pointer;
+      }
+
+      .footer-link:hover,
+      .footer-link:focus {
+        color: #244d78;
+        text-decoration: none;
+      }
+
+      .footer-meta {
+        text-align: right;
+        color: #778299;
+        font-size: 14px;
+        line-height: 1.55;
+      }
+
+      .footer-product {
+        margin: 0 0 12px 0;
+        color: #26324a;
+        font-size: 18px;
+        font-weight: 800;
+      }
+
+      .footer-meta p {
+        margin: 0 0 8px 0;
+      }
+
+      .footer-meta strong {
+        color: #53617d;
       }
 
       @media (max-width: 1080px) {
@@ -1369,11 +1605,42 @@ ui <- fluidPage(
         #home_page .hero-subtitle {
           white-space: normal;
         }
+
+        #home_page .workflow-panel {
+          grid-template-columns: 1fr;
+          gap: 18px;
+        }
+
+        #home_page .workflow-copy {
+          padding-right: 0;
+          padding-bottom: 22px;
+        }
+
+        #home_page .workflow-copy-grid {
+          max-width: none;
+        }
+
+        #home_page .workflow-figure {
+          min-height: 0;
+          border-left: none;
+          border-top: 1px solid #d3dfeb;
+          padding-left: 0;
+          padding-top: 22px;
+        }
+
+        .app-footer-inner {
+          grid-template-columns: 1fr;
+          gap: 22px;
+        }
+
+        .footer-meta {
+          text-align: left;
+        }
       }
 
       @media (max-width: 768px) {
         #home_page {
-          padding: 0 0 40px 0;
+          padding: 0;
         }
 
         #home_page .home-shell {
@@ -1408,6 +1675,52 @@ ui <- fluidPage(
 
         #home_page .section-title {
           font-size: 24px;
+        }
+
+        #home_page .workflow-section .section-title {
+          font-size: 30px;
+        }
+
+        #home_page .workflow-section {
+          width: 100%;
+        }
+
+        #home_page .workflow-copy {
+          padding: 18px 0 14px 0;
+        }
+
+        #home_page .workflow-copy-grid {
+          max-width: none;
+        }
+
+        #home_page .workflow-lede-title {
+          font-size: 23px;
+        }
+
+        #home_page .workflow-lede {
+          font-size: 14px;
+        }
+
+        #home_page .workflow-credit {
+          font-size: 13px;
+        }
+
+        #home_page .workflow-figure {
+          padding: 18px 0 0 0;
+        }
+
+        #home_page .workflow-image {
+          width: 100%;
+          max-height: none;
+        }
+
+        .app-footer {
+          padding: 26px 20px;
+        }
+
+        .footer-links {
+          grid-template-columns: 1fr;
+          gap: 12px;
         }
       }
 
@@ -1488,59 +1801,6 @@ ui <- fluidPage(
         border-radius: 10px;
         border-color: #c8d7ea;
         font-size: 16px;
-      }
-
-      /* Module selector (Step 4) */
-      #modules_page .module-selector-wrap {
-        background: #f3f5f7;
-        border: 1px solid #d7dde4;
-        border-radius: 12px;
-        padding: 14px 16px;
-      }
-
-      #modules_page .module-selector-wrap .form-group {
-        margin-bottom: 0;
-      }
-
-      #modules_page .module-selector-wrap label {
-        font-size: 15px;
-        font-weight: 700;
-        color: #33485e;
-        margin-bottom: 8px;
-      }
-
-      #modules_page .module-selector-wrap .selectize-control.single .selectize-input {
-        min-height: 44px;
-        display: flex;
-        align-items: center;
-        border: 1px solid #cfd7e0;
-        border-radius: 8px;
-        font-size: 15px;
-        color: #2f3f50;
-        padding: 9px 12px;
-        background: #ffffff;
-        box-shadow: inset 0 1px 2px rgba(36, 52, 67, 0.06);
-      }
-
-      #modules_page .module-selector-wrap .selectize-input.focus {
-        border-color: #9aaec4;
-        box-shadow: 0 0 0 0.2rem rgba(138, 156, 176, 0.20);
-      }
-
-      #modules_page .module-selector-wrap .selectize-dropdown {
-        border-color: #cfd7e0;
-        border-radius: 8px;
-        box-shadow: 0 10px 20px rgba(55, 70, 84, 0.14);
-      }
-
-      #modules_page .module-selector-wrap .selectize-dropdown .option {
-        padding: 9px 12px;
-        font-size: 14px;
-      }
-
-      #modules_page .module-selector-wrap .selectize-dropdown .active {
-        background: #eef2f6;
-        color: #304356;
       }
 
       .function-annotation-grid {
@@ -1676,6 +1936,331 @@ ui <- fluidPage(
 
       .function-met-pmid-empty {
         margin: 0;
+      }
+
+      .fast-function-report {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .fast-function-hero {
+        border: 1px solid #d8e2ee;
+        border-radius: 12px;
+        background: #f8fafc;
+        padding: 18px 20px;
+      }
+
+      .fast-function-eyebrow {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+        color: #52677e;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .fast-function-hero h3 {
+        margin: 0 0 12px 0;
+        color: #162f49;
+        font-size: 24px;
+        font-weight: 750;
+        line-height: 1.28;
+      }
+
+      .fast-function-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .fast-meta-pill,
+      .fast-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border: 1px solid #d6e0ec;
+        border-radius: 999px;
+        background: #ffffff;
+        color: #2a4662;
+        font-size: 13px;
+        font-weight: 650;
+        line-height: 1.2;
+        padding: 6px 10px;
+      }
+
+      .fast-meta-pill.conf-high,
+      .fast-chip.conf-high {
+        background: #eaf7ef;
+        border-color: #bddfc9;
+        color: #21643a;
+      }
+
+      .fast-meta-pill.conf-medium,
+      .fast-chip.conf-medium {
+        background: #fff6e6;
+        border-color: #f2d29a;
+        color: #80551b;
+      }
+
+      .fast-meta-pill.conf-low,
+      .fast-chip.conf-low {
+        background: #fdeeee;
+        border-color: #efc0c0;
+        color: #8c3030;
+      }
+
+      .fast-chip.dir-up {
+        background: #eaf7ef;
+        border-color: #bddfc9;
+        color: #21643a;
+      }
+
+      .fast-chip.dir-down {
+        background: #faece7;
+        border-color: #f0997b;
+        color: #993c1d;
+      }
+
+      .fast-chip.dir-mixed {
+        background: #f1f3f5;
+        border-color: #dbe5f2;
+        color: #52677e;
+      }
+
+      .fast-function-sections {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 14px;
+      }
+
+      .fast-info-section {
+        border: 1px solid #dbe5f2;
+        border-radius: 12px;
+        background: #ffffff;
+        overflow: hidden;
+      }
+
+      .fast-section-head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 13px 16px;
+        border-bottom: 1px solid #edf2f7;
+        background: #fbfdff;
+      }
+
+      .fast-section-icon {
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: #edf4fb;
+        color: #2d5d86;
+        flex: 0 0 auto;
+      }
+
+      .fast-section-head h4 {
+        margin: 0;
+        color: #1c3957;
+        font-size: 17px;
+        font-weight: 700;
+      }
+
+      .fast-section-body {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding: 14px 16px 16px 16px;
+      }
+
+      .fast-field {
+        display: grid;
+        grid-template-columns: 180px minmax(0, 1fr);
+        gap: 12px;
+        align-items: start;
+      }
+
+      .fast-field-label {
+        color: #587088;
+        font-size: 12px;
+        font-weight: 750;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+
+      .fast-field-value {
+        min-width: 0;
+        color: #26394c;
+        font-size: 15px;
+        line-height: 1.6;
+      }
+
+      .fast-field-value p {
+        margin: 0;
+      }
+
+      .fast-muted {
+        color: #738497;
+        font-style: italic;
+      }
+
+      .fast-chip-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+      }
+
+      .fast-mini-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      .fast-mini-table th {
+        padding: 7px 8px;
+        border-bottom: 1px solid #dce6f1;
+        color: #52677e;
+        background: #f6f9fc;
+        font-size: 11px;
+        font-weight: 750;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+
+      .fast-mini-table td {
+        padding: 8px;
+        border-bottom: 1px solid #eef2f6;
+        color: #2d4053;
+        vertical-align: top;
+      }
+
+      .fast-mini-table tr:last-child td {
+        border-bottom: none;
+      }
+
+      .fast-pathway-group {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .fast-pathway-group + .fast-pathway-group {
+        margin-top: 4px;
+      }
+
+      .fast-pathway-group-title {
+        font-size: 13px;
+        font-weight: 700;
+        color: #1c3957;
+      }
+
+      .fast-pathway-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 10px;
+      }
+
+      .fast-pathway-card {
+        background: #f7f8fb;
+        border: 1px solid #e4e7ee;
+        border-radius: 10px;
+        padding: 12px 14px;
+      }
+
+      .fast-pathway-id {
+        font-size: 13px;
+        font-weight: 700;
+        color: #2f4b99;
+        margin-bottom: 4px;
+      }
+
+      .fast-pathway-desc {
+        font-size: 14px;
+        color: #33404f;
+        line-height: 1.5;
+      }
+
+      .fast-origin-wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .fast-origin-bar {
+        display: flex;
+        width: 100%;
+        height: 14px;
+        border-radius: 999px;
+        overflow: hidden;
+        background: #e3e5ee;
+      }
+
+      .fast-origin-seg {
+        height: 100%;
+      }
+
+      .fast-origin-seg-endo {
+        background: #2f9e6a;
+      }
+
+      .fast-origin-seg-exo {
+        background: #c1602e;
+      }
+
+      .fast-origin-seg-unknown {
+        background: #dcdfe8;
+      }
+
+      .fast-origin-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 18px;
+      }
+
+      .fast-origin-legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 14px;
+        color: #33404f;
+      }
+
+      .fast-origin-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        display: inline-block;
+        flex: 0 0 auto;
+      }
+
+      .fast-origin-dot-endo {
+        background: #2f9e6a;
+      }
+
+      .fast-origin-dot-exo {
+        background: #c1602e;
+      }
+
+      .fast-origin-dot-unknown {
+        background: #dcdfe8;
+      }
+
+      @media (max-width: 760px) {
+        .fast-field {
+          grid-template-columns: 1fr;
+          gap: 4px;
+        }
+
+        .fast-function-hero h3 {
+          font-size: 21px;
+        }
       }
       
       /* Card styles */
@@ -1941,6 +2526,23 @@ ui <- fluidPage(
         border: 1px solid #f6dfb7;
       }
 
+      #results_page .results-preview-item .btn.results-preview-download-btn {
+        font-size: 12px;
+        font-weight: 700;
+        border-radius: 999px;
+        padding: 4px 12px;
+        color: #21603b;
+        background: #e6f6ec;
+        border: 1px solid #c1e8d0;
+        line-height: 1.4;
+      }
+
+      #results_page .results-preview-item .btn.results-preview-download-btn:hover {
+        color: #21603b;
+        background: #d7f0e0;
+        border-color: #a9dcbc;
+      }
+
       #results_page .results-empty-preview {
         font-size: 13px;
         color: #6b7684;
@@ -1959,6 +2561,10 @@ ui <- fluidPage(
         border-radius: 10px;
         padding: 12px;
         background: #f7fbff;
+      }
+
+      #results_page .run-next-row {
+        margin-top: 18px;
       }
 
       #results_page #analysis_parameters h5 {
@@ -2757,7 +3363,7 @@ ui <- fluidPage(
   tags$div(
     class = "top-navbar",
     tags$div(
-      style = "display: flex; justify-content: space-between; align-items: center; max-width: 1400px; margin: 0 auto;",
+      style = "display: flex; justify-content: space-between; align-items: center; width: 100%;",
       tags$div(
         class = "navbar-brand",
         tags$img(
@@ -2775,8 +3381,8 @@ ui <- fluidPage(
         tags$li(class = "nav-item", actionLink("nav_annotation", "Feature Annotation", class = "nav-link")),
         tags$li(class = "nav-item", actionLink("nav_network", "PCSF Subnetwork", class = "nav-link")),
         tags$li(class = "nav-item", actionLink("nav_modules", "Module Identification", class = "nav-link")),
-        tags$li(class = "nav-item", actionLink("nav_function", "Function Annotation", class = "nav-link")),
-        tags$li(class = "nav-item", actionLink("nav_results", "Results", class = "nav-link"))
+        tags$li(class = "nav-item", actionLink("nav_function", "Function Interpretation", class = "nav-link")),
+        tags$li(class = "nav-item", actionLink("nav_results", "Results Download", class = "nav-link"))
       )
     )
   ),
@@ -2813,9 +3419,8 @@ ui <- fluidPage(
               class = "btn btn-hero btn-hero-primary"
             ),
             tags$a(
-              href = "https://github.com/tidymass/featuremap_shiny",
-              target = "_blank",
               class = "btn btn-hero btn-hero-secondary",
+              onclick = "Shiny.setInputValue('footer_nav', 'docs', {priority: 'event'}); return false;",
               icon("book"),
               "Documentation"
             )
@@ -2894,43 +3499,45 @@ ui <- fluidPage(
           class = "workflow-section home-section",
           tags$div(
             class = "home-section-head",
-            tags$h2(class = "section-title", "Workflow Overview")
+            tags$h2(class = "section-title", "About FeatureMAP")
           ),
           tags$div(
-            class = "workflow-card",
-            plotOutput("workflow_diagram", height = 400)
-          )
-        ),
-
-        # Citation Section
-        tags$div(
-          class = "citation-section home-section",
-          tags$div(
-            class = "home-section-head",
-            tags$h2(class = "section-title", "Citation")
-          ),
-          tags$div(
-            class = "citation-card",
+            class = "workflow-panel",
             tags$div(
-              class = "citation-text",
-              tags$p(
-                style = "font-size: 18px; margin-bottom: 10px;",
-                "If you use FeatureMAP in your research, please cite:"
-              ),
-              tags$p(
-                style = "margin-left: 20px;",
-                tags$strong("FeatureMAP: "),
-                "A Comprehensive Pipeline for Metabolite Feature-based ",
-                "Functional Module Identification and Annotation. ",
-                tags$em("Journal Name"),
-                ", Year;Volume:Pages."
+              class = "workflow-copy",
+              tags$div(
+                class = "workflow-copy-grid",
+                tags$div(
+                  tags$p(class = "workflow-kicker", "Feature-centric metabolic interpretation"),
+                  tags$h3(
+                    class = "workflow-lede-title",
+                    "From LC-MS features to dysregulated metabolic modules"
+                  )
+                ),
+                tags$div(
+                  tags$p(
+                    class = "workflow-lede",
+                    "FeatureMAP is a feature-centric, metabolic network-guided framework for interpreting untargeted LC-MS metabolomics data without requiring complete metabolite identification or an arbitrary significant-feature cutoff. It takes a conventional feature table with m/z, retention time, ionization mode, and phenotype association as input, then converts partially annotated feature signals into network-refined annotations and dysregulated metabolic modules."
+                  ),
+                  tags$p(
+                    class = "workflow-lede",
+                    "The workflow integrates multi-evidence feature-to-metabolite annotation, cutoff-free feature weighting, PCSF-based network refinement, robustness-weighted subnetwork construction, community detection, module scoring, and structured LLM-assisted interpretation. Final outputs include refined feature-metabolite assignments, statistically supported modules, functional summaries, confidence rationales, and prioritized metabolites for downstream validation."
+                  ),
+                  tags$p(
+                    class = "workflow-credit",
+                    tags$strong("Citation"),
+                    "FeatureMAP is developed by the Shen Lab for feature-based metabolic functional module identification and annotation. If FeatureMAP supports your research, please cite the FeatureMAP manuscript and acknowledge the online service in downstream reports."
+                  )
+                )
               )
             ),
-            actionButton(
-              "copy_citation",
-              "Copy Citation",
-              icon = icon("copy"),
-              class = "btn btn-light"
+            tags$div(
+              class = "workflow-figure",
+              tags$img(
+                src = "workflow_overview.png",
+                class = "workflow-image",
+                alt = "FeatureMAP workflow overview"
+              )
             )
           )
         )
@@ -3328,7 +3935,7 @@ ui <- fluidPage(
                           numericInput(
                             "pcsf_b_min",
                             "b min",
-                            value = 30,
+                            value = 20,
                             min = 0,
                             step = 1
                           )
@@ -3361,7 +3968,7 @@ ui <- fluidPage(
                           numericInput(
                             "pcsf_w_min",
                             "w min",
-                            value = 30,
+                            value = 20,
                             min = 0,
                             step = 1
                           )
@@ -3392,15 +3999,15 @@ ui <- fluidPage(
                   
                   conditionalPanel(
                     condition = "!input.pcsf_grid_tune",
-                    sliderInput(
+                    numericInput(
                       "pcsf_b",
                       "Node prize weight (b)",
-                      min = 20, max = 60, value = 40, step = 1
+                      min = 20, max = 60, value = 20, step = 1
                     ),
-                    sliderInput(
+                    numericInput(
                       "pcsf_w",
                       "Steiner penalty (w)",
-                      min = 20, max = 60, value = 30, step = 5
+                      min = 20, max = 60, value = 25, step = 5
                     )
                   ),
                   
@@ -3434,7 +4041,7 @@ ui <- fluidPage(
                   checkboxInput(
                     "pcsf_show_network",
                     "Visualize PCSF subnetwork",
-                    value = FALSE
+                    value = TRUE
                   )
                   
                 ),
@@ -3603,17 +4210,11 @@ ui <- fluidPage(
                 tags$div(
                   class = "param-card",
                   tags$h4("Module size constraint"),
-                  
+
                   numericInput(
                     "min_module_size",
                     "Minimum size",
                     value = 3, min = 2
-                  ),
-                  
-                  numericInput(
-                    "max_module_size",
-                    "Maximum size",
-                    value = 100000, min = 10
                   )
                 ),
                 
@@ -3686,10 +4287,30 @@ ui <- fluidPage(
                     title = tagList(icon("network-wired"), "Visualization"),
                     tags$div(
                       class = "module-visual-shell",
-                      uiOutput("module_selector_ui"),
-                      tags$hr(class = "module-selector-divider"),
                       tags$div(
                         class = "module-visual-filter-row",
+                        tags$div(
+                          id = "module_selector_ui",
+                          class = "pcsf-selector-item",
+                          tags$div(
+                            class = "pcsf-selector-input",
+                            tags$div(
+                              class = "pcsf-selector-field",
+                              selectizeInput(
+                                "selected_module",
+                                label = NULL,
+                                choices = character(0),
+                                selected = NULL,
+                                multiple = FALSE,
+                                width = "100%",
+                                options = list(
+                                  placeholder = "Module"
+                                )
+                              )
+                            ),
+                            build_info_icon("Select which detected module to display in the network below.")
+                          )
+                        ),
                         tags$div(
                           id = "module_node_selector_ui",
                           class = "pcsf-selector-item",
@@ -3759,7 +4380,7 @@ ui <- fluidPage(
       )
     ),
     
-    # Function Annotation Page
+    # Function Interpretation Page
     tags$div(
       id = "function_page",
       style = "display: none;",
@@ -3772,7 +4393,7 @@ ui <- fluidPage(
             tags$div(class = "results-kicker", icon("robot"), "Workflow Step"),
             tags$div(class = "results-step-number", "Step 5")
           ),
-          tags$div(class = "step-title", "AI-Powered Function Annotation"),
+          tags$div(class = "step-title", "AI-Powered Function Interpretation"),
           tags$div(class = "step-description", "Automatically annotate module functions using large language models")
         ),
         
@@ -3832,22 +4453,15 @@ ui <- fluidPage(
                   radioButtons(
                     "func_mode",
                     NULL,
-                    choices = c("Fast" = "fast", "Advanced (multi-agent debate)" = "advanced"),
+                    choices = c("Fast" = "fast", "Advanced" = "advanced"),
                     selected = "fast"
                   ),
 
                   conditionalPanel(
                     condition = "input.func_mode == 'advanced'",
-
                     checkboxInput(
                       "func_synthesize",
-                      "Run cross-module synthesis after annotation",
-                      value = FALSE
-                    ),
-
-                    checkboxInput(
-                      "func_debate_html",
-                      "Export per-module debate transcript (HTML)",
+                      "Run cross-module synthesis",
                       value = FALSE
                     )
                   )
@@ -3877,51 +4491,6 @@ ui <- fluidPage(
                   )
                 ),
                 
-                # ================= Metabolite class database =================
-                tags$div(
-                  class = "param-card",
-                  tags$h4(
-                    "Reference Database",
-                    build_info_icon(
-                      paste0(
-                        "Choose <code>Use default database (recommended)</code> to use the built-in metabolite ",
-                        "class annotations provided by FeatureMAP, based on HMDB and KEGG reference data.<br><br>",
-                        "If you want to use your own class annotation file, select ",
-                        "<code>Upload your own dataset</code> and upload it below."
-                      )
-                    )
-                  ),
-                  
-                  radioButtons(
-                    "func_class_source",
-                    "Class annotation",
-                    choices = c(
-                      "Use default database" = "default",
-                      "Upload your own dataset" = "upload"
-                    ),
-                    selected = "default"
-                  ),
-                  
-                  conditionalPanel(
-                    condition = "input.func_class_source == 'upload'",
-                    fileInput(
-                      "func_class_file",
-                      tags$span(
-                        "Choose your reference",
-                        build_info_icon(
-                          paste0(
-                            "Each reference table must contain these columns:<br>",
-                            "<code>id</code>, <code>name</code>, <code>synonyms</code>, and <code>class</code>.<br><br>",
-                            "Reference-format examples are available on our GitHub: ",
-                            "<a href='https://github.com/tidymass/featuremap_resources' target='_blank'>featuremap_resources</a>"
-                          )
-                        )
-                      ),
-                      accept = c(".rda", ".RData", ".csv")
-                    )
-                  )
-                ),
-                
                 # ================= PubMed =================
                 tags$div(
                   class = "param-card",
@@ -3941,8 +4510,6 @@ ui <- fluidPage(
                       "Years to search",
                       value = 5, min = 1, max = 20
                     ),
-
-                    helpText("Up to three deduplicated papers per query are retained automatically."),
 
                   passwordInput(
                     "func_ncbi_key",
@@ -3982,7 +4549,7 @@ ui <- fluidPage(
                   textInput(
                     "func_llm_model",
                     NULL,
-                    placeholder = "e.g. gpt-4.1-mini"
+                    placeholder = "e.g. gpt-5.4"
                   ),
                   
                   
@@ -4023,7 +4590,7 @@ ui <- fluidPage(
               tags$div(
                 class = "card-header card-header-result",
                 icon("robot"),
-                "Module Functional Annotation"
+                "Module Functional Interpretation"
               ),
               tags$div(
                 class = "card-body",
@@ -4073,21 +4640,25 @@ ui <- fluidPage(
                   class = "results-card-note",
                   "Select table format and network format. A single ZIP package will include selected tables and selected networks."
                 ),
-                checkboxGroupInput(
-                  "export_items",
-                  "Select Tables to Export",
-                  choices = c(
-                    "Annotation table 1"   = "anno1",
-                    "Annotation table 2"   = "anno2",
-                    "Module score"         = "module_score",
-                    "Module table"         = "module_table",
-                    "Module function"      = "module_function"
-                  )
+                tags$div(
+                  class = "results-network-wrap",
+                  tags$div(class = "results-preview-title", icon("table"), "Table Export"),
+                  checkboxGroupInput(
+                    "export_items",
+                    "Select Tables to Export",
+                    choices = c(
+                      "Annotation table 1"   = "anno1",
+                      "Annotation table 2"   = "anno2",
+                      "Module score"         = "module_score",
+                      "Module table"         = "module_table",
+                      "Module function"      = "module_function"
+                    )
+                  ),
+                  selectInput("export_format", "Table Format",
+                              choices = c("Excel (.xlsx)" = "xlsx",
+                                          "CSV (multiple files)" = "csv",
+                                          "RData" = "rdata"))
                 ),
-                selectInput("export_format", "Table Format",
-                            choices = c("Excel (.xlsx)" = "xlsx",
-                                        "CSV (multiple files)" = "csv",
-                                        "RData" = "rdata")),
                 tags$div(
                   class = "results-network-wrap",
                   tags$div(class = "results-preview-title", icon("sitemap"), "Network Export"),
@@ -4110,12 +4681,7 @@ ui <- fluidPage(
                     selected = "html"
                   )
                 ),
-                tags$div(
-                  class = "results-preview-wrap",
-                  tags$div(class = "results-preview-title", icon("list-ul"), "Selected Content"),
-                  uiOutput("export_preview")
-                )
-                ,
+                uiOutput("results_advanced_mode_downloads"),
                 tags$div(
                   class = "run-next-row",
                   downloadButton("download_results", "Download Results",
@@ -4147,7 +4713,137 @@ ui <- fluidPage(
               )
             )
           )
+        )
+      )
+    ),
+
+    # Documentation Page
+    tags$div(
+      id = "docs_page",
+      style = "display: none;",
+      tags$div(
+        class = "content-wrapper",
+        tags$div(
+          class = "step-box results-step-box",
+          tags$div(
+            class = "results-step-top",
+            tags$div(class = "results-kicker", icon("book-open"), "Help"),
+            tags$div(class = "results-step-number", "Docs")
+          ),
+          tags$div(class = "step-title", "Documentation"),
+          tags$div(
+            class = "step-description",
+            "Quick reference for preparing inputs, running the workflow, and exporting FeatureMAP results."
+          )
         ),
+        fluidRow(
+          column(
+            width = 4,
+            tags$div(
+              class = "card",
+              tags$div(class = "card-header", icon("table"), " Required Inputs"),
+              tags$div(
+                class = "card-body",
+                tags$p("Prepare a feature table with m/z, retention time, polarity, intensity, condition, and statistical columns."),
+                tags$p("Optional MS/MS evidence can be uploaded to improve feature-to-metabolite annotation support.")
+              )
+            )
+          ),
+          column(
+            width = 4,
+            tags$div(
+              class = "card",
+              tags$div(class = "card-header", icon("route"), " Workflow"),
+              tags$div(
+                class = "card-body",
+                tags$p("FeatureMAP runs multi-evidence annotation, PCSF subnetwork extraction, module identification, function interpretation, and result export.")
+              )
+            )
+          ),
+          column(
+            width = 4,
+            tags$div(
+              class = "card",
+              tags$div(class = "card-header", icon("link"), " Resources"),
+              tags$div(
+                class = "card-body",
+                tags$p(
+                  tags$a(
+                    href = "https://www.shen-lab.org/featuremap-tutorial",
+                    target = "_blank",
+                    "Open the full online tutorial"
+                  )
+                ),
+                tags$p(
+                  tags$a(
+                    href = "https://github.com/tidymass/featuremap_shiny",
+                    target = "_blank",
+                    "View FeatureMAP Shiny on GitHub"
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+  ),
+
+  # Global Footer
+  tags$div(
+    class = "app-footer",
+    tags$div(
+      class = "app-footer-inner",
+      tags$div(
+        tags$img(
+          src = "shen_lab_footer_logo.png",
+          class = "footer-logo",
+          alt = "Shen Lab",
+          onerror = "this.onerror=null; this.src='shen_lab_logo6.png';"
+        )
+      ),
+      tags$div(
+        class = "footer-links",
+        tags$a(
+          class = "footer-link",
+          onclick = "Shiny.setInputValue('footer_nav', 'home', {priority: 'event'}); return false;",
+          "Home"
+        ),
+        tags$a(
+          class = "footer-link",
+          onclick = "Shiny.setInputValue('footer_nav', 'home', {priority: 'event'}); setTimeout(function(){ document.querySelector('#home_page .workflow-section')?.scrollIntoView({behavior: 'smooth', block: 'start'}); }, 80); return false;",
+          "About"
+        ),
+        tags$a(
+          class = "footer-link",
+          onclick = "Shiny.setInputValue('footer_nav', 'docs', {priority: 'event'}); return false;",
+          "Help"
+        ),
+        tags$a(
+          class = "footer-link",
+          href = "https://www.shen-lab.org/contact",
+          target = "_blank",
+          "Contact Us"
+        ),
+        tags$a(
+          class = "footer-link",
+          href = "https://github.com/tidymass/featuremap_shiny",
+          target = "_blank",
+          "GitHub"
+        ),
+        tags$a(
+          class = "footer-link",
+          onclick = "window.scrollTo({top: 0, behavior: 'smooth'}); return false;",
+          "Back to top ",
+          icon("arrow-up")
+        )
+      ),
+      tags$div(
+        class = "footer-meta",
+        tags$p(class = "footer-product", "FeatureMAP"),
+        tags$p(HTML("&copy; 2026 Shen Lab. All rights reserved.")),
+        tags$p("Last updated 2026-08-17"),
+        tags$p("Version ", tags$strong("v1.0"))
       )
     )
   )
@@ -4185,6 +4881,7 @@ server <- function(input, output, session) {
     function_result = NULL,
     function_status = "idle",
     function_pubmed_used = FALSE,
+    function_synthesis_html_path = NULL,
     results_export_tables_touched = FALSE,
     results_export_networks_touched = FALSE,
     results_export_tables_updating = FALSE,
@@ -4354,9 +5051,9 @@ server <- function(input, output, session) {
         list(target = "modules_result_card", title = "Step 4 Guide: Result", text = "Check module network, module score, and module table in this result panel.")
       ),
       `function` = list(
-        list(target = "function_param_card", title = "Step 5 Guide: Parameters", text = "Set functional annotation options and provide required API key(s) in this panel."),
-        list(target = "run_function_annotation", title = "Step 5 Guide: Run", text = "Click this button to run AI-powered functional annotation."),
-        list(target = "function_result_card", title = "Step 5 Guide: Result", text = "Check functional annotation outputs in this result panel.")
+        list(target = "function_param_card", title = "Step 5 Guide: Parameters", text = "Set functional interpretation options and provide required API key(s) in this panel."),
+        list(target = "run_function_annotation", title = "Step 5 Guide: Run", text = "Click this button to run AI-powered functional interpretation."),
+        list(target = "function_result_card", title = "Step 5 Guide: Result", text = "Check functional interpretation outputs in this result panel.")
       ),
       results = list(
         list(target = "results_export_card", title = "Step 6 Guide: Export Options", text = "Choose which result tables to export and select output format in this panel."),
@@ -4616,47 +5313,13 @@ server <- function(input, output, session) {
   observeEvent(input$get_started, {
     switch_page("upload")
   })
-  
-  # Copy citation button
-  observeEvent(input$copy_citation, {
-    session$sendCustomMessage(
-      "copy-to-clipboard",
-      list(
-        text = citation_text,
-        inputId = "copy_citation_result"
-      )
-    )
-  })
 
-  observeEvent(input$copy_citation_result, {
-    if (isTRUE(input$copy_citation_result$ok)) {
-      showNotification("Citation copied to clipboard!", type = "message")
-    } else {
-      showNotification(
-        "Clipboard copy failed. Please copy the citation manually.",
-        type = "error"
-      )
+  observeEvent(input$footer_nav, {
+    target <- input$footer_nav
+    if (target %in% c("home", "upload", "annotation", "network", "modules", "function", "results", "docs")) {
+      switch_page(target)
     }
   })
-  
-  # Workflow diagram (delete later)
-  output$workflow_diagram <- renderPlot({
-    par(mar = c(1, 1, 1, 1), bg = "transparent")
-    plot(1:5, rep(1, 5), type = "n", xlim = c(0, 6), ylim = c(0, 2),
-         xlab = "", ylab = "", axes = FALSE)
-    
-    steps <- c("Upload", "Annotate", "Extract", "Identify", "Interpret")
-    colors <- c("#667eea", "#9b59b6", "#e74c3c", "#f39c12", "#27ae60")
-    
-    for (i in 1:5) {
-      rect(i - 0.4, 0.5, i + 0.4, 1.5, col = colors[i], border = NA)
-      text(i, 1, steps[i], col = "white", font = 2, cex = 1.3)
-      if (i < 5) {
-        arrows(i + 0.45, 1, i + 0.55, 1, length = 0.15, lwd = 4, col = "#34495e")
-      }
-    }
-  })
-  
   
   ## Step 1: Data upload================================================
   observeEvent(
@@ -5607,6 +6270,7 @@ server <- function(input, output, session) {
       type = node_type,
       group = node_group,
       label = node_label,
+      compound_name = node_compound_name,
       stringsAsFactors = FALSE
     )
   })
@@ -5673,9 +6337,15 @@ server <- function(input, output, session) {
     feature_fill <- "#fc8d58"
     metabolite_fill <- "#4474b3"
 
+    has_name <- !is.na(lookup$compound_name) & nzchar(lookup$compound_name)
     nodes <- data.frame(
       id = node_id,
-      label = lookup$label,
+      label = "",
+      title = ifelse(
+        has_name,
+        paste0("Name: ", lookup$compound_name, "<br>ID: ", node_id),
+        paste0("ID: ", node_id)
+      ),
       size = scales::rescale(node_prize, to = c(10, 40)),
       color.background = ifelse(lookup$group == "Feature", feature_fill, metabolite_fill),
       color.border = ifelse(lookup$group == "Feature", feature_fill, metabolite_fill),
@@ -5961,7 +6631,6 @@ server <- function(input, output, session) {
           res        = rv$annotation_object,
           method     = input$module_method,
           min_size   = input$min_module_size,
-          max_size   = input$max_module_size,
           n_perm     = input$n_perm,
           seed       = input$module_seed,
           workers    = input$module_workers,
@@ -6076,30 +6745,35 @@ server <- function(input, output, session) {
   })
   
   
-  output$module_selector_ui <- renderUI({
-    req(rv$module_res)
-    req(rv$module_res$module_score)
-    
+  observeEvent(list(rv$module_status, rv$module_res$module_score), ignoreInit = FALSE, {
+    if (rv$module_status != "finished" || is.null(rv$module_res$module_score)) {
+      updateSelectizeInput(
+        session,
+        "selected_module",
+        choices = character(0),
+        selected = character(0)
+      )
+      return()
+    }
+
     mods <- unique(as.character(rv$module_res$module_score$Module))
     mod_num <- suppressWarnings(as.numeric(gsub("[^0-9]+", "", mods)))
     mods <- mods[order(is.na(mod_num), mod_num, mods)]
-    req(length(mods) > 0)
-    current_selected <- input$selected_module
+
+    current_selected <- isolate(input$selected_module)
     selected_mod <- if (!is.null(current_selected) && current_selected %in% mods) {
       current_selected
-    } else {
+    } else if (length(mods) > 0) {
       mods[1]
+    } else {
+      character(0)
     }
-    
-    tags$div(
-      class = "module-selector-wrap",
-      selectInput(
-        "selected_module",
-        "Select module to visualize",
-        choices  = mods,
-        selected = selected_mod,
-        width = "100%"
-      )
+
+    updateSelectizeInput(
+      session,
+      "selected_module",
+      choices = mods,
+      selected = selected_mod
     )
   })
 
@@ -6523,7 +7197,7 @@ server <- function(input, output, session) {
   })
   
   
-  ## Step 5: Functional Annotation =====================================
+  ## Step 5: Function Interpretation =====================================
   observeEvent(input$run_function_annotation, {
     
     req(rv$module_res)
@@ -6565,49 +7239,17 @@ server <- function(input, output, session) {
       }
     }
     
-    ref_data <- tryCatch({
-      
-      if (input$func_class_source == "default") {
-        NULL
-        
-      } else {
-        
-        req(input$func_class_file)
-        
-        cat("Loading uploaded file:", input$func_class_file$name, "\n")
-        
-        ext <- tools::file_ext(input$func_class_file$name)
-        
-        result <- if (ext %in% c("rda", "RData")) {
-          e <- new.env()
-          load(input$func_class_file$datapath, envir = e)
-          e[[ls(e)[1]]]
-        } else {
-          read.csv(input$func_class_file$datapath, check.names = FALSE)
-        }
-        
-        cat("Uploaded data dimensions:", nrow(result), "x", ncol(result), "\n")
-        result
-      }
-      
-    }, error = function(e) {
-      cat("!!! ERROR loading ref_data:", e$message, "\n")
-      showNotification(
-        paste("Failed to load reference data:", e$message),
-        type = "error",
-        duration = NULL
-      )
-      NULL
-    })
-
-    if (input$func_class_source != "default" && is.null(ref_data)) {
-      cat("ref_data is NULL, aborting\n")
-      return()
-    }
+    # Reference database is always the built-in FeatureMAP database.
+    ref_data <- NULL
 
     func_mode <- if (identical(input$func_mode, "advanced")) "advanced" else "fast"
+    # Cross-module synthesis only runs in Advanced mode, and only if the
+    # user checked the box for it.
     func_synthesize  <- func_mode == "advanced" && isTRUE(input$func_synthesize)
-    func_debate_html <- func_mode == "advanced" && isTRUE(input$func_debate_html)
+    # The per-module debate transcript HTML always generates in Advanced
+    # mode (needed to render the Debate History tab and to make it
+    # available on the Results Download page).
+    func_debate_html <- func_mode == "advanced"
 
     debate_html_dir <- NULL
     if (func_debate_html) {
@@ -6621,7 +7263,7 @@ server <- function(input, output, session) {
 
     show_process_modal(
       title = "Step 5 Running",
-      text = "Module annotation is in progress. Please wait."
+      text = "Module interpretation is in progress. Please wait."
     )
     
     # ---- set status ----
@@ -6679,14 +7321,14 @@ server <- function(input, output, session) {
         shinyjs::enable("run_function_annotation")
         
         showNotification(
-          paste("Functional annotation failed:", res$message),
+          paste("Functional interpretation failed:", res$message),
           type = "error",
           duration = NULL
         )
         update_process_modal(
           "error",
           "Step 5 Failed",
-          paste("Functional annotation failed:", res$message)
+          paste("Functional interpretation failed:", res$message)
         )
         close_process_modal(2200)
         
@@ -6694,33 +7336,35 @@ server <- function(input, output, session) {
         # ---- normalize empty result as "finished" ----
         mf <- res$module_function
         is_empty <- is.null(mf) || !is.data.frame(mf) || nrow(mf) == 0
-        
+
         rv$function_result <- res
         rv$function_status <- "finished"
-        
+
+        # annotate_module() writes synthesis_network.html to the current
+        # working directory (not configurable), so look for it there.
+        rv$function_synthesis_html_path <- NULL
+        if (!is.null(res$module_synthesis)) {
+          candidate <- file.path(getwd(), "synthesis_network.html")
+          if (file.exists(candidate)) {
+            rv$function_synthesis_html_path <- candidate
+          }
+        }
+
         if (is_empty) {
           showNotification(
             "No significant modules passed the cutoff. Try relaxing the cutoff or using p-value instead of FDR.",
             type = "warning",
             duration = NULL
           )
-        } else {
-          # ---- force selector refresh ----
-          if ("module_id" %in% names(mf)) {
-            module_ids <- sort(unique(mf$module_id))
-            updateSelectInput(
-              session,
-              "selected_function_module",
-              choices  = module_ids,
-              selected = module_ids[1]
-            )
-          }
         }
-        
+        # (function_module_selector rebuilds itself via renderUI whenever
+        # rv$function_result/rv$function_status change, so no manual
+        # update*Input() call is needed here.)
+
         update_process_modal(
           "success",
           "Step 5 Completed",
-          "Module function annotation finished successfully."
+          "Module function interpretation finished successfully."
         )
         close_process_modal(900)
         
@@ -6736,7 +7380,7 @@ server <- function(input, output, session) {
       tags$div(
         class = "empty-panel empty-panel-fill",
         icon("spinner", class = "fa-spin"),
-        "Generating AI-powered functional annotation..."
+        "Generating AI-powered functional interpretation..."
       )
       
       # ---- finished but no result ----
@@ -6755,16 +7399,42 @@ server <- function(input, output, session) {
       
       # ---- finished with result ----
     } else if (rv$function_status == "finished") {
-      
-      tags$div(
-        class = "function-result-shell",
-        uiOutput("function_module_selector"),
-        uiOutput("function_module_output"),
-        uiOutput("function_debate_ui"),
-        uiOutput("function_literature_ui"),
-        uiOutput("function_result_status_ui")
-      )
-      
+
+      if (identical(rv$function_mode_used, "advanced")) {
+        tags$div(
+          class = "function-result-shell",
+          tabsetPanel(
+            id = "function_result_tabs",
+            type = "tabs",
+            tabPanel(
+              title = tagList(icon("circle-check"), "Accepted Interpretations"),
+              tags$div(
+                class = "function-visual-filter-row",
+                uiOutput("function_module_selector"),
+                uiOutput("function_hypothesis_selector")
+              ),
+              uiOutput("function_module_output")
+            ),
+            tabPanel(
+              title = tagList(icon("comments"), "Debate History"),
+              uiOutput("function_debate_ui")
+            ),
+            tabPanel(
+              title = tagList(icon("diagram-project"), "Cross-Module Synthesis"),
+              uiOutput("function_synthesis_ui")
+            )
+          ),
+          uiOutput("function_result_status_ui")
+        )
+      } else {
+        tags$div(
+          class = "function-result-shell",
+          uiOutput("function_module_selector"),
+          uiOutput("function_module_output"),
+          uiOutput("function_result_status_ui")
+        )
+      }
+
       # ---- idle ----
     } else {
       
@@ -6780,125 +7450,90 @@ server <- function(input, output, session) {
   output$function_module_selector <- renderUI({
     if (rv$function_status != "finished") return(NULL)
     if (is.null(rv$function_result) || is.null(rv$function_result$module_function)) return(NULL)
-    
+
     df <- rv$function_result$module_function
     if (!is.data.frame(df) || !"module_id" %in% colnames(df)) return(NULL)
-    
+
     module_ids <- sort(unique(df$module_id))
     if (length(module_ids) == 0) return(NULL)
-    
+
     tags$div(
-      class = "function-selector-wrap",
-      selectInput(
-        "selected_function_module",
-        "Select module",
-        choices  = module_ids,
-        selected = module_ids[1],
-        width = "100%"
-      )
-    )
-  })
-  
-  
-  #### ---- Module annotation output ----
-  output$function_literature_ui <- renderUI({
-    if (rv$function_status != "finished") return(NULL)
-    if (is.null(input$selected_function_module)) return(NULL)
-    if (is.null(rv$function_result) || is.null(rv$function_result$module_function)) return(NULL)
-
-    if (!isTRUE(rv$function_pubmed_used)) {
-      return(
-        tags$div(
-          class = "param-card function-annotation-card",
-          tags$h4(icon("book"), "Literature Evidence (PMID)"),
-          tags$p(
-            class = "function-annotation-note",
-            "Literature-based annotation was disabled in this run."
-          )
-        )
-      )
-    }
-
-    mod_df <- rv$function_result$module_function %>%
-      dplyr::filter(as.character(module_id) == as.character(input$selected_function_module))
-
-    if (nrow(mod_df) == 0 || !"pubmed_pmids" %in% names(mod_df)) {
-      return(
-        tags$div(
-          class = "param-card function-annotation-card",
-          tags$h4(icon("book"), "Literature Evidence (PMID)"),
-          tags$p(
-            class = "function-annotation-note",
-            "No literature evidence found. Please re-run Step 5 with Literature-based Annotation enabled."
-          )
-        )
-      )
-    }
-
-    split_pmids <- function(x) {
-      if (is.na(x) || !nzchar(trimws(x))) return(character(0))
-      parts <- trimws(strsplit(as.character(x), "[;,]\\s*")[[1]])
-      unique(parts[nzchar(parts)])
-    }
-
-    has_hypotheses <- "hypothesis_id" %in% names(mod_df) && nrow(mod_df) > 1
-
-    make_pmid_chips <- function(pmids) {
-      if (length(pmids) == 0) {
-        return(tags$p(class = "function-annotation-note", "No retained PubMed references."))
-      }
+      id = "function_module_selector_ui",
+      class = "pcsf-selector-item",
       tags$div(
-        class = "function-pmid-list",
-        lapply(pmids, function(x) {
-          tags$a(
-            class = "function-pmid-chip",
-            href = paste0("https://pubmed.ncbi.nlm.nih.gov/", x, "/"),
-            target = "_blank",
-            rel = "noopener noreferrer",
-            paste0("PMID: ", x)
+        class = "pcsf-selector-input",
+        tags$div(
+          class = "pcsf-selector-field",
+          selectizeInput(
+            "selected_function_module",
+            label = NULL,
+            choices = module_ids,
+            selected = module_ids[1],
+            multiple = FALSE,
+            width = "100%",
+            options = list(placeholder = "Module")
           )
-        })
+        ),
+        build_info_icon("Select which annotated module to display.")
       )
-    }
-
-    if (has_hypotheses) {
-      blocks <- lapply(seq_len(nrow(mod_df)), function(i) {
-        pmids <- split_pmids(mod_df$pubmed_pmids[i])
-        hyp_label <- paste(
-          na.omit(c(
-            if ("hypothesis_id" %in% names(mod_df)) as.character(mod_df$hypothesis_id[i]) else NA,
-            if ("hypothesis_type" %in% names(mod_df)) as.character(mod_df$hypothesis_type[i]) else NA
-          )),
-          collapse = " — "
-        )
-        tags$div(
-          style = "margin-bottom: 10px;",
-          if (nzchar(hyp_label)) tags$div(style = "font-weight:600; margin-bottom:4px;", hyp_label),
-          make_pmid_chips(pmids)
-        )
-      })
-
-      return(
-        tags$div(
-          class = "param-card function-annotation-card",
-          tags$h4(icon("book"), "Literature Evidence (PMID)"),
-          blocks
-        )
-      )
-    }
-
-    pmids <- unique(unlist(lapply(mod_df$pubmed_pmids, split_pmids)))
-
-    tags$div(
-      class = "param-card function-annotation-card",
-      tags$h4(icon("book"), "Literature Evidence (PMID)"),
-      tags$p(
-        class = "function-annotation-note",
-        paste0("Retained references for this module: ", length(pmids))
-      ),
-      make_pmid_chips(pmids)
     )
   })
+
+  #### ---- Hypothesis selector (advanced mode only) ----
+  output$function_hypothesis_selector <- renderUI({
+    if (rv$function_status != "finished") return(NULL)
+    if (!identical(rv$function_mode_used, "advanced")) return(NULL)
+    if (is.null(rv$function_result) || is.null(rv$function_result$module_function)) return(NULL)
+    if (is.null(input$selected_function_module)) return(NULL)
+
+    df <- rv$function_result$module_function
+    if (!is.data.frame(df) ||
+        !all(c("module_id", "hypothesis_id", "verdict_status") %in% names(df))) {
+      return(NULL)
+    }
+
+    sub <- df[as.character(df$module_id) == as.character(input$selected_function_module), , drop = FALSE]
+    accepted <- sub[!is.na(sub$verdict_status) & sub$verdict_status == "accepted", , drop = FALSE]
+
+    if (nrow(accepted) == 0) {
+      return(
+        tags$div(
+          id = "function_hypothesis_selector_ui",
+          class = "pcsf-selector-item",
+          tags$p(class = "fast-muted", style = "margin: 8px 0 0 0;", "No accepted hypothesis for this module.")
+        )
+      )
+    }
+
+    choices <- unique(as.character(accepted$hypothesis_id))
+
+    tags$div(
+      id = "function_hypothesis_selector_ui",
+      class = "pcsf-selector-item",
+      tags$div(
+        class = "pcsf-selector-input",
+        tags$div(
+          class = "pcsf-selector-field",
+          selectizeInput(
+            "selected_function_hypothesis",
+            label = NULL,
+            choices = choices,
+            selected = choices[1],
+            multiple = FALSE,
+            width = "100%",
+            options = list(placeholder = "Hypothesis")
+          )
+        ),
+        build_info_icon("Select which accepted hypothesis to display for this module.")
+      )
+    )
+  })
+
+
+  #### ---- Module annotation output ----
+  # (Literature evidence is now rendered inline, per accepted hypothesis,
+  # inside render_fast_module()'s "Phenotype & Literature" section — no
+  # separate standalone literature panel is needed any more.)
   output$function_module_output <- renderUI({
     if (rv$function_status != "finished") return(NULL)
     if (is.null(rv$function_result) || is.null(rv$function_result$module_function)) return(NULL)
@@ -6917,68 +7552,433 @@ server <- function(input, output, session) {
       }
     }
 
-    is_advanced <- nrow(mod_df) > 1 || "hypothesis_id" %in% names(mod_df)
+    split_semicolon <- function(x) {
+      if (is.null(x) || length(x) == 0 || is.na(x[1])) return(character(0))
+      parts <- trimws(strsplit(as.character(x[1]), ";\\s*")[[1]])
+      parts <- parts[nzchar(parts) & !(toupper(parts) %in% c("NA", "NULL", "UNKNOWN"))]
+      unique(parts)
+    }
 
-    render_hypothesis <- function(row) {
-      verdict <- get_field(row, "verdict_status")
-      hyp_label <- if (is_advanced) {
-        paste(
-          na.omit(c(
-            get_field(row, "hypothesis_id"),
-            get_field(row, "hypothesis_type")
-          )),
-          collapse = " — "
-        )
-      } else {
-        NULL
+    compact_text <- function(x) {
+      if (is.null(x) || length(x) == 0) return(character(0))
+      x <- trimws(as.character(unlist(x, use.names = FALSE)))
+      x[!is.na(x) & nzchar(x) & !(toupper(x) %in% c("NA", "NULL", "UNKNOWN"))]
+    }
+
+    as_finite_number <- function(x) {
+      if (is.null(x) || length(x) == 0) return(NA_real_)
+      val <- suppressWarnings(as.numeric(x[1]))
+      if (is.finite(val)) val else NA_real_
+    }
+
+    fmt_pct <- function(x) {
+      val <- as_finite_number(x)
+      if (is.na(val)) return(NULL)
+      if (abs(val) <= 1) val <- val * 100
+      paste0(round(val, 1), "%")
+    }
+
+    fmt_cell <- function(x, percent = FALSE) {
+      if (is.list(x)) x <- unlist(x, use.names = FALSE)
+      if (length(x) == 0 || all(is.na(x))) return("–")
+      if (percent) {
+        pct <- fmt_pct(x[1])
+        if (!is.null(pct)) return(pct)
       }
+      x <- compact_text(x)
+      if (length(x) == 0) "–" else paste(x, collapse = ", ")
+    }
 
+    conf_class <- function(x) {
+      lab <- tolower(trimws(as.character(x %||% "")))
+      if (lab %in% c("high", "medium", "low")) paste0("conf-", lab) else ""
+    }
+
+    direction_chip <- function(x) {
+      lab <- tolower(trimws(as.character(x %||% "")))
+      icon_name <- switch(lab,
+        up = "arrow-trend-up",
+        down = "arrow-trend-down",
+        "arrows-left-right"
+      )
+      dir_cls <- if (lab %in% c("up", "down")) paste0("dir-", lab) else "dir-mixed"
+      label <- if (nzchar(lab)) paste0(toupper(substr(lab, 1, 1)), substr(lab, 2, nchar(lab))) else "–"
+      tags$span(class = paste("fast-chip", dir_cls), icon(icon_name), label)
+    }
+
+    chip_list <- function(items, empty = "Not available.", class = "fast-chip") {
+      items <- compact_text(items)
+      if (length(items) == 0) {
+        return(tags$span(class = "fast-muted", empty))
+      }
       tags$div(
-        class = "function-annotation-grid",
-        if (!is.null(hyp_label) && nzchar(hyp_label)) {
-          tags$div(
-            class = "function-annotation-hypothesis-header",
-            style = "grid-column: 1 / -1; display:flex; align-items:center; gap:8px; font-weight:600;",
-            icon("flask"), hyp_label,
-            if (!is.null(verdict)) {
-              tags$span(
-                class = if (identical(tolower(verdict), "accepted")) "badge bg-success" else "badge bg-secondary",
-                style = "margin-left:6px;",
-                verdict
-              )
-            }
-          )
-        },
+        class = "fast-chip-list",
+        lapply(items, function(item) tags$span(class = class, item))
+      )
+    }
 
+    fast_field <- function(label, value) {
+      tags$div(
+        class = "fast-field",
+        tags$div(class = "fast-field-label", label),
+        tags$div(class = "fast-field-value", value)
+      )
+    }
+
+    fast_section <- function(icon_name, title, ...) {
+      body <- list(...)
+      tags$section(
+        class = "fast-info-section",
         tags$div(
-          class = "param-card function-annotation-card",
-          tags$h4(icon("tag"), "Module Title"),
-          tags$p(class = "function-annotation-title", get_field(row, "title", "–"))
+          class = "fast-section-head",
+          tags$span(class = "fast-section-icon", icon(icon_name)),
+          tags$h4(title)
         ),
+        do.call(tags$div, c(list(class = "fast-section-body"), body))
+      )
+    }
 
-        tags$div(
-          class = "param-card function-annotation-card",
-          tags$h4(icon("align-left"), "Functional Summary"),
-          tags$p(class = "function-annotation-text", get_field(row, "functional_summary", "–"))
+    get_evidence_df <- function(path) {
+      ev <- rv$function_result$module_evidence
+      if (is.null(ev)) return(NULL)
+      df <- ev
+      for (p in path) {
+        if (is.null(df[[p]])) return(NULL)
+        df <- df[[p]]
+      }
+      if (!is.data.frame(df) || nrow(df) == 0) return(NULL)
+      if ("module_id" %in% names(df)) {
+        df <- df[as.character(df$module_id) == as.character(input$selected_function_module), , drop = FALSE]
+      }
+      if (!is.data.frame(df) || nrow(df) == 0) return(NULL)
+      df
+    }
+
+    mini_table <- function(df, cols, labels, percent_cols = character(0), max_rows = 6, empty = "Not available.") {
+      if (is.null(df) || !is.data.frame(df) || nrow(df) == 0) {
+        return(tags$p(class = "fast-muted", empty))
+      }
+      cols <- cols[cols %in% names(df)]
+      if (length(cols) == 0) return(tags$p(class = "fast-muted", empty))
+      df <- utils::head(df, max_rows)
+      tags$table(
+        class = "fast-mini-table",
+        tags$thead(
+          tags$tr(lapply(cols, function(col) tags$th(labels[[col]] %||% col)))
         ),
-
-        tags$div(
-          class = "param-card function-annotation-card",
-          tags$h4(icon("chart-simple"), "Confidence"),
-          tags$p(class = "function-annotation-confidence", get_field(row, "confidence_label", "–"))
-        ),
-
-        tags$div(
-          class = "param-card function-annotation-card",
-          tags$h4(icon("think-peaks"), "Rationale"),
-          tags$p(class = "function-annotation-text", get_field(row, "rationale", "–"))
+        tags$tbody(
+          lapply(seq_len(nrow(df)), function(i) {
+            tags$tr(lapply(cols, function(col) {
+              tags$td(fmt_cell(df[[col]][i], percent = col %in% percent_cols))
+            }))
+          })
         )
       )
     }
 
-    tagList(
-      lapply(seq_len(nrow(mod_df)), function(i) render_hypothesis(mod_df[i, , drop = FALSE]))
-    )
+    # Show ONE representation per field: the structured table when it is
+    # available (it carries more detail), otherwise fall back to a compact
+    # chip list built from the summary text. Never show both, to avoid
+    # repeating the same information twice.
+    evidence_content <- function(chip_items, table_df, table_cols, table_labels,
+                                  percent_cols = character(0), max_rows = 6,
+                                  chip_class = "fast-chip", empty = "Not available.") {
+      if (!is.null(table_df) && is.data.frame(table_df) && nrow(table_df) > 0) {
+        mini_table(table_df, cols = table_cols, labels = table_labels,
+                   percent_cols = percent_cols, max_rows = max_rows, empty = empty)
+      } else {
+        chip_list(chip_items, empty, chip_class)
+      }
+    }
+
+    evidence_field <- function(label, chip_items, table_df, table_cols, table_labels,
+                                percent_cols = character(0), max_rows = 6, empty = "Not available.") {
+      fast_field(
+        label,
+        evidence_content(chip_items, table_df, table_cols, table_labels, percent_cols, max_rows, empty = empty)
+      )
+    }
+
+    # Clickable PMID pills (used as the Literature support fallback when no
+    # structured evidence table is available).
+    pmid_link_list <- function(pmids, empty = "No retained PubMed references.") {
+      pmids <- compact_text(pmids)
+      if (length(pmids) == 0) {
+        return(tags$p(class = "fast-muted", empty))
+      }
+      tags$div(
+        class = "function-pmid-list",
+        lapply(pmids, function(x) {
+          tags$a(
+            class = "function-pmid-chip",
+            href = paste0("https://pubmed.ncbi.nlm.nih.gov/", x, "/"),
+            target = "_blank",
+            rel = "noopener noreferrer",
+            paste0("PMID: ", x)
+          )
+        })
+      )
+    }
+
+    # KEGG / HMDB pathway coverage as grouped ID + description cards
+    # (mirrors the compact reference-card layout, grouped by database).
+    pathway_card_group <- function(label, df) {
+      if (is.null(df) || !is.data.frame(df) || nrow(df) == 0 ||
+          !all(c("pathway_id", "pathway_name") %in% names(df))) {
+        return(NULL)
+      }
+      tags$div(
+        class = "fast-pathway-group",
+        tags$div(class = "fast-pathway-group-title", label),
+        tags$div(
+          class = "fast-pathway-grid",
+          lapply(seq_len(nrow(df)), function(i) {
+            pid  <- as.character(df$pathway_id[i])
+            pname <- as.character(df$pathway_name[i])
+            hit  <- if ("n_hit" %in% names(df)) suppressWarnings(as.numeric(df$n_hit[i])) else NA
+            tot  <- if ("n_metabolites" %in% names(df)) suppressWarnings(as.numeric(df$n_metabolites[i])) else NA
+            pct  <- if ("coverage" %in% names(df)) fmt_pct(df$coverage[i]) else NULL
+            stats_parts <- compact_text(c(
+              if (!is.na(hit) && !is.na(tot)) paste0(hit, "/", tot),
+              pct
+            ))
+            detail <- if (length(stats_parts) > 0) {
+              paste0(pname, " (", paste(stats_parts, collapse = ", "), ")")
+            } else {
+              pname
+            }
+            tags$div(
+              class = "fast-pathway-card",
+              tags$div(class = "fast-pathway-id", pid),
+              tags$div(class = "fast-pathway-desc", detail)
+            )
+          })
+        )
+      )
+    }
+
+    # Segmented origin bar (endogenous / exogenous / unknown) with a
+    # colored-dot legend underneath, instead of plain text chips.
+    origin_bar <- function(endo_num, exo_num, unknown_num) {
+      if (is.na(endo_num) || is.na(exo_num)) return(NULL)
+      if (is.na(unknown_num)) unknown_num <- 0
+      total <- endo_num + exo_num + unknown_num
+      if (total <= 0) return(NULL)
+
+      endo_pct <- round(100 * endo_num / total, 1)
+      exo_pct  <- round(100 * exo_num / total, 1)
+      unk_pct  <- round(100 * unknown_num / total, 1)
+
+      tags$div(
+        class = "fast-origin-wrap",
+        tags$div(
+          class = "fast-origin-bar",
+          if (endo_pct > 0) tags$div(class = "fast-origin-seg fast-origin-seg-endo", style = paste0("width:", endo_pct, "%;")),
+          if (exo_pct > 0) tags$div(class = "fast-origin-seg fast-origin-seg-exo", style = paste0("width:", exo_pct, "%;")),
+          if (unk_pct > 0) tags$div(class = "fast-origin-seg fast-origin-seg-unknown", style = paste0("width:", unk_pct, "%;"))
+        ),
+        tags$div(
+          class = "fast-origin-legend",
+          tags$span(class = "fast-origin-legend-item", tags$span(class = "fast-origin-dot fast-origin-dot-endo"), paste0("Endogenous ", endo_pct, "%")),
+          tags$span(class = "fast-origin-legend-item", tags$span(class = "fast-origin-dot fast-origin-dot-exo"), paste0("Exogenous ", exo_pct, "%")),
+          tags$span(class = "fast-origin-legend-item", tags$span(class = "fast-origin-dot fast-origin-dot-unknown"), paste0("Unknown ", unk_pct, "%"))
+        )
+      )
+    }
+
+    render_fast_module <- function(row) {
+      title <- get_field(row, "title", "Untitled module function")
+      confidence <- get_field(row, "confidence_label", "–")
+      hypothesis_type <- get_field(row, "hypothesis_type", "–")
+      direction <- get_field(row, "global_direction", "–")
+      module_id <- get_field(row, "module_id", as.character(input$selected_function_module))
+      hyp_id <- get_field(row, "hypothesis_id")
+
+      top_df <- get_evidence_df(c("top_metabolites"))
+      anchor_df <- get_evidence_df(c("anchor_metabolites"))
+      pubmed_df <- get_evidence_df(c("pubmed_evidence"))
+
+      kegg_df <- get_evidence_df(c("pathway_coverage", "kegg"))
+      hmdb_df <- get_evidence_df(c("pathway_coverage", "hmdb"))
+
+      endo_num <- as_finite_number(row$origin_endogenous_frac)
+      exo_num <- as_finite_number(row$origin_exogenous_frac)
+      unknown_num <- if (!is.na(endo_num) && !is.na(exo_num)) {
+        max(0, 1 - endo_num - exo_num)
+      } else {
+        NA_real_
+      }
+
+      anchor_items <- split_semicolon(get_field(row, "anchor_metabolites", ""))
+      if (length(anchor_items) == 0 && !is.null(anchor_df) && "anchor_name" %in% names(anchor_df)) {
+        anchor_items <- compact_text(anchor_df$anchor_name)
+      }
+      top_items <- split_semicolon(get_field(row, "top_metabolites", ""))
+      if (length(top_items) == 0 && !is.null(top_df) && "Compound_name" %in% names(top_df)) {
+        ordered_top_df <- top_df
+        if ("top_rank" %in% names(ordered_top_df)) {
+          ordered_top_df <- ordered_top_df[order(suppressWarnings(as.numeric(ordered_top_df$top_rank))), , drop = FALSE]
+        }
+        top_items <- compact_text(ordered_top_df$Compound_name)
+      }
+      pmids <- split_semicolon(get_field(row, "pubmed_pmids", ""))
+
+      literature_table <- NULL
+      if (!is.null(pubmed_df) && "pubmed_evidence_json" %in% names(pubmed_df)) {
+        ev_json <- compact_text(pubmed_df$pubmed_evidence_json[1])
+        if (length(ev_json) > 0) {
+          literature_table <- tryCatch(
+            jsonlite::fromJSON(ev_json[1], simplifyDataFrame = TRUE),
+            error = function(e) NULL
+          )
+        }
+      }
+
+      tags$div(
+        class = "fast-function-report",
+        tags$div(
+          class = "fast-function-hero",
+          if (!is.null(hyp_id)) {
+            tags$div(class = "fast-function-eyebrow", icon("users"), "Advanced mode · accepted hypothesis")
+          } else {
+            tags$div(class = "fast-function-eyebrow", icon("bolt"), "Fast mode interpretation")
+          },
+          tags$h3(title),
+          tags$div(
+            class = "fast-function-meta",
+            tags$span(class = "fast-meta-pill", icon("layer-group"), paste("Module", module_id)),
+            if (!is.null(hyp_id)) {
+              tags$span(class = "fast-meta-pill", icon("code-branch"), paste("Hypothesis", hyp_id))
+            },
+            tags$span(class = "fast-meta-pill", icon("fingerprint"), hypothesis_type),
+            tags$span(class = paste("fast-meta-pill", conf_class(confidence)), icon("shield-halved"), paste("Confidence:", confidence))
+          )
+        ),
+        tags$div(
+          class = "fast-function-sections",
+          # 1. The headline call: what we think this module does, the
+          #    metabolites driving it, and why.
+          fast_section(
+            "wand-magic-sparkles",
+            "Function Interpretation",
+            fast_field("Summary", tags$p(get_field(row, "functional_summary", "–"))),
+            evidence_field(
+              "Core drivers",
+              chip_items = anchor_items,
+              table_df = anchor_df,
+              table_cols = c("anchor_top_id", "anchor_name", "Compound_ID"),
+              table_labels = c(anchor_top_id = "Top ID", anchor_name = "Metabolite", Compound_ID = "Compound ID"),
+              max_rows = 6,
+              empty = "No anchor metabolites selected."
+            )
+          ),
+          # 2. Chemical/biochemical evidence behind the call above.
+          fast_section(
+            "flask",
+            "Biochemical Context",
+            fast_field(
+              "Chemical-class profile",
+              chip_list(split_semicolon(get_field(row, "class_names", "")), "No class profile available.")
+            ),
+            fast_field(
+              "Pathway coverage",
+              {
+                groups <- list(
+                  pathway_card_group("KEGG Pathways", kegg_df),
+                  pathway_card_group("HMDB Pathways", hmdb_df)
+                )
+                groups <- groups[!vapply(groups, is.null, logical(1))]
+                if (length(groups) > 0) {
+                  tagList(groups)
+                } else {
+                  chip_list(c(
+                    split_semicolon(get_field(row, "top_kegg_pathways", "")),
+                    split_semicolon(get_field(row, "top_hmdb_pathways", ""))
+                  ), "No pathway matches available.")
+                }
+              }
+            ),
+            fast_field(
+              "Origin profile",
+              origin_bar(endo_num, exo_num, unknown_num) %||% tags$p(class = "fast-muted", "No origin profile available.")
+            )
+          ),
+          # 3. Module-level statistics: the ranked metabolite list and the
+          #    overall direction of change (moved out of the hero above).
+          fast_section(
+            "chart-column",
+            "Module Statistics",
+            fast_field(
+              "Top metabolites",
+              chip_list(utils::head(top_items, 12), "No top metabolite summary available.")
+            ),
+            fast_field("Global direction", direction_chip(direction))
+          ),
+          # 4. External relevance: does this line up with phenotype/literature.
+          fast_section(
+            "heart-pulse",
+            "Phenotype & Literature",
+            fast_field("Phenotype relationship", tags$p(get_field(row, "phenotype_relationship", "–"))),
+            fast_field(
+              "Literature support",
+              if (isTRUE(rv$function_pubmed_used)) {
+                if (!is.null(literature_table) && is.data.frame(literature_table) && nrow(literature_table) > 0) {
+                  mini_table(
+                    literature_table,
+                    cols = c("pmid", "title", "evidence_scope", "source_term"),
+                    labels = c(pmid = "PMID", title = "Title", evidence_scope = "Scope", source_term = "Source term"),
+                    max_rows = 5,
+                    empty = "No PubMed evidence detail table available."
+                  )
+                } else {
+                  pmid_link_list(pmids)
+                }
+              } else {
+                tags$span(class = "fast-muted", "Literature-based annotation was disabled in this run.")
+              }
+            )
+          ),
+          # 5. How much to trust the call above.
+          fast_section(
+            "shield-halved",
+            "Evidence Strength",
+            fast_field(
+              "Confidence label",
+              tags$span(class = paste("fast-chip", conf_class(confidence)), confidence)
+            ),
+            fast_field("Rationale", tags$p(get_field(row, "rationale", "–")))
+          )
+        )
+      )
+    }
+
+    if (!identical(rv$function_mode_used, "advanced")) {
+      return(render_fast_module(mod_df[1, , drop = FALSE]))
+    }
+
+    # Advanced mode: only the accepted hypothesis chosen in the
+    # "Select hypothesis" box is shown, using the same report layout as
+    # fast mode.
+    accepted_df <- mod_df[!is.na(mod_df$verdict_status) & mod_df$verdict_status == "accepted", , drop = FALSE]
+
+    if (nrow(accepted_df) == 0) {
+      return(
+        tags$div(
+          class = "empty-panel",
+          icon("circle-info"),
+          "No accepted hypothesis for this module."
+        )
+      )
+    }
+
+    sel_hyp <- input$selected_function_hypothesis
+    row <- if (!is.null(sel_hyp) && sel_hyp %in% accepted_df$hypothesis_id) {
+      accepted_df[as.character(accepted_df$hypothesis_id) == as.character(sel_hyp), , drop = FALSE][1, , drop = FALSE]
+    } else {
+      accepted_df[1, , drop = FALSE]
+    }
+
+    render_fast_module(row)
   })
 
   #### ---- Debate transcript (advanced mode) ----
@@ -6994,8 +7994,8 @@ server <- function(input, output, session) {
           tags$h4(icon("messages"), "Debate Transcript"),
           tags$p(
             class = "function-annotation-note",
-            "Debate transcript export was disabled for this run. Re-run Step 5 in Advanced mode with ",
-            tags$em("Export per-module debate transcript"), " enabled to see the Proposer / Skeptic / Arbiter exchange here."
+            "Debate transcript is not available for this run. Re-run Step 5 in Advanced mode to see the ",
+            "Proposer / Skeptic / Arbiter exchange here."
           )
         )
       )
@@ -7020,22 +8020,85 @@ server <- function(input, output, session) {
 
     debate_html <- tryCatch(
       paste(readLines(fpath, warn = FALSE, encoding = "UTF-8"), collapse = "\n"),
-      error = function(e) NULL
+      error = function(e) e
     )
-    if (is.null(debate_html)) return(NULL)
-
-    tags$div(
-      class = "param-card function-annotation-card",
-      tags$h4(icon("messages"), "Debate Transcript"),
-      tags$p(
-        class = "function-annotation-note",
-        "Proposer / Skeptic / Arbiter exchange for this module."
-      ),
-      tags$iframe(
-        srcdoc = debate_html,
-        style = "width:100%; height:820px; border:1px solid #dee2e6; border-radius:8px;",
-        sandbox = "allow-same-origin"
+    if (inherits(debate_html, "error") || !nzchar(debate_html)) {
+      return(
+        tags$div(
+          class = "param-card function-annotation-card",
+          tags$h4(icon("messages"), "Debate Transcript"),
+          tags$p(
+            class = "function-annotation-note",
+            paste0(
+              "Could not read the debate transcript HTML",
+              if (inherits(debate_html, "error")) paste0(": ", debate_html$message) else "."
+            )
+          )
+        )
       )
+    }
+
+    tags$iframe(
+      srcdoc = debate_html,
+      style = "width:100%; height:820px; border:1px solid #dee2e6; border-radius:8px;",
+      sandbox = "allow-same-origin allow-scripts"
+    )
+  })
+
+  #### ---- Cross-module synthesis (advanced mode) ----
+  output$function_synthesis_ui <- renderUI({
+    if (rv$function_status != "finished") return(NULL)
+    if (!identical(rv$function_mode_used, "advanced")) return(NULL)
+
+    if (is.null(rv$function_result) || is.null(rv$function_result$module_synthesis)) {
+      return(
+        tags$div(
+          class = "param-card function-annotation-card",
+          tags$h4(icon("diagram-project"), "Cross-Module Synthesis"),
+          tags$p(
+            class = "function-annotation-note",
+            "Cross-module synthesis was not run for this annotation. Check ",
+            tags$em("Run cross-module synthesis"), " in Advanced mode, then re-run Step 5 to see the integrated network here."
+          )
+        )
+      )
+    }
+
+    syn_path <- rv$function_synthesis_html_path
+    if (is.null(syn_path) || !file.exists(syn_path)) {
+      return(
+        tags$div(
+          class = "param-card function-annotation-card",
+          tags$h4(icon("diagram-project"), "Cross-Module Synthesis"),
+          tags$p(class = "function-annotation-note", "Synthesis completed, but the network HTML file could not be found.")
+        )
+      )
+    }
+
+    syn_html <- tryCatch(
+      paste(readLines(syn_path, warn = FALSE, encoding = "UTF-8"), collapse = "\n"),
+      error = function(e) e
+    )
+    if (inherits(syn_html, "error") || !nzchar(syn_html)) {
+      return(
+        tags$div(
+          class = "param-card function-annotation-card",
+          tags$h4(icon("diagram-project"), "Cross-Module Synthesis"),
+          tags$p(
+            class = "function-annotation-note",
+            paste0(
+              "Could not read the synthesis network HTML",
+              if (inherits(syn_html, "error")) paste0(": ", syn_html$message) else "."
+            )
+          )
+        )
+      )
+    }
+
+    tags$iframe(
+      srcdoc = syn_html,
+      style = "width:100%; height:900px; border:1px solid #dee2e6; border-radius:8px;",
+      sandbox = "allow-same-origin allow-scripts"
     )
   })
 
@@ -7071,35 +8134,36 @@ server <- function(input, output, session) {
 
     tags$div(
       class = "param-card",
-      tags$h4(icon("circle-check"), "Functional Annotation Status"),
-      tags$p(
-        style = "margin-bottom:6px;",
-        paste0("Annotated modules: ", n_modules, " (mode: ", rv$function_mode_used %||% input$func_mode, ")")
-      ),
-      tags$p(
-        style = "margin-bottom:6px;",
-        paste0(
-          "Literature-based annotation: ",
-          if (has_literature) "Enabled" else "Disabled"
+      tags$h4(icon("circle-check"), "Functional Interpretation Status"),
+      tags$ul(
+        style = "margin:0; padding-left:18px; list-style:disc;",
+        tags$li(
+          style = "margin-bottom:5px;",
+          paste0("Annotated modules: ", n_modules, " (mode: ", rv$function_mode_used %||% input$func_mode, ")")
+        ),
+        tags$li(
+          style = "margin-bottom:5px;",
+          paste0(
+            "Literature-based annotation: ",
+            if (has_literature) "Enabled" else "Disabled"
+          )
+        ),
+        if (length(debate_files) > 0) {
+          tags$li(
+            style = "margin-bottom:5px;",
+            paste0("Debate transcripts available for ", length(debate_files), " module(s). Download from Results Download.")
+          )
+        },
+        if (!is.null(rv$function_result$module_synthesis)) {
+          tags$li(
+            style = "margin-bottom:5px;",
+            "Cross-module synthesis completed. Download from Results Download."
+          )
+        },
+        tags$li(
+          style = "margin-bottom:0; font-weight:600;",
+          "Congratulations! Functional interpretation is complete. You can go to Results Download to download outputs."
         )
-      ),
-      if (length(debate_files) > 0) {
-        tags$p(
-          style = "margin-bottom:6px;",
-          downloadButton("download_debate_html", paste0("Download debate transcripts (", length(debate_files), ")"),
-                          class = "btn-outline-secondary btn-sm")
-        )
-      },
-      if (!is.null(rv$function_result$module_synthesis)) {
-        tags$p(
-          style = "margin-bottom:6px;",
-          icon("diagram-project"),
-          " Cross-module synthesis completed (see synthesis_network.html in Results)."
-        )
-      },
-      tags$p(
-        style = "margin-bottom:0; font-weight:600;",
-        "Congratulations! Functional annotation is complete. You can go to Results to download outputs."
       )
     )
   })
@@ -7274,15 +8338,16 @@ server <- function(input, output, session) {
       node_compound_name <- rep(NA_character_, length(node_id))
     }
     node_compound_name <- as.character(node_compound_name)
-    node_label <- ifelse(
-      node_group == "Metabolite" & !is.na(node_compound_name) & nzchar(node_compound_name),
-      node_compound_name,
-      node_id
-    )
+    has_name <- node_group == "Metabolite" & !is.na(node_compound_name) & nzchar(node_compound_name)
 
     nodes <- data.frame(
       id = node_id,
-      label = node_label,
+      label = "",
+      title = ifelse(
+        has_name,
+        paste0("Name: ", node_compound_name, "<br>ID: ", node_id),
+        paste0("ID: ", node_id)
+      ),
       value = scales::rescale(node_prize, to = c(10, 40)),
       color = ifelse(node_group == "Feature", "#fc8d58", "#4474b3"),
       color.border = ifelse(node_group == "Feature", "#fc8d58", "#4474b3"),
@@ -7484,102 +8549,12 @@ server <- function(input, output, session) {
         tags$div(class = "results-overview-value", paste0(n_export_ready, " / ", length(payload))),
         tags$div(
           class = "results-overview-subtext",
-          paste0("Functional annotation: ", function_status)
+          paste0("Functional interpretation: ", function_status)
         )
       )
     )
   })
 
-  output$export_preview <- renderUI({
-    payload <- export_payload()
-    selected_tables <- if (is.null(input$export_items)) character(0) else input$export_items
-    selected_networks <- if (is.null(input$network_export_items)) character(0) else input$network_export_items
-    network_format_label <- switch(
-      input$network_export_format,
-      html = "HTML",
-      graphml = "GraphML",
-      "HTML"
-    )
-    module_info <- module_export_info()
-    pcsf_ready <- !is.null(pcsf_export_data())
-    module_ready <- isTRUE(module_info$is_ready)
-
-    table_items <- if (length(selected_tables) > 0) {
-      lapply(selected_tables, function(item) {
-        item_label <- unname(export_labels[[item]])
-        if (is.null(item_label) || is.na(item_label)) item_label <- item
-        ready <- is_export_ready(payload[[item]])
-
-        tags$li(
-          class = "results-preview-item",
-          tags$span(class = "results-preview-item-label", item_label),
-          tags$span(
-            class = paste("results-preview-status", if (ready) "ready" else "pending"),
-            if (ready) "Ready" else "Pending"
-          )
-        )
-      })
-    } else {
-      list()
-    }
-
-    network_label_map <- c(
-      pcsf = paste0("PCSF subnetwork (", network_format_label, ")"),
-      module = if (length(module_info$requested) == 0) {
-        paste0("Module network (none selected, ", network_format_label, ")")
-      } else if (identical(module_info$mode, "all")) {
-        paste0("Module network (all ", length(module_info$requested), " modules, ", network_format_label, ")")
-      } else if (length(module_info$requested) <= 3) {
-        paste0("Module network (", paste(module_info$requested, collapse = ", "), ", ", network_format_label, ")")
-      } else {
-        paste0(
-          "Module network (",
-          paste(utils::head(module_info$requested, 3), collapse = ", "),
-          " +", length(module_info$requested) - 3, " more, ",
-          network_format_label, ")"
-        )
-      }
-    )
-    network_ready_map <- c(
-      pcsf = pcsf_ready,
-      module = module_ready
-    )
-    network_items <- if (length(selected_networks) > 0) {
-      lapply(selected_networks, function(key) {
-        item_label <- unname(network_label_map[[key]])
-        if (is.null(item_label) || is.na(item_label)) item_label <- key
-        ready <- isTRUE(network_ready_map[[key]])
-
-        tags$li(
-          class = "results-preview-item",
-          tags$span(class = "results-preview-item-label", item_label),
-          tags$span(
-            class = paste("results-preview-status", if (ready) "ready" else "pending"),
-            if (ready) "Ready" else "Pending"
-          )
-        )
-      })
-    } else {
-      list()
-    }
-
-    preview_items <- c(table_items, network_items)
-    if (length(preview_items) == 0) {
-      return(
-        tags$p(
-          class = "results-empty-preview",
-          icon("circle-info"),
-          " No content selected yet."
-        )
-      )
-    }
-
-    tags$ul(
-      class = "results-preview-list",
-      preview_items
-    )
-  })
-  
   observe({
     selected <- input$export_items
     selected_networks <- input$network_export_items
@@ -7633,6 +8608,61 @@ server <- function(input, output, session) {
       utils::zip(zipfile = file, files = basename(debate_files))
     }
   )
+
+  output$download_synthesis_html <- downloadHandler(
+    filename = function() {
+      "synthesis_network.html"
+    },
+    content = function(file) {
+      syn_path <- rv$function_synthesis_html_path
+      req(!is.null(syn_path), file.exists(syn_path))
+      file.copy(syn_path, file, overwrite = TRUE)
+    }
+  )
+
+  #### ---- Advanced-mode download buttons (Results Download page) ----
+  output$results_advanced_mode_downloads <- renderUI({
+    debate_dir <- rv$function_debate_html_dir
+    debate_files <- if (!is.null(debate_dir) && dir.exists(debate_dir)) {
+      list.files(debate_dir, pattern = "\\.html?$", full.names = TRUE)
+    } else {
+      character(0)
+    }
+    has_synthesis <- !is.null(rv$function_synthesis_html_path) && file.exists(rv$function_synthesis_html_path)
+
+    if (length(debate_files) == 0 && !has_synthesis) return(NULL)
+
+    tags$div(
+      class = "results-preview-wrap",
+      tags$div(class = "results-preview-title", icon("robot"), "Advanced Mode Outputs"),
+      tags$ul(
+        class = "results-preview-list",
+        if (length(debate_files) > 0) {
+          tags$li(
+            class = "results-preview-item",
+            tags$span(
+              class = "results-preview-item-label",
+              paste0("Debate transcripts (", length(debate_files), ")")
+            ),
+            downloadButton(
+              "download_debate_html", "Download",
+              class = "results-preview-download-btn"
+            )
+          )
+        },
+        if (has_synthesis) {
+          tags$li(
+            class = "results-preview-item",
+            tags$span(class = "results-preview-item-label", "Synthesis network"),
+            downloadButton(
+              "download_synthesis_html", "Download",
+              class = "results-preview-download-btn"
+            )
+          )
+        }
+      )
+    )
+  })
 
   output$download_results <- downloadHandler(
     filename = function() {
@@ -7858,12 +8888,7 @@ server <- function(input, output, session) {
         tags$ul(
           tags$li(paste("Algorithm:", input$module_method)),
           tags$li(paste("Node frequency threshold:", input$node_freq)),
-          tags$li(
-            paste(
-              "Module size:",
-              input$min_module_size, "–", input$max_module_size
-            )
-          ),
+          tags$li(paste("Minimum module size:", input$min_module_size)),
           tags$li(paste("Permutations:", input$n_perm)),
           tags$li(paste("Random seed:", input$module_seed))
         )
@@ -7871,12 +8896,12 @@ server <- function(input, output, session) {
       
       
       ## -------- Step 5 --------
-      tags$h5("Step 5 – Functional Annotation"),
+      tags$h5("Step 5 – Function Interpretation"),
       if (is.null(rv$function_result)) {
-        tags$p("Functional annotation: Skipped")
+        tags$p("Functional interpretation: Skipped")
       } else {
         tags$ul(
-          tags$li(paste("Annotation mode:", input$func_mode)),
+          tags$li(paste("Interpretation mode:", input$func_mode)),
           tags$li(
             paste(
               "Significance cutoff:",
@@ -7892,12 +8917,6 @@ server <- function(input, output, session) {
             tags$li(
               if (isTRUE(input$func_synthesize)) "Cross-module synthesis: Enabled"
               else "Cross-module synthesis: Disabled"
-            )
-          },
-          if (identical(input$func_mode, "advanced")) {
-            tags$li(
-              if (isTRUE(input$func_debate_html)) "Debate transcript export: Enabled"
-              else "Debate transcript export: Disabled"
             )
           }
         )

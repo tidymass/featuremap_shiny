@@ -4,8 +4,10 @@ chat_openai_silicon_call <- function(
     model,
     base_url,
     max_tokens = 2000,
-    temperature = 0
+    temperature = 0,
+    token_parameter = c("max_tokens", "max_completion_tokens")
 ) {
+  token_parameter <- match.arg(token_parameter)
   base_url <- sub("/+$", "", base_url)
   url <- paste0(base_url, "/v1/chat/completions")
 
@@ -14,26 +16,63 @@ chat_openai_silicon_call <- function(
     "Content-Type" = "application/json"
   )
 
-  body <- list(
-    model       = model,
-    messages    = messages,
-    max_tokens  = max_tokens,
-    temperature = temperature
-  )
+  build_body <- function(token_param, include_temperature = TRUE) {
+    body <- list(
+      model    = model,
+      messages = messages
+    )
+    body[[token_param]] <- max_tokens
+    if (isTRUE(include_temperature)) body$temperature <- temperature
+    body
+  }
 
-  res <- tryCatch({
-    httr::POST(url, headers, body = jsonlite::toJSON(body, auto_unbox = TRUE))
-  }, error = function(e) {
-    message("HTTP error: ", e$message)
-    return(NULL)
-  })
+  post_body <- function(body) {
+    tryCatch({
+      httr::POST(url, headers, body = jsonlite::toJSON(body, auto_unbox = TRUE))
+    }, error = function(e) {
+      message("HTTP error: ", e$message)
+      return(NULL)
+    })
+  }
+
+  res <- post_body(build_body(token_parameter))
 
   if (is.null(res)) return(NULL)
 
   if (httr::status_code(res) != 200) {
-    message("Chat HTTP status: ", httr::status_code(res))
-    message("Response: ", httr::content(res, "text", encoding = "UTF-8"))
-    return(NULL)
+    response_text <- httr::content(res, "text", encoding = "UTF-8")
+    if (identical(token_parameter, "max_tokens") &&
+        grepl("max_tokens", response_text, fixed = TRUE) &&
+        grepl("max_completion_tokens", response_text, fixed = TRUE)) {
+      res <- post_body(build_body("max_completion_tokens"))
+      if (!is.null(res) && httr::status_code(res) == 200) {
+        token_parameter <- "max_completion_tokens"
+      } else if (is.null(res)) {
+        return(NULL)
+      } else {
+        response_text <- httr::content(res, "text", encoding = "UTF-8")
+      }
+    }
+
+    if (httr::status_code(res) != 200 &&
+        grepl("temperature", response_text, fixed = TRUE) &&
+        grepl("Unsupported", response_text, fixed = TRUE)) {
+      retry_token_parameter <- if (identical(token_parameter, "max_tokens") &&
+                                   grepl("max_completion_tokens", response_text, fixed = TRUE)) {
+        "max_completion_tokens"
+      } else {
+        token_parameter
+      }
+      res <- post_body(build_body(retry_token_parameter, include_temperature = FALSE))
+      if (is.null(res)) return(NULL)
+      response_text <- httr::content(res, "text", encoding = "UTF-8")
+    }
+
+    if (httr::status_code(res) != 200) {
+      message("Chat HTTP status: ", httr::status_code(res))
+      message("Response: ", response_text)
+      return(NULL)
+    }
   }
 
   cont <- tryCatch(httr::content(res, encoding = "UTF-8"), error = function(e) NULL)
@@ -230,7 +269,8 @@ chat_api_call <- function(
       model = model,
       base_url = "https://api.openai.com",
       max_tokens = max_tokens,
-      temperature = temperature
+      temperature = temperature,
+      token_parameter = "max_completion_tokens"
     ))
   }
 
