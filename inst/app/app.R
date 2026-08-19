@@ -3526,7 +3526,19 @@ ui <- fluidPage(
                   tags$p(
                     class = "workflow-credit",
                     tags$strong("Citation"),
-                    "FeatureMAP is developed by the Shen Lab for feature-based metabolic functional module identification and annotation. If FeatureMAP supports your research, please cite the FeatureMAP manuscript and acknowledge the online service in downstream reports."
+                    tags$br(),
+                    tags$em(
+                      "FeatureMAP enables unbiased discovery and interpretation of dysregulated metabolic modules from untargeted metabolomics"
+                    ),
+                    tags$br(),
+                    HTML(
+                      "Yuting Wang<sup>1,2,+</sup>, Feifan Zhang<sup>1,2,+</sup>, Yijiang Liu<sup>1,2</sup>, Jiramet Kinchagawat<sup>1,2</sup>, Guoping Peng, Zeng Li, Chuchu Wang<sup>1</sup>, and Xiaotao Shen<sup>1,2,3,*</sup>"
+                    ),
+                    tags$br(),
+                    tags$span(
+                      style = "font-style: italic; color: #7a8aa0; font-size: 0.92em;",
+                      "(Manuscript in preparation — citation to be updated upon submission)"
+                    )
                   )
                 )
               )
