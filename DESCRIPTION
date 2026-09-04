@@ -55,6 +55,8 @@ Imports:
     masstools,
     rlang,
     cli
+Suggests:
+    digest
 Remotes:
     tidymass/massdataset,
     tidymass/metid,

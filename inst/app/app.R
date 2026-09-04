@@ -59,6 +59,11 @@ load_featuremap_functions <- function() {
 
 load_featuremap_functions()
 
+# Shiny's 5 MB default rejects almost every real feature table, and reference
+# databases are larger still. Override with the featuremap.max_upload_mb
+# option or the FEATUREMAP_MAX_UPLOAD_MB environment variable.
+options(shiny.maxRequestSize = featuremap_max_upload_bytes())
+
 build_info_icon <- function(content) {
   tags$span(
     class = "inline-info-wrap",
@@ -3597,6 +3602,11 @@ ui <- fluidPage(
                     style = "color:#6c757d;",
                     "Required columns: variable_id, mz, rt, polarity, mean_intensity, condition, and pvalue."
                   ),
+                  tags$br(),
+                  tags$small(
+                    style = "color:#6c757d;",
+                    paste0("Maximum upload size: ", featuremap_max_upload_label(), " per file.")
+                  ),
                   tags$hr(),
                   tags$br(),
                   fileInput(
@@ -5633,14 +5643,9 @@ server <- function(input, output, session) {
         resolve_demo_file("demo_ms2.rda")
       )
 
-      tmpdir <- tempfile("featuremap_demo_")
-      dir.create(tmpdir)
-      file.copy(demo_files, file.path(tmpdir, basename(demo_files)), overwrite = TRUE)
-
-      old_wd <- getwd()
-      on.exit(setwd(old_wd), add = TRUE)
-      setwd(tmpdir)
-      utils::zip(zipfile = file, files = basename(demo_files))
+      # Flatten with zip -j instead of setwd(): the working directory is
+      # process-wide and shared by every concurrent Shiny session.
+      zip_flat(file, demo_files)
     }
   )
 
@@ -7291,15 +7296,10 @@ server <- function(input, output, session) {
     # available on the Results Download page).
     func_debate_html <- func_mode == "advanced"
 
-    function_html_dir <- NULL
-    if (identical(func_mode, "advanced")) {
-      session_id <- gsub("[^A-Za-z0-9._-]+", "_", session$token %||% as.character(Sys.getpid()))
-      function_html_dir <- file.path(
-        tempdir(), "featuremap_html",
-        paste(format(Sys.time(), "%Y%m%d_%H%M%S"), session_id, sep = "_")
-      )
-      dir.create(function_html_dir, recursive = TRUE, showWarnings = FALSE)
-    }
+    # Always give this run its own directory, in both fast and advanced
+    # mode. Writing generated HTML into getwd() would make concurrent
+    # sessions overwrite each other's synthesis_network.html.
+    function_html_dir <- session_html_dir(session)
     rv$function_html_dir <- function_html_dir
     rv$function_debate_html_dir <- function_html_dir
 
@@ -7348,7 +7348,7 @@ server <- function(input, output, session) {
           synthesize      = func_synthesize,
           synthesis_model = input$func_llm_model,
           debate_html     = func_debate_html,
-          html_dir        = if (is.null(function_html_dir)) getwd() else function_html_dir
+          html_dir        = function_html_dir
         )
         
         result
@@ -7385,15 +7385,12 @@ server <- function(input, output, session) {
 
         rv$function_synthesis_html_path <- NULL
         if (!is.null(res$module_synthesis)) {
-          candidate <- file.path(
-            if (is.null(function_html_dir)) getwd() else function_html_dir,
-            "synthesis_network.html"
-          )
+          candidate <- file.path(function_html_dir, "synthesis_network.html")
           if (!file.exists(candidate)) {
             candidate <- tryCatch(
               export_synthesis_network_html(
                 res = res,
-                html_dir = if (is.null(function_html_dir)) getwd() else function_html_dir,
+                html_dir = function_html_dir,
                 output_file = "synthesis_network.html",
                 show_same_module = FALSE
               ),
@@ -8690,10 +8687,7 @@ server <- function(input, output, session) {
       }
       req(length(debate_files) > 0)
 
-      old_wd <- getwd()
-      on.exit(setwd(old_wd), add = TRUE)
-      setwd(debate_dir)
-      utils::zip(zipfile = file, files = basename(debate_files))
+      zip_flat(file, debate_files)
     }
   )
 
@@ -8889,20 +8883,13 @@ server <- function(input, output, session) {
         }
       }
 
-      files_to_zip <- list.files(tmpdir)
+      files_to_zip <- list.files(tmpdir, full.names = TRUE)
       if (length(files_to_zip) == 0) {
         stop("No exportable content is available yet. Run PCSF/module steps or select ready tables.")
       }
       
       # ---- zip everything ----
-      old_wd <- getwd()
-      on.exit(setwd(old_wd), add = TRUE)
-      setwd(tmpdir)
-      
-      zip(
-        zipfile = file,
-        files   = files_to_zip
-      )
+      zip_flat(file, files_to_zip)
       
     }
     

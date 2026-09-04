@@ -87,7 +87,56 @@ chat_openai_silicon_call <- function(
   list(content = content_txt, raw = cont, finish_reason = finish_reason)
 }
 
-siliconflow_base_urls <- function() {
+# SiliconFlow runs two independent sites, api.siliconflow.com (global) and
+# api.siliconflow.cn (mainland China), with separate accounts: a key issued by
+# one is rejected by the other. When the region is not configured we probe both
+# and remember which one worked.
+#
+# That memory must be per API key, not per R process. One R process serves
+# every Shiny session, so a process-wide cache (the previous
+# options(featuremap.siliconflow.active_base_url = ...)) let whoever ran first
+# pin the endpoint for everybody else, and users holding a key for the other
+# site could never get a successful call.
+.siliconflow_endpoint_cache <- new.env(parent = emptyenv())
+
+# Identify a key without keeping the key itself around. digest is available in
+# practice (htmltools depends on it), but the fallback keeps this working if it
+# is not: the fingerprint only has to separate keys inside one process.
+siliconflow_key_fingerprint <- function(api_key) {
+  key <- if (is.null(api_key) || length(api_key) == 0) {
+    ""
+  } else {
+    trimws(as.character(api_key[1]))
+  }
+  if (!nzchar(key)) return("__nokey__")
+
+  if (requireNamespace("digest", quietly = TRUE)) {
+    return(digest::digest(key, algo = "sha256"))
+  }
+
+  codes <- utf8ToInt(key)
+  checksum <- sum(as.numeric(codes) * seq_along(codes)) %% 2147483647
+  paste0("len", nchar(key), "_", format(checksum, scientific = FALSE))
+}
+
+siliconflow_cached_base_url <- function(api_key) {
+  fp <- siliconflow_key_fingerprint(api_key)
+  if (!exists(fp, envir = .siliconflow_endpoint_cache, inherits = FALSE)) {
+    return("")
+  }
+  value <- get(fp, envir = .siliconflow_endpoint_cache, inherits = FALSE)
+  if (is.null(value) || length(value) == 0) return("")
+  trimws(as.character(value[1]))
+}
+
+siliconflow_cache_base_url <- function(api_key, base_url) {
+  fp <- siliconflow_key_fingerprint(api_key)
+  assign(fp, base_url, envir = .siliconflow_endpoint_cache)
+  invisible(base_url)
+}
+
+siliconflow_base_urls <- function(api_key = NULL) {
+  # 1. An explicitly configured endpoint always wins.
   explicit <- getOption(
     "featuremap.siliconflow.base_url",
     Sys.getenv("SILICONFLOW_BASE_URL", unset = "")
@@ -96,12 +145,7 @@ siliconflow_base_urls <- function() {
   explicit <- trimws(as.character(explicit[1]))
   if (nzchar(explicit)) return(sub("/+$", "", explicit))
 
-  cached <- getOption("featuremap.siliconflow.active_base_url", "")
-  if (!is.null(cached) && length(cached) > 0) {
-    cached <- trimws(as.character(cached[1]))
-    if (nzchar(cached)) return(sub("/+$", "", cached))
-  }
-
+  # 2. An explicitly configured region wins over anything auto-detected.
   region <- getOption(
     "featuremap.siliconflow.region",
     Sys.getenv("SILICONFLOW_REGION", unset = "auto")
@@ -116,7 +160,14 @@ siliconflow_base_urls <- function() {
     return("https://api.siliconflow.com")
   }
 
-  c("https://api.siliconflow.com", "https://api.siliconflow.cn")
+  defaults <- c("https://api.siliconflow.com", "https://api.siliconflow.cn")
+
+  # 3. Auto: start with whatever last worked for this key, but keep the other
+  #    site as a fallback so a stale entry can never lock a user out.
+  cached <- siliconflow_cached_base_url(api_key)
+  if (nzchar(cached)) return(unique(c(sub("/+$", "", cached), defaults)))
+
+  defaults
 }
 
 chat_siliconflow_call <- function(
@@ -126,7 +177,7 @@ chat_siliconflow_call <- function(
     max_tokens = 2000,
     temperature = 0
 ) {
-  base_urls <- siliconflow_base_urls()
+  base_urls <- siliconflow_base_urls(api_key)
   for (i in seq_along(base_urls)) {
     base_url <- base_urls[[i]]
     if (i > 1) {
@@ -143,7 +194,7 @@ chat_siliconflow_call <- function(
     )
     if (!is.null(out)) {
       out$base_url <- base_url
-      options(featuremap.siliconflow.active_base_url = base_url)
+      siliconflow_cache_base_url(api_key, base_url)
       return(out)
     }
   }
