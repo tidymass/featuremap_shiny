@@ -171,10 +171,43 @@ step "4/6  Installing dependencies (this is the long part)"
 runR 'cat("parent .libPaths()[1]: ", .libPaths()[1], "\n", sep="")'
 Rscript -e 'cat("child  .libPaths()[1]: ", .libPaths()[1], "\n", sep="")'
 
-runR 'for (p in c("remotes","BiocManager","digest","Rcpp","BH"))
-        if (!requireNamespace(p, quietly=TRUE)) install.packages(p, lib = .libPaths()[1])
+runR 'lib <- .libPaths()[1]
+      for (p in c("remotes","BiocManager","digest"))
+        if (!requireNamespace(p, quietly=TRUE)) install.packages(p, lib = lib)
       cat("bootstrap ok\n")' || die "could not install the bootstrap packages"
-ok "remotes + BiocManager + Rcpp + BH ready"
+ok "remotes + BiocManager ready"
+
+# Rcpp and BH are header-only from the compilers point of view. Being
+# *loadable* is not enough and is not even the right test: R CMD INSTALL
+# resolves LinkingTo to <lib>/<pkg>/include, so the headers must exist in a
+# library this build can see. A system copy that satisfies requireNamespace()
+# but ships no headers would silently skip the install and fail later with
+# "fatal error: Rcpp.h: No such file or directory".
+runR '
+  lib <- .libPaths()[1]
+  need <- character(0)
+  for (p in c("Rcpp","BH")) {
+    hdr <- if (p == "Rcpp") "Rcpp.h" else file.path("boost","config.hpp")
+    found <- FALSE
+    for (l in .libPaths()) {
+      f <- file.path(l, p, "include", hdr)
+      if (file.exists(f)) { cat(sprintf("  %-5s headers: %s\n", p, f)); found <- TRUE; break }
+    }
+    if (!found) need <- c(need, p)
+  }
+  if (length(need)) {
+    cat("--> installing headers for:", paste(need, collapse=", "), "\n")
+    install.packages(need, lib = lib)
+  }
+  bad <- character(0)
+  for (p in c("Rcpp","BH")) {
+    hdr <- if (p == "Rcpp") "Rcpp.h" else file.path("boost","config.hpp")
+    if (!any(file.exists(file.path(.libPaths(), p, "include", hdr)))) bad <- c(bad, p)
+  }
+  if (length(bad)) { cat("MISSING HEADERS:", paste(bad, collapse=", "), "\n"); quit(status = 1) }
+  cat("headers ok\n")
+' || die "Rcpp/BH headers are not available — pcsf2featuremap cannot compile without them"
+ok "Rcpp + BH headers in place"
 
 # igraph: the P3M binary links against libglpk, which is absent here. Install
 # it, check it actually loads, and rebuild from source (which uses igraph's
