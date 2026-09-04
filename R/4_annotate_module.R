@@ -193,7 +193,34 @@ annotate_module <- function(res                  = NULL,
     ref_df <- tibble::as_tibble(ref_df)
     for (nm in setdiff(c("name", "class", "synonyms"), colnames(ref_df)))
       ref_df[[nm]] <- NA_character_
+
+    # A column whose values are all NA is typed logical by R, and a logical
+    # column cannot be combined with the character column it pairs with in the
+    # other reference. The bundled kegg_function$origin is exactly this: 6853
+    # rows, zero non-NA, stored as logical, while hmdb_function$origin is
+    # character. Retyping them here keeps combine_function_refs() honest.
+    for (nm in setdiff(colnames(ref_df), "id")) {
+      col <- ref_df[[nm]]
+      if (is.logical(col) && all(is.na(col))) ref_df[[nm]] <- NA_character_
+    }
     ref_df
+  }
+
+  # dplyr::coalesce() requires its arguments to share a type, and reports a
+  # mismatch as "Can't combine `..1` <character> and `..2` <logical>" -- an
+  # error that names no column, so it is hard to trace back to the data. Meet
+  # it halfway instead: an all-NA vector carries no information and can safely
+  # take the other side's type, and anything paired with character becomes
+  # character.
+  coalesce_compat <- function(a, b) {
+    all_na_lgl <- function(x) is.logical(x) && all(is.na(x))
+    if (all_na_lgl(a) && !all_na_lgl(b)) a <- as.vector(a, mode = typeof(b))
+    if (all_na_lgl(b) && !all_na_lgl(a)) b <- as.vector(b, mode = typeof(a))
+    if (is.character(a) || is.character(b)) {
+      a <- as.character(a)
+      b <- as.character(b)
+    }
+    dplyr::coalesce(a, b)
   }
 
   combine_function_refs <- function(module_df, hmdb_ref, kegg_ref) {
@@ -209,7 +236,7 @@ annotate_module <- function(res                  = NULL,
         by = c("KEGG_ID" = "id")
       )
     for (nm in intersect(hmdb_cols, kegg_cols))
-      out[[nm]] <- dplyr::coalesce(out[[paste0(nm, ".hmdb")]], out[[paste0(nm, ".kegg")]])
+      out[[nm]] <- coalesce_compat(out[[paste0(nm, ".hmdb")]], out[[paste0(nm, ".kegg")]])
     for (nm in setdiff(hmdb_cols, kegg_cols))
       out[[nm]] <- out[[paste0(nm, ".hmdb")]]
     for (nm in setdiff(kegg_cols, hmdb_cols))
@@ -217,7 +244,7 @@ annotate_module <- function(res                  = NULL,
     out %>%
       dplyr::mutate(
         Compound_ID   = INCHI_ID,
-        Compound_name = dplyr::coalesce(Compound_name, name)
+        Compound_name = coalesce_compat(Compound_name, name)
       ) %>%
       dplyr::select(-dplyr::matches("\\.(hmdb|kegg)$"))
   }
