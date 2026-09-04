@@ -181,24 +181,32 @@ ok "remotes + BiocManager + Rcpp + BH ready"
 # vendored GLPK) if it does not.
 runR '
   lib <- .libPaths()[1]
-  cat("installing into:", lib, "\n")
-  ours <- file.path(lib, "igraph")
-  loads <- function() tryCatch({ unloadNamespace("igraph"); TRUE }, error = function(e) FALSE) ||
-                      tryCatch({ loadNamespace("igraph"); TRUE }, error = function(e) {
-                        cat("  igraph does not load:", conditionMessage(e), "\n"); FALSE })
-  if (!dir.exists(ours)) install.packages("igraph", lib = lib)
+  cat("installing into: ", lib, "\n", sep = "")
+
+  # A fresh Rscript each time, so no unloading is needed. Report WHY it fails:
+  # a missing dependency and a missing shared library need different fixes.
+  loads <- function() tryCatch({ loadNamespace("igraph"); TRUE },
+    error = function(e) { cat("  igraph does not load: ", conditionMessage(e), "\n", sep = ""); FALSE })
+
+  # An existing igraph directory does not mean its dependencies are present,
+  # so never skip straight to the load test on that basis.
   if (!loads()) {
-    cat("--> reinstalling igraph from source against our GLPK\n")
+    cat("--> installing igraph and its dependencies\n")
+    install.packages("igraph", lib = lib)
+  }
+  if (!loads()) {
+    cat("--> rebuilding igraph from source against our GLPK\n")
     install.packages("igraph", lib = lib, type = "source")
   }
   loadNamespace("igraph")
-  cat("igraph ok:", as.character(packageVersion("igraph")),
-      "from", dirname(getNamespaceInfo("igraph", "path")), "\n")
+  cat("igraph ok: ", as.character(packageVersion("igraph")),
+      "  from ", dirname(getNamespaceInfo("igraph", "path")), "\n", sep = "")
 ' || die "igraph could not be installed"
 ok "igraph works"
 
 # Rdisop lives on Bioconductor, not CRAN.
-runR 'if (!requireNamespace("Rdisop", quietly=TRUE)) BiocManager::install("Rdisop", ask=FALSE, update=FALSE, lib = .libPaths()[1])
+runR 'ok <- tryCatch({ loadNamespace("Rdisop"); TRUE }, error = function(e) FALSE)
+      if (!ok) BiocManager::install("Rdisop", ask=FALSE, update=FALSE, lib = .libPaths()[1])
       loadNamespace("Rdisop"); cat("Rdisop ok\n")' || die "Rdisop (Bioconductor) failed"
 ok "Rdisop works"
 
