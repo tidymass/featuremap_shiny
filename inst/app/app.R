@@ -4541,7 +4541,8 @@ ui <- fluidPage(
                     choices = c(
                       "OpenAI" = "openai",
                       "Google Gemini" = "gemini",
-                      "SiliconFlow" = "siliconflow"
+                      "SiliconFlow" = "siliconflow",
+                      "Local" = "local"
                     )
                   ),
                   
@@ -4563,11 +4564,20 @@ ui <- fluidPage(
                     NULL,
                     placeholder = "e.g. gpt-5.4"
                   ),
+
+                  conditionalPanel(
+                    condition = "input.func_provider == 'local'",
+                    textInput(
+                      "func_base_url",
+                      "Local Base URL",
+                      placeholder = "e.g. http://localhost:8000"
+                    )
+                  ),
                   
                   
                   passwordInput(
                     "func_llm_key",
-                    "LLM API Key"
+                    "LLM API Key (optional for Local)"
                   )
                 ),
                 
@@ -7222,13 +7232,29 @@ server <- function(input, output, session) {
     if (!nzchar(llm_key)) {
       llm_key <- trimws(Sys.getenv("FEATUREMAP_LLM_API_KEY", unset = ""))
     }
-    if (!nzchar(llm_key)) {
+    if (!identical(input$func_provider, "local") && !nzchar(llm_key)) {
       showNotification(
         "LLM API key missing. Fill the input or set FEATUREMAP_LLM_API_KEY.",
         type = "error",
         duration = NULL
       )
       return()
+    }
+
+    llm_base_url <- NULL
+    if (identical(input$func_provider, "local")) {
+      llm_base_url <- trimws(input$func_base_url)
+      if (!nzchar(llm_base_url)) {
+        llm_base_url <- trimws(Sys.getenv("FEATUREMAP_LLM_BASE_URL", unset = ""))
+      }
+      if (!nzchar(llm_base_url)) {
+        showNotification(
+          "Local LLM base URL missing. Fill the input or set FEATUREMAP_LLM_BASE_URL.",
+          type = "error",
+          duration = NULL
+        )
+        return()
+      }
     }
     
     if (isTRUE(input$func_use_pubmed)) {
@@ -7314,6 +7340,7 @@ server <- function(input, output, session) {
           llm_model     = input$func_llm_model,
           NCBI_api_key  = ncbi_key,
           llm_api_key   = llm_key,
+          base_url      = llm_base_url,
           synthesize      = func_synthesize,
           synthesis_model = input$func_llm_model,
           debate_html     = func_debate_html,
@@ -8920,7 +8947,11 @@ server <- function(input, output, session) {
               input$func_p_type, "<", input$func_p_cutoff
             )
           ),
+          tags$li(paste("LLM provider:", input$func_provider)),
           tags$li(paste("LLM model:", input$func_llm_model)),
+          if (identical(input$func_provider, "local")) {
+            tags$li(paste("Local base URL:", input$func_base_url))
+          },
           tags$li(
             if (input$func_use_pubmed) "PubMed literature: Enabled"
             else "PubMed literature: Disabled"
