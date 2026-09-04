@@ -85,7 +85,25 @@ ok "compiling with Ncpus=$NCPUS"
 # is forced two ways that Renviron.site cannot undo: .libPaths() inside
 # R_PROFILE_USER (profiles run after Renviron) and an explicit -l on
 # R CMD INSTALL.
+# Renviron.site on this machine hard-assigns R_LIBS_USER to /scratch, which
+# overrides anything we export. R reads the SITE env file first and the USER
+# env file second, so a user env file wins -- and pointing at ours via
+# R_ENVIRON_USER keeps it scoped to this script instead of touching
+# ~/.Renviron, which would redirect the user's own R sessions too.
+#
+# This matters beyond the parent process: remotes builds source packages in a
+# child `R CMD INSTALL`, and that child resolves LinkingTo headers (Rcpp.h,
+# boost/) through R_LIBS/R_LIBS_USER -- not through the .libPaths() we set in
+# the profile. Without this, packages install into rlib but their headers are
+# looked up in /scratch.
+cat > "$FM_ROOT/Renviron.install" <<ENVR
+R_LIBS=$FM_LIB
+R_LIBS_USER=$FM_LIB
+ENVR
+export R_ENVIRON_USER="$FM_ROOT/Renviron.install"
+
 export R_LIBS_USER="$FM_LIB"
+export R_LIBS="$FM_LIB"
 export FM_LIB FM_LOCAL FM_CRAN
 export FM_NCPUS="$NCPUS"
 
@@ -145,9 +163,18 @@ fi
 
 # ------------------------------------------------------- 4. base tooling
 step "4/6  Installing dependencies (this is the long part)"
-runR 'for (p in c("remotes","BiocManager","digest")) if (!requireNamespace(p, quietly=TRUE)) install.packages(p, lib = .libPaths()[1])
-      cat("bootstrap ok\n")' || die "could not install remotes/BiocManager"
-ok "remotes + BiocManager ready"
+# Rcpp and BH are LinkingTo (compile-time only) dependencies of
+# pcsf2featuremap. Nothing imports them at run time, so they can be missed
+# when resolving a chain of remote dependencies -- and their absence shows up
+# only as "fatal error: boost/....hpp: No such file or directory" deep in a
+# compile log. Install them up front.
+runR 'cat("parent .libPaths()[1]: ", .libPaths()[1], "\n", sep="")'
+Rscript -e 'cat("child  .libPaths()[1]: ", .libPaths()[1], "\n", sep="")'
+
+runR 'for (p in c("remotes","BiocManager","digest","Rcpp","BH"))
+        if (!requireNamespace(p, quietly=TRUE)) install.packages(p, lib = .libPaths()[1])
+      cat("bootstrap ok\n")' || die "could not install the bootstrap packages"
+ok "remotes + BiocManager + Rcpp + BH ready"
 
 # igraph: the P3M binary links against libglpk, which is absent here. Install
 # it, check it actually loads, and rebuild from source (which uses igraph's
@@ -179,6 +206,19 @@ ok "Rdisop works"
 runR "remotes::install_deps('$FM_SRC', dependencies = TRUE, upgrade = 'never')
       cat('deps done\n')" || die "dependency install failed — see the log above"
 ok "dependencies installed"
+
+# pcsf2featuremap compiles C++ against Boost; verify it separately so a build
+# failure here is not mistaken for a problem with featuremapshiny itself.
+runR '
+  if (!requireNamespace("pcsf2featuremap", quietly = TRUE)) {
+    cat("--> pcsf2featuremap missing, installing it directly\n")
+    remotes::install_github("tidymass/pcsf2featuremap",
+                            lib = .libPaths()[1], upgrade = "never")
+  }
+  loadNamespace("pcsf2featuremap")
+  cat("pcsf2featuremap ok:", as.character(packageVersion("pcsf2featuremap")), "\n")
+' || die "pcsf2featuremap failed to build — check the log for the first 'fatal error:' line"
+ok "pcsf2featuremap works"
 
 # ---------------------------------------------------------------- 5. package
 step "5/6  Installing featuremapshiny"
