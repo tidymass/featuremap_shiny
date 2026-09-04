@@ -4903,6 +4903,8 @@ server <- function(input, output, session) {
     function_result = NULL,
     function_status = "idle",
     function_pubmed_used = FALSE,
+    function_html_dir = NULL,
+    function_debate_html_dir = NULL,
     function_synthesis_html_path = NULL,
     results_export_tables_touched = FALSE,
     results_export_networks_touched = FALSE,
@@ -7289,15 +7291,17 @@ server <- function(input, output, session) {
     # available on the Results Download page).
     func_debate_html <- func_mode == "advanced"
 
-    debate_html_dir <- NULL
-    if (func_debate_html) {
-      debate_html_dir <- file.path(
-        tempdir(), "featuremap_debate_html",
-        format(Sys.time(), "%Y%m%d_%H%M%S")
+    function_html_dir <- NULL
+    if (identical(func_mode, "advanced")) {
+      session_id <- gsub("[^A-Za-z0-9._-]+", "_", session$token %||% as.character(Sys.getpid()))
+      function_html_dir <- file.path(
+        tempdir(), "featuremap_html",
+        paste(format(Sys.time(), "%Y%m%d_%H%M%S"), session_id, sep = "_")
       )
-      dir.create(debate_html_dir, recursive = TRUE, showWarnings = FALSE)
+      dir.create(function_html_dir, recursive = TRUE, showWarnings = FALSE)
     }
-    rv$function_debate_html_dir <- debate_html_dir
+    rv$function_html_dir <- function_html_dir
+    rv$function_debate_html_dir <- function_html_dir
 
     show_process_modal(
       title = "Step 5 Running",
@@ -7344,7 +7348,7 @@ server <- function(input, output, session) {
           synthesize      = func_synthesize,
           synthesis_model = input$func_llm_model,
           debate_html     = func_debate_html,
-          debate_html_dir = if (is.null(debate_html_dir)) getwd() else debate_html_dir
+          html_dir        = if (is.null(function_html_dir)) getwd() else function_html_dir
         )
         
         result
@@ -7379,11 +7383,23 @@ server <- function(input, output, session) {
         rv$function_result <- res
         rv$function_status <- "finished"
 
-        # annotate_module() writes synthesis_network.html to the current
-        # working directory (not configurable), so look for it there.
         rv$function_synthesis_html_path <- NULL
         if (!is.null(res$module_synthesis)) {
-          candidate <- file.path(getwd(), "synthesis_network.html")
+          candidate <- file.path(
+            if (is.null(function_html_dir)) getwd() else function_html_dir,
+            "synthesis_network.html"
+          )
+          if (!file.exists(candidate)) {
+            candidate <- tryCatch(
+              export_synthesis_network_html(
+                res = res,
+                html_dir = if (is.null(function_html_dir)) getwd() else function_html_dir,
+                output_file = "synthesis_network.html",
+                show_same_module = FALSE
+              ),
+              error = function(e) NULL
+            )
+          }
           if (file.exists(candidate)) {
             rv$function_synthesis_html_path <- candidate
           }
@@ -8048,6 +8064,17 @@ server <- function(input, output, session) {
     fpath <- file.path(debate_dir, fname)
 
     if (!file.exists(fpath)) {
+      tryCatch(
+        export_debate_html(
+          res = rv$function_result,
+          module_id = module_id,
+          html_dir = debate_dir
+        ),
+        error = function(e) NULL
+      )
+    }
+
+    if (!file.exists(fpath)) {
       return(
         tags$div(
           class = "param-card function-annotation-card",
@@ -8170,6 +8197,14 @@ server <- function(input, output, session) {
     } else {
       character(0)
     }
+    debate_payload <- rv$function_result$module_evidence$debate_html_payload
+    has_debate_payload <- !is.null(debate_payload) &&
+      is.data.frame(debate_payload) &&
+      nrow(debate_payload) > 0
+    debate_count <- max(
+      length(debate_files),
+      if (has_debate_payload) nrow(debate_payload) else 0L
+    )
 
     tags$div(
       class = "param-card",
@@ -8187,10 +8222,14 @@ server <- function(input, output, session) {
             if (has_literature) "Enabled" else "Disabled"
           )
         ),
-        if (length(debate_files) > 0) {
+        if (debate_count > 0) {
           tags$li(
             style = "margin-bottom:5px;",
-            paste0("Debate transcripts available for ", length(debate_files), " module(s). Download from Results Download.")
+            paste0(
+              "Debate transcripts available for ",
+              debate_count,
+              " module(s). Download from Results Download."
+            )
           )
         },
         if (!is.null(rv$function_result$module_synthesis)) {
@@ -8639,6 +8678,16 @@ server <- function(input, output, session) {
       req(!is.null(debate_dir), dir.exists(debate_dir))
 
       debate_files <- list.files(debate_dir, pattern = "\\.html?$", full.names = TRUE)
+      if (length(debate_files) == 0 && !is.null(rv$function_result)) {
+        tryCatch(
+          export_debate_html(
+            res = rv$function_result,
+            html_dir = debate_dir
+          ),
+          error = function(e) NULL
+        )
+        debate_files <- list.files(debate_dir, pattern = "\\.html?$", full.names = TRUE)
+      }
       req(length(debate_files) > 0)
 
       old_wd <- getwd()
@@ -8667,21 +8716,29 @@ server <- function(input, output, session) {
     } else {
       character(0)
     }
+    debate_payload <- rv$function_result$module_evidence$debate_html_payload
+    has_debate_payload <- !is.null(debate_payload) &&
+      is.data.frame(debate_payload) &&
+      nrow(debate_payload) > 0
+    debate_count <- max(
+      length(debate_files),
+      if (has_debate_payload) nrow(debate_payload) else 0L
+    )
     has_synthesis <- !is.null(rv$function_synthesis_html_path) && file.exists(rv$function_synthesis_html_path)
 
-    if (length(debate_files) == 0 && !has_synthesis) return(NULL)
+    if (debate_count == 0 && !has_synthesis) return(NULL)
 
     tags$div(
       class = "results-preview-wrap",
       tags$div(class = "results-preview-title", icon("robot"), "Advanced Mode Outputs"),
       tags$ul(
         class = "results-preview-list",
-        if (length(debate_files) > 0) {
+        if (debate_count > 0) {
           tags$li(
             class = "results-preview-item",
             tags$span(
               class = "results-preview-item-label",
-              paste0("Debate transcripts (", length(debate_files), ")")
+              paste0("Debate transcripts (", debate_count, ")")
             ),
             downloadButton(
               "download_debate_html", "Download",
