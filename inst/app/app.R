@@ -178,6 +178,23 @@ ui <- fluidPage(
         padding: 20px 14px 10px 14px;
       }
       
+      /* The running / success / error faces all live in the card from the
+         start; only the class decides which one is visible. */
+      .fm-process-modal .fm-modal-icon.running,
+      .fm-process-modal .fm-modal-icon.error,
+      .fm-process-modal .wb-check,
+      .fm-process-modal .wb-done-rows,
+      .fm-process-modal .fm-modal-actions { display: none; }
+      .fm-process-modal.is-running .fm-modal-icon.running { display: flex; }
+      .fm-process-modal.is-error   .fm-modal-icon.error   { display: flex; }
+      .fm-process-modal.is-error   .fm-modal-actions      { display: flex; }
+      .fm-process-modal.is-success .wb-check              { display: block; }
+      /* keep the icon block the same height in both states so the card
+         does not jump when it switches from running to success */
+      .fm-process-modal .wb-check { margin: 6px auto 24px auto; }
+      .fm-process-modal.is-success .fm-modal-actions      { display: flex; }
+      .fm-process-modal.is-success .wb-done-rows:not(:empty) { display: flex; }
+      
       .modal.fm-process-modal-wrap {
         display: flex !important;
         align-items: center;
@@ -271,11 +288,12 @@ ui <- fluidPage(
 
       .inline-info-card {
         display: none;
-        position: absolute;
-        top: calc(100% + 8px);
+        position: fixed;
+        top: 0;
         left: 0;
         z-index: 2200;
         width: 320px;
+        max-width: calc(100vw - 32px);
         padding: 10px 12px;
         border-radius: 10px;
         border: 1px solid #d7e1ec;
@@ -285,6 +303,12 @@ ui <- fluidPage(
         font-size: 12px;
         line-height: 1.5;
         white-space: normal;
+        /* the icon can sit inside an uppercase/tracked heading, so the
+           popover has to reset the inherited type styling */
+        text-transform: none;
+        letter-spacing: normal;
+        font-weight: 400;
+        text-align: left;
       }
 
       .inline-info-card code {
@@ -299,9 +323,6 @@ ui <- fluidPage(
         text-decoration: underline;
       }
 
-      .inline-info-wrap:hover .inline-info-card,
-      .inline-info-wrap:focus-within .inline-info-card,
-      .inline-info-wrap:focus .inline-info-card,
       .inline-info-wrap.is-pinned .inline-info-card {
         display: block;
       }
@@ -328,56 +349,19 @@ ui <- fluidPage(
           flex: 1;
         }
         
-        #network_page .step-main-row {
-          align-items: flex-start;
-        }
 
-        #network_page .step-main-row > [class*='col-'] {
-          display: block;
-        }
 
-        #network_page .step-main-row > [class*='col-'] > .card {
-          display: block;
-        }
 
         #network_page #network_result_card {
           display: flex;
           flex-direction: column;
         }
 
-        #network_page #network_result_card > .card-body {
-          flex: 1;
-        }
 
-        #network_page .card > .card-body {
-          display: flex;
-          flex-direction: column;
-          min-height: 0;
-        }
 
-        #network_page .card > .card-body > .tabbable {
-          display: flex;
-          flex-direction: column;
-          flex: 1;
-          min-height: 0;
-        }
 
-        #network_page .card > .card-body > .tabbable > .tab-content {
-          display: flex;
-          flex: 1;
-          min-height: 0;
-        }
 
-        #network_page .card > .card-body > .tabbable > .tab-content > .tab-pane {
-          flex: 1;
-          min-width: 0;
-        }
 
-        #network_page .card > .card-body > .tabbable > .tab-content > .active {
-          display: flex;
-          flex-direction: column;
-          min-height: 0;
-        }
 
         #network_page #pcsf_network_container {
           display: flex;
@@ -388,8 +372,10 @@ ui <- fluidPage(
         #network_page .pcsf-network-shell {
           display: flex;
           flex-direction: column;
-          gap: 8px;
+          flex: 1 1 auto;
+          gap: 12px;
           min-height: 0;
+          padding: 16px 26px 20px 26px;
         }
 
         #network_page .pcsf-network-topbar {
@@ -402,8 +388,11 @@ ui <- fluidPage(
         #network_page .pcsf-network-stage {
           display: flex;
           flex: 1;
-          min-height: 0;
+          min-height: 460px;
           width: 100%;
+          border: 1px solid #e6edf4;
+          border-radius: 10px;
+          overflow: hidden;
         }
 
         #network_page .pcsf-network-stage > .empty-panel-fill,
@@ -412,6 +401,100 @@ ui <- fluidPage(
           min-height: 100%;
           height: 100%;
           width: 100%;
+        }
+
+        /* Reproducibility filters, floating over the top-left of the canvas */
+        #network_page .pcsf-network-stage {
+          position: relative;
+        }
+
+        #network_page .pcsf-filter-panel {
+          position: absolute;
+          top: 12px;
+          left: 12px;
+          z-index: 10;
+          width: 186px;
+          padding: 12px 14px 13px 14px;
+          background: rgba(255, 255, 255, 0.94);
+          -webkit-backdrop-filter: blur(6px);
+          backdrop-filter: blur(6px);
+          border: 1px solid #e3eaf2;
+          border-radius: 10px;
+          box-shadow: 0 6px 18px rgba(28, 52, 80, 0.10);
+        }
+
+        #network_page .pcsf-filter-head {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          margin-bottom: 11px;
+          font-size: 10.5px;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: #6d8299;
+        }
+
+        #network_page .pcsf-filter-head i {
+          font-size: 10px;
+          color: #9fb2c6;
+        }
+
+        #network_page .pcsf-filter-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+        }
+
+        #network_page .pcsf-filter-row + .pcsf-filter-row {
+          margin-top: 8px;
+        }
+
+        #network_page .pcsf-filter-label {
+          font-size: 12px;
+          font-weight: 600;
+          color: #5c7186;
+          white-space: nowrap;
+        }
+
+        #network_page .pcsf-filter-row .form-group {
+          margin: 0;
+          flex: 0 0 74px;
+          width: 74px;
+        }
+
+        #network_page .pcsf-filter-row .form-control {
+          height: 30px;
+          padding: 3px 8px;
+          font-size: 12px;
+          font-weight: 600;
+          text-align: center;
+          color: #26415e;
+          border: 1px solid #d7e0ea;
+          border-radius: 6px;
+          font-variant-numeric: tabular-nums;
+        }
+
+        #network_page .pcsf-filter-count {
+          margin-top: 11px;
+          padding-top: 10px;
+          border-top: 1px solid #eef2f7;
+          font-size: 11.5px;
+          line-height: 1.6;
+          color: #8296ab;
+          font-variant-numeric: tabular-nums;
+        }
+
+        #network_page .pcsf-filter-count b {
+          color: #26415e;
+          font-weight: 700;
+        }
+
+        #network_page .pcsf-filter-note {
+          margin-top: 3px;
+          font-size: 11px;
+          color: #b0bccb;
         }
 
         #network_page .pcsf-selector-row {
@@ -430,7 +513,7 @@ ui <- fluidPage(
 
         #network_page .pcsf-selector-input {
           display: flex;
-          align-items: flex-start;
+          align-items: center;
           gap: 8px;
         }
 
@@ -444,9 +527,43 @@ ui <- fluidPage(
           margin-bottom: 0;
         }
 
+        /* A long compound name used to wrap onto three lines and push the
+           whole topbar (and the canvas) down. Keep the box one line high and
+           clip what does not fit - the full name is in the tooltip. */
+        #network_page .pcsf-selector-field .selectize-input {
+          display: flex;
+          align-items: center;
+          flex-wrap: nowrap;
+          min-height: 38px;
+          height: 38px;
+          padding-right: 26px;
+          overflow: hidden;
+        }
+
+        #network_page .pcsf-selector-field .selectize-input > .item,
+        #network_page .pcsf-selector-field .selectize-input > input {
+          display: block;
+          min-width: 0;
+          max-width: 100%;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        /* the dropdown list itself can stay one line per option */
+        #network_page .pcsf-selector-field .selectize-dropdown .option {
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        #network_page .pcsf-selector-input .inline-info-wrap {
+          align-self: center;
+        }
+
         #network_page .pcsf-selector-input .inline-info-wrap {
           margin-left: 0;
-          margin-top: 8px;
+          margin-top: 0;
           flex: 0 0 auto;
         }
 
@@ -490,319 +607,1556 @@ ui <- fluidPage(
           margin-left: auto;
         }
 
-        #network_page[data-sync-panels='ready'] #network_result_card {
-          height: var(--network-panel-height);
-        }
 
-        #network_page[data-sync-panels='ready'] #network_result_card > .card-body {
-          min-height: 0;
-        }
 
-        #network_page[data-sync-panels='ready'] #network_result_card > .card-body {
-          overflow: hidden;
-        }
 
-        #network_page[data-sync-panels='ready'] #network_result_card > .card-body > .tabbable,
-        #network_page[data-sync-panels='ready'] #network_result_card > .card-body > .tabbable > .tab-content {
-          min-height: 0;
-          height: 100%;
-        }
 
-        #network_page[data-sync-panels='ready'] #network_result_card > .card-body > .tabbable > .tab-content > .tab-pane,
-        #network_page[data-sync-panels='ready'] #network_result_card > .card-body > .tabbable > .tab-content > .active {
-          min-height: 0;
-        }
 
-        #network_page[data-sync-panels='ready'] #network_result_card .pcsf-network-shell {
-          flex: 1;
-          height: 100%;
-          min-height: 0;
-          overflow: hidden;
-        }
 
-        #network_page[data-sync-panels='ready'] #network_result_card #pcsf_node_selectors,
-        #network_page[data-sync-panels='ready'] #network_result_card #pcsf_network_legend,
-        #network_page[data-sync-panels='ready'] #network_result_card #pcsf_tuning_summary,
-        #network_page[data-sync-panels='ready'] #network_result_card #pcsf_selected_annotation_ui {
-          flex: 0 0 auto;
-          min-height: 0;
-        }
 
-        #network_page[data-sync-panels='ready'] #network_result_card #pcsf_network_container {
+
+
+
+
+        /* =================================================================
+           Analysis workbench layout (Step pages)
+           Full-bleed, edge-to-edge: header rail + sidebar + work area.
+           No floating cards, no outer gutters.
+           ================================================================= */
+
+        .workbench {
           display: flex;
-          flex: 1;
-          height: 100%;
+          flex-direction: column;
+          height: calc(100vh - var(--fm-nav-h, 70px));
+          min-height: 520px;
+          background: #ffffff;
+        }
+
+        /* ---- Header rail ---- */
+        .wb-header {
+          flex: 0 0 auto;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 32px;
+          padding: 13px 28px;
+          background: #ffffff;
+          border-bottom: 1px solid #e3eaf2;
+        }
+
+        .wb-header-left {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          min-width: 0;
+        }
+
+        .wb-eyebrow {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.09em;
+          text-transform: uppercase;
+          color: #8296ab;
+          white-space: nowrap;
+          flex: 0 0 auto;
+        }
+
+        .wb-eyebrow i {
+          font-size: 11px;
+          color: #9fb2c6;
+        }
+
+        .wb-header-divider {
+          width: 1px;
+          height: 20px;
+          background: #e0e7ef;
+          flex: 0 0 auto;
+        }
+
+        /* Frosted-glass capsule: a translucent tinted pane, a light top
+           edge and a soft bloom underneath, sitting on a blurred backdrop. */
+        .wb-title {
+          position: relative;
+          margin: 0;
+          padding: 7px 20px;
+          border-radius: 999px;
+          font-size: 17px;
+          font-weight: 800;
+          letter-spacing: 0.005em;
+          color: #1c4370;
+          white-space: nowrap;
+          background:
+            linear-gradient(140deg, rgba(214, 232, 247, 0.46) 0%,
+                                     rgba(194, 219, 240, 0.40) 45%,
+                                     rgba(186, 224, 229, 0.44) 100%);
+          border: 1px solid rgba(255, 255, 255, 0.55);
+          -webkit-backdrop-filter: blur(12px) saturate(165%);
+          backdrop-filter: blur(12px) saturate(165%);
+          box-shadow:
+            0 1px 0 rgba(255, 255, 255, 0.75) inset,
+            0 -1px 0 rgba(23, 55, 90, 0.10) inset,
+            0 0 0 1px rgba(35, 78, 124, 0.12),
+            0 5px 15px rgba(28, 62, 100, 0.15);
+          text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
+        }
+
+        /* the glossy highlight across the upper half */
+        .wb-title::before {
+          content: \"\";
+          position: absolute;
+          left: 6px;
+          right: 6px;
+          top: 1px;
+          height: 45%;
+          border-radius: 999px 999px 40% 40% / 999px 999px 100% 100%;
+          background: linear-gradient(180deg, rgba(255, 255, 255, 0.66), rgba(255, 255, 255, 0));
+          pointer-events: none;
+        }
+
+        /* a soft tinted bloom so the glass reads as lit from behind */
+        .wb-header-left {
+          position: relative;
+        }
+
+        .wb-header-left::after {
+          content: \"\";
+          position: absolute;
+          left: 45%;
+          top: 50%;
+          width: 220px;
+          height: 34px;
+          transform: translateY(-50%);
+          border-radius: 999px;
+          background: radial-gradient(closest-side, rgba(79, 164, 166, 0.34), transparent 70%);
+          filter: blur(12px);
+          pointer-events: none;
+          z-index: -1;
+        }
+
+        /* ---- Step rail ---- */
+        .wb-stepper {
+          display: flex;
+          align-items: center;
+          gap: 0;
+          margin: 0;
+          padding: 0;
+          list-style: none;
+          flex: 0 0 auto;
+        }
+
+        .wb-step {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .wb-step-dot {
+          width: 23px;
+          height: 23px;
+          border-radius: 50%;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 11.5px;
+          font-weight: 700;
+          background: #eef2f7;
+          color: #9aabbd;
+          border: 1px solid #e3e9f0;
+          flex: 0 0 auto;
+        }
+
+        .wb-step-name {
+          font-size: 11.5px;
+          font-weight: 600;
+          letter-spacing: 0.03em;
+          color: #9aabbd;
+          white-space: nowrap;
+        }
+
+        .wb-step-line {
+          width: 22px;
+          height: 1px;
+          background: #e0e7ef;
+          margin: 0 9px;
+          flex: 0 0 auto;
+        }
+
+        .wb-step.is-current .wb-step-dot {
+          background: #2b598e;
+          border-color: #2b598e;
+          color: #ffffff;
+        }
+
+        .wb-step.is-current .wb-step-name {
+          color: #24466d;
+        }
+
+        .wb-step.is-done .wb-step-dot {
+          background: #e3eef7;
+          border-color: #cfe0ee;
+          color: #3f7fa0;
+        }
+
+        .wb-step.is-done .wb-step-name {
+          color: #6d8ba3;
+        }
+
+        /* ---- Body: sidebar + work area ---- */
+        .wb-body {
+          flex: 1 1 auto;
+          display: flex;
           min-height: 0;
         }
 
-        #network_page[data-sync-panels='ready'] #network_result_card #pcsf_network_container > .pcsf-network-stage {
-          flex: 1;
+        .wb-side {
+          flex: 0 0 372px;
+          width: 372px;
+          display: flex;
+          flex-direction: column;
           min-height: 0;
+          background: #f9fbfd;
+          border-right: 1px solid #e3eaf2;
         }
 
-        #network_page[data-sync-panels='ready'] #network_result_card #pcsf_network_container .empty-panel-fill {
-          min-height: 100%;
-          height: 100%;
-        }
-
-        #network_page[data-sync-panels='ready'] #network_result_card .annotation-table-wrap,
-        #network_page[data-sync-panels='ready'] #network_result_card .pcsf-linked-table-card {
+        .wb-side-scroll {
+          flex: 1 1 auto;
           min-height: 0;
           overflow-y: auto;
           overflow-x: hidden;
         }
 
-        /* Upload: keep left panel natural and lock right panel to the same height with internal scroll */
-        #upload_page .step-main-row {
-          align-items: flex-start;
+        .wb-section {
+          padding: 20px 24px 22px 24px;
+          border-bottom: 1px solid #e8eef5;
         }
 
-        #upload_page .step-main-row > [class*='col-'] {
+        .wb-section:last-child {
+          border-bottom: 0;
+        }
+
+        .wb-section-title {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin: 0;
+          font-size: 11.5px;
+          font-weight: 700;
+          letter-spacing: 0.085em;
+          text-transform: uppercase;
+          color: #5c7186;
+        }
+
+        .wb-section-title i {
+          font-size: 12px;
+          color: #7d93aa;
+        }
+
+        .wb-field-label {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          margin-bottom: 8px;
+          font-size: 13.5px;
+          font-weight: 600;
+          color: #34485f;
+        }
+
+        .wb-hint {
+          margin: 6px 0 0 0;
+          font-size: 12.5px;
+          line-height: 1.55;
+          color: #7e90a3;
+        }
+
+        .wb-subfield {
+          padding-top: 18px;
+          border-top: 1px dashed #e1e9f2;
+        }
+
+        .wb-inline-actions {
+          display: flex;
+          gap: 8px;
+          flex-wrap: wrap;
+          margin-top: 18px;
+        }
+
+        /* ---- Sticky action bar ---- */
+        .wb-actions {
+          flex: 0 0 auto;
+          display: flex;
+          gap: 10px;
+          padding: 14px 24px;
+          background: #ffffff;
+          border-top: 1px solid #e3eaf2;
+        }
+
+        .wb-actions .btn {
+          flex: 1 1 0;
+          font-weight: 600;
+          font-size: 14px;
+          padding: 10px 14px;
+          border-radius: 8px;
+        }
+
+        .wb-actions .btn[disabled],
+        .wb-actions .shiny-download-link[disabled] {
+          pointer-events: none;
+          color: #8da0b3 !important;
+          background: #edf1f5 !important;
+          border-color: #dce4ec !important;
+          box-shadow: none !important;
+          opacity: 1;
+        }
+
+        /* ---- Work area ---- */
+        .wb-main {
+          position: relative;
+          flex: 1 1 auto;
+          display: flex;
+          flex-direction: column;
+          min-width: 0;
+          min-height: 0;
+          background: #ffffff;
+        }
+
+        .wb-main-inner {
+          flex: 1 1 auto;
+          display: flex;
+          flex-direction: column;
+          min-height: 0;
+        }
+
+        /* ---- Step-complete card ---- */
+        /* ---- Stacked plot panels in a work area ---- */
+        .wb-plot-stack {
+          flex: 1 1 auto;
+          min-height: 0;
+          overflow-y: auto;
+          overflow-x: hidden;
+          padding: 20px 26px 24px 26px;
+          display: flex;
+          flex-direction: column;
+          gap: 18px;
+        }
+
+        .wb-plot-card {
+          flex: 0 0 auto;
+          border: 1px solid #e6edf4;
+          border-radius: 12px;
+          background: #ffffff;
+          padding: 14px 16px 10px 16px;
+        }
+
+        .wb-plot-title {
+          font-size: 11.5px;
+          font-weight: 700;
+          letter-spacing: 0.07em;
+          text-transform: uppercase;
+          color: #7b8fa3;
+          margin-bottom: 10px;
+        }
+
+        .wb-plot-card .empty-panel {
+          min-height: 260px;
+          border: 1px dashed #e2e9f1;
+          background: #fbfcfe;
+          color: #9aabbd;
+          font-size: 13.5px;
+        }
+
+        .wb-plot-card .shiny-plotly-output,
+        .wb-plot-card .plotly,
+        .wb-plot-card .html-widget {
+          width: 100% !important;
+          max-width: 100% !important;
+        }
+
+        /* ---- Metric tiles: headline number, no chart ----
+           Earlier versions gave two numbers a whole bar chart each, which
+           spent a lot of area on very little information. */
+        .wb-metric-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+          gap: 16px;
+        }
+
+        .wb-metric {
+          padding: 22px 24px 24px 24px;
+          border: 1px solid #e6edf4;
+          border-radius: 12px;
+          background: #ffffff;
+        }
+
+        .wb-metric-name {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 13px;
+          font-weight: 700;
+          letter-spacing: 0.045em;
+          text-transform: uppercase;
+          color: #6d8299;
+        }
+
+        .wb-metric-figure {
+          display: flex;
+          align-items: baseline;
+          flex-wrap: wrap;
+          gap: 12px;
+          margin: 16px 0 6px 0;
+        }
+
+        .wb-metric-value {
+          font-size: 36px;
+          font-weight: 700;
+          line-height: 1;
+          letter-spacing: -0.02em;
+          color: #1c3450;
+          font-variant-numeric: tabular-nums;
+        }
+
+        .wb-delta {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          padding: 4px 10px;
+          border-radius: 999px;
+          font-size: 12px;
+          font-weight: 700;
+          font-variant-numeric: tabular-nums;
+          white-space: nowrap;
+        }
+
+        .wb-delta.is-good {
+          background: #e8f5f1;
+          color: #227f6f;
+        }
+
+        .wb-delta.is-flat {
+          background: #eef2f7;
+          color: #7b8fa3;
+        }
+
+        .wb-delta.is-up {
+          background: #fdf1e7;
+          color: #a8672c;
+        }
+
+        .wb-metric-was {
+          font-size: 12.5px;
+          color: #9aabbd;
+          font-variant-numeric: tabular-nums;
+        }
+
+        .wb-metric-was b {
+          color: #7b8fa3;
+          font-weight: 600;
+        }
+
+        .wb-metric-chart {
+          margin-top: 20px;
+        }
+
+        .wb-metric-chart svg {
+          display: block;
+          width: 100%;
+          height: auto;
+        }
+
+        .wb-metric-desc {
+          margin: 14px 0 0 0;
+          padding-top: 14px;
+          border-top: 1px solid #f0f4f8;
+          font-size: 12.5px;
+          line-height: 1.65;
+          color: #8296ab;
+        }
+
+        .wb-metric-note {
+          margin: 16px 0 0 0;
+          font-size: 12.5px;
+          color: #93a5b8;
+        }
+
+        /* ---- Empty work area: what to do on this page ---- */
+        .wb-empty-layer {
+          position: absolute;
+          top: 49px;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          z-index: 5;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 24px;
+          background: #ffffff;
+        }
+
+        .wb-empty {
+          width: 100%;
+          max-width: 840px;
+          text-align: center;
+        }
+
+        .wb-empty-icon {
+          width: 62px;
+          height: 62px;
+          margin: 0 auto 18px auto;
+          border-radius: 16px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 24px;
+          color: #4a7bb0;
+          background: linear-gradient(160deg, #eef4fb 0%, #e6f1f4 100%);
+          border: 1px solid #e0eaf3;
+        }
+
+        .wb-empty-title {
+          font-size: 18px;
+          font-weight: 700;
+          color: #24405e;
+          margin-bottom: 20px;
+        }
+
+        .wb-empty-steps {
+          text-align: left;
+          border: 1px solid #e6edf4;
+          border-radius: 12px;
+          overflow: hidden;
+          background: #fbfcfe;
+        }
+
+        .wb-empty-step {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 13px 20px;
+          border-bottom: 1px solid #eef2f7;
+        }
+
+        .wb-empty-step:last-child {
+          border-bottom: 0;
+        }
+
+        .wb-empty-step-num {
+          flex: 0 0 auto;
+          width: 21px;
+          height: 21px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 11px;
+          font-weight: 700;
+          background: #e3ecf7;
+          color: #2b598e;
+        }
+
+        .wb-empty-step-text {
+          font-size: 13.5px;
+          line-height: 1.5;
+          color: #4a627c;
+        }
+
+        .wb-empty-step-text b {
+          color: #26415e;
+          font-weight: 600;
+        }
+
+        .wb-empty-tag {
+          display: inline-block;
+          margin-left: 6px;
+          padding: 1px 7px;
+          border-radius: 999px;
+          font-size: 10.5px;
+          font-weight: 700;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          vertical-align: 1px;
+        }
+
+        .wb-empty-tag.is-required {
+          background: #fdeeee;
+          color: #b4544f;
+        }
+
+        .wb-empty-tag.is-optional {
+          background: #eef2f7;
+          color: #7b8fa3;
+        }
+
+        .wb-empty-foot {
+          margin-top: 16px;
+          font-size: 12.5px;
+          color: #93a5b8;
+        }
+
+        .wb-empty-foot b {
+          color: #4a627c;
+          font-weight: 600;
+        }
+
+        /* ---- Success state inside the process card ---- */
+        .fm-modal-actions {
+          margin-top: 22px;
+          display: flex;
+          justify-content: center;
+        }
+
+        .fm-modal-actions .btn {
+          min-width: 132px;
+          font-weight: 600;
+          padding: 9px 20px;
+          border-radius: 8px;
+        }
+
+        .wb-check {
+          width: 84px;
+          height: 84px;
+          margin: 0 auto 18px auto;
           display: block;
         }
 
-        #upload_page .step-main-row > [class*='col-'] > .card {
+        .wb-check-ring {
+          fill: none;
+          stroke: #2f9e8f;
+          stroke-width: 2.6;
+          stroke-linecap: round;
+          stroke-dasharray: 151;
+          stroke-dashoffset: 151;
+          transform-origin: 50% 50%;
+          transform: rotate(-90deg);
+          animation: wbDraw 0.62s cubic-bezier(0.65, 0, 0.35, 1) 0.1s forwards;
+        }
+
+        .wb-check-mark {
+          fill: none;
+          stroke: #2f9e8f;
+          stroke-width: 3.4;
+          stroke-linecap: round;
+          stroke-linejoin: round;
+          stroke-dasharray: 40;
+          stroke-dashoffset: 40;
+          animation: wbDraw 0.34s cubic-bezier(0.65, 0, 0.35, 1) 0.62s forwards;
+        }
+
+        .wb-check-halo {
+          fill: #2f9e8f;
+          opacity: 0;
+          transform-origin: 50% 50%;
+          animation: wbHalo 0.75s ease-out 0.62s forwards;
+        }
+
+        @keyframes wbDraw {
+          to { stroke-dashoffset: 0; }
+        }
+
+        @keyframes wbHalo {
+          0%   { opacity: 0.20; transform: scale(0.55); }
+          100% { opacity: 0;    transform: scale(1.20); }
+        }
+
+        .wb-done-rows {
+          display: flex;
+          flex-direction: column;
+          gap: 1px;
+          margin: 22px auto 0 auto;
+          max-width: 420px;
+          background: #eaf0f6;
+          border: 1px solid #e6edf4;
+          border-radius: 10px;
+          overflow: hidden;
+          text-align: left;
+        }
+
+        .wb-done-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 14px;
+          padding: 11px 15px;
+          background: #fbfcfe;
+          font-size: 13px;
+        }
+
+        .wb-done-row-label {
+          display: flex;
+          align-items: center;
+          gap: 9px;
+          color: #5c7186;
+          font-weight: 500;
+        }
+
+        .wb-done-row-label i {
+          color: #90a4b8;
+          font-size: 12px;
+        }
+
+        .wb-done-row-value {
+          font-weight: 700;
+          color: #26415e;
+          font-variant-numeric: tabular-nums;
+          white-space: nowrap;
+        }
+
+        /* ---- Empty work area: what to do on this page ---- */
+        .wb-empty-layer {
+          position: absolute;
+          top: 49px;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          z-index: 5;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 24px;
+          background: #ffffff;
+        }
+
+        .wb-empty {
           width: 100%;
+          max-width: 840px;
+          text-align: center;
         }
 
-        #upload_page .card > .card-body {
+        .wb-empty-icon {
+          width: 62px;
+          height: 62px;
+          margin: 0 auto 18px auto;
+          border-radius: 16px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 24px;
+          color: #4a7bb0;
+          background: linear-gradient(160deg, #eef4fb 0%, #e6f1f4 100%);
+          border: 1px solid #e0eaf3;
+        }
+
+        .wb-empty-title {
+          font-size: 18px;
+          font-weight: 700;
+          color: #24405e;
+          margin-bottom: 20px;
+        }
+
+        .wb-empty-steps {
+          text-align: left;
+          border: 1px solid #e6edf4;
+          border-radius: 12px;
+          overflow: hidden;
+          background: #fbfcfe;
+        }
+
+        .wb-empty-step {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 13px 20px;
+          border-bottom: 1px solid #eef2f7;
+        }
+
+        .wb-empty-step:last-child {
+          border-bottom: 0;
+        }
+
+        .wb-empty-step-num {
+          flex: 0 0 auto;
+          width: 21px;
+          height: 21px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 11px;
+          font-weight: 700;
+          background: #e3ecf7;
+          color: #2b598e;
+        }
+
+        .wb-empty-step-text {
+          font-size: 13.5px;
+          line-height: 1.5;
+          color: #4a627c;
+        }
+
+        .wb-empty-step-text b {
+          color: #26415e;
+          font-weight: 600;
+        }
+
+        .wb-empty-tag {
+          display: inline-block;
+          margin-left: 6px;
+          padding: 1px 7px;
+          border-radius: 999px;
+          font-size: 10.5px;
+          font-weight: 700;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          vertical-align: 1px;
+        }
+
+        .wb-empty-tag.is-required {
+          background: #fdeeee;
+          color: #b4544f;
+        }
+
+        .wb-empty-tag.is-optional {
+          background: #eef2f7;
+          color: #7b8fa3;
+        }
+
+        .wb-empty-foot {
+          margin-top: 16px;
+          font-size: 12.5px;
+          color: #93a5b8;
+        }
+
+        .wb-empty-foot b {
+          color: #4a627c;
+          font-weight: 600;
+        }
+
+        .wb-toast-slot {
+          display: contents;
+        }
+
+        /* Top-centre of the whole window, like the quick-start dialog. */
+
+
+
+
+
+        /* animated tick */
+        .wb-check {
+          width: 76px;
+          height: 76px;
+          margin: 0 auto 16px auto;
+          display: block;
+        }
+
+        .wb-check-ring {
+          fill: none;
+          stroke: #2f9e8f;
+          stroke-width: 2.6;
+          stroke-linecap: round;
+          stroke-dasharray: 151;
+          stroke-dashoffset: 151;
+          transform-origin: 50% 50%;
+          transform: rotate(-90deg);
+          animation: wbDraw 0.62s cubic-bezier(0.65, 0, 0.35, 1) 0.1s forwards;
+        }
+
+        .wb-check-mark {
+          fill: none;
+          stroke: #2f9e8f;
+          stroke-width: 3.4;
+          stroke-linecap: round;
+          stroke-linejoin: round;
+          stroke-dasharray: 40;
+          stroke-dashoffset: 40;
+          animation: wbDraw 0.34s cubic-bezier(0.65, 0, 0.35, 1) 0.62s forwards;
+        }
+
+        .wb-check-halo {
+          fill: #2f9e8f;
+          opacity: 0;
+          transform-origin: 50% 50%;
+          animation: wbHalo 0.75s ease-out 0.62s forwards;
+        }
+
+        @keyframes wbDraw {
+          to { stroke-dashoffset: 0; }
+        }
+
+        @keyframes wbHalo {
+          0%   { opacity: 0.20; transform: scale(0.55); }
+          100% { opacity: 0;    transform: scale(1.20); }
+        }
+
+
+
+        .wb-done-rows {
           display: flex;
           flex-direction: column;
-          min-height: 0;
+          gap: 1px;
+          background: #eaf0f6;
+          border: 1px solid #e6edf4;
+          border-radius: 10px;
+          overflow: hidden;
+          text-align: left;
         }
 
-        #upload_page .card > .card-body > .tabbable {
+        .wb-done-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 14px;
+          padding: 11px 15px;
+          background: #fbfcfe;
+          font-size: 13px;
+        }
+
+        .wb-done-row-label {
+          display: flex;
+          align-items: center;
+          gap: 9px;
+          color: #5c7186;
+          font-weight: 500;
+        }
+
+        .wb-done-row-label i {
+          color: #90a4b8;
+          font-size: 12px;
+        }
+
+        .wb-done-row-value {
+          font-weight: 700;
+          color: #26415e;
+          font-variant-numeric: tabular-nums;
+          white-space: nowrap;
+        }
+
+        .wb-done-row.is-muted .wb-done-row-value {
+          color: #a9b8c8;
+          font-weight: 600;
+        }
+
+        /* ---- Buttons ---- */
+        .btn-wb-primary,
+        .btn.btn-wb-primary {
+          background: #2b598e;
+          border: 1px solid #2b598e;
+          color: #ffffff;
+        }
+
+        .btn-wb-primary:hover,
+        .btn.btn-wb-primary:hover {
+          background: #234b7b;
+          border-color: #234b7b;
+          color: #ffffff;
+        }
+
+        .btn-wb-next,
+        .btn.btn-wb-next {
+          background: #ffffff;
+          border: 1px solid #cbd8e6;
+          color: #2b598e;
+        }
+
+        .btn-wb-next:hover,
+        .btn.btn-wb-next:hover {
+          background: #f1f6fb;
+          border-color: #9fb8d2;
+          color: #1d4a7a;
+        }
+
+        .btn-wb-next[disabled],
+        .btn.btn-wb-next[disabled] {
+          color: #a9b8c8;
+          border-color: #e0e7ef;
+          background: #f7f9fc;
+        }
+
+        .btn-wb-ghost,
+        .btn.btn-wb-ghost {
+          background: #ffffff;
+          border: 1px solid #d9e2ec;
+          color: #4a627c;
+          font-size: 13px;
+          font-weight: 600;
+          padding: 7px 12px;
+          border-radius: 7px;
+        }
+
+        .btn-wb-ghost:hover,
+        .btn.btn-wb-ghost:hover {
+          background: #f1f6fb;
+          border-color: #b9cbdf;
+          color: #2b598e;
+        }
+
+        /* ---- Form controls inside the sidebar ---- */
+        /* Spacing comes from flex `gap`, not from margins on the controls.
+           Margin-based rules kept failing here because a conditionalPanel is
+           a plain <div data-display-if> whose margins Shiny and Bootstrap
+           both touch; `gap` applies between every pair of children whatever
+           they are, and a hidden panel contributes no gap at all. */
+        .wb-side .wb-section,
+        .wb-side .wb-subfield,
+        .wb-side [data-display-if] {
           display: flex;
           flex-direction: column;
-          flex: 1;
-          min-height: 0;
+          gap: 18px;
         }
 
-        #upload_page .card > .card-body > .tabbable > .tab-content {
+        .wb-side .form-group,
+        .wb-side .shiny-input-container,
+        .wb-side .wb-section > *,
+        .wb-side .wb-subfield > *,
+        .wb-side [data-display-if] > * {
+          margin-top: 0;
+          margin-bottom: 0;
+        }
+
+        /* the gap already separates the title from the first control */
+        .wb-side .wb-section-title {
+          margin-bottom: 0;
+        }
+
+        /* An unrendered uiOutput is still a flex child, so it would add a
+           second gap and push the next control down. */
+        .wb-side .shiny-html-output:empty,
+        .wb-side [data-display-if]:empty {
+          display: none;
+        }
+
+        /* checkboxes read as one line, so they need less air above */
+        .wb-side .checkbox,
+        .wb-side .form-group.shiny-input-checkboxgroup {
+          margin: 0;
+        }
+
+        .wb-side .checkbox label {
           display: flex;
-          flex: 1;
+          align-items: center;
+          gap: 8px;
+          font-size: 13.5px;
+          color: #3d556f;
+          font-weight: 500;
+          padding-left: 0;
+        }
+
+        .wb-side .checkbox input[type='checkbox'],
+        .wb-side .radio input[type='radio'] {
+          position: static;
+          margin: 0;
+          flex: 0 0 auto;
+        }
+
+        .wb-side .radio {
+          margin: 0;
+        }
+
+        .wb-side .radio + .radio {
+          margin-top: 9px;
+        }
+
+        .wb-side .radio label {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding-left: 0;
+        }
+
+        /* fluidRow of small numeric inputs (grid tuning) */
+        .wb-side .row {
+          margin-left: -6px;
+          margin-right: -6px;
+        }
+
+        .wb-side .row > [class*='col-'] {
+          padding-left: 6px;
+          padding-right: 6px;
+        }
+
+        .wb-side .row > [class*='col-'] .form-group {
+          margin-top: 0;
+        }
+
+        .wb-side .row + .row {
+          margin-top: 14px;
+        }
+
+        .wb-side .control-label,
+        .wb-side .shiny-input-container > label {
+          display: block;
+          font-size: 13.5px;
+          font-weight: 600;
+          color: #34485f;
+          margin-bottom: 9px;
+          line-height: 1.35;
+        }
+
+        .wb-side .btn-file {
+          background: #edf2f8;
+          border: 1px solid #d5e0ec;
+          border-right: 0;
+          color: #35577f;
+          font-weight: 600;
+          font-size: 13px;
+        }
+
+        .wb-side .btn-file:hover {
+          background: #e2ebf5;
+          color: #23446b;
+        }
+
+        .wb-side .input-group .form-control.wb-file-demo {
+          color: #26415e;
+          font-weight: 600;
+        }
+
+        .wb-side .input-group .form-control {
+          font-size: 13px;
+          color: #7b8c9e;
+          background: #ffffff;
+          border-color: #d5e0ec;
+          box-shadow: none;
+        }
+
+        /* Sliders (ionRangeSlider). The stock widget stacks value bubble,
+           min/max captions, track and a tick grid into ~40px, which in a
+           372px sidebar reads as one squashed block. Only the value bubble
+           and the track are kept, and they get real vertical separation. */
+        .wb-side .irs {
+          font-family: inherit;
+        }
+
+        .wb-side .irs--shiny {
+          height: 58px;
+          margin-top: 2px;
+        }
+
+        /* tick grid and the 0 / 1 end captions collide with the bubble */
+        .wb-side .irs--shiny .irs-grid,
+        .wb-side .irs--shiny .irs-min,
+        .wb-side .irs--shiny .irs-max {
+          display: none;
+        }
+
+        .wb-side .irs--shiny .irs-single {
+          top: 0;
+          background: #2b598e;
+          color: #ffffff;
+          font-size: 11.5px;
+          font-weight: 700;
+          line-height: 1.35;
+          padding: 3px 9px;
+          border-radius: 6px;
+        }
+
+        .wb-side .irs--shiny .irs-single:before {
+          border-top-color: #2b598e;
+        }
+
+        .wb-side .irs--shiny .irs-line {
+          height: 6px;
+          top: 36px;
+          background: #e4ebf3;
+          border: 0;
+          border-radius: 999px;
+        }
+
+        .wb-side .irs--shiny .irs-bar {
+          height: 6px;
+          top: 36px;
+          background: #2b598e;
+          border: 0;
+          border-radius: 999px;
+        }
+
+        .wb-side .irs--shiny .irs-handle {
+          top: 30px;
+          width: 18px;
+          height: 18px;
+          border: 2px solid #2b598e;
+          background: #ffffff;
+          box-shadow: 0 1px 3px rgba(28, 52, 80, 0.22);
+        }
+
+        .wb-side .irs--shiny .irs-handle > i {
+          display: none;
+        }
+
+        .wb-side .progress {
+          height: 4px;
+          margin-top: 8px;
+          margin-bottom: 0;
+          background: #e8eef5;
+        }
+
+        .wb-side .radio label,
+        .wb-side .shiny-options-group label {
+          font-size: 13.5px;
+          color: #3d556f;
+          font-weight: 500;
+        }
+
+        /* ---- Preview surface ---- */
+        .workbench .wb-preview-shell {
+          display: flex;
+          flex: 1 1 auto;
+          min-height: 0;
+          flex-direction: column;
+        }
+
+        .workbench .wb-preview-shell > .tabbable {
+          display: flex;
+          flex: 1 1 auto;
+          min-height: 0;
+          flex-direction: column;
+        }
+
+        .workbench .wb-preview-shell > .tabbable > .nav-tabs {
+          flex: 0 0 auto;
+          margin: 0;
+          padding: 0 26px;
+          gap: 0;
+          border-bottom: 1px solid #e8eef5;
+          background: #ffffff;
+        }
+
+        .workbench .nav-tabs .nav-link {
+          border: 0;
+          border-bottom: 2px solid transparent;
+          border-radius: 0;
+          background: transparent;
+          padding: 14px 2px;
+          margin-right: 26px;
+          font-size: 13.5px;
+          font-weight: 600;
+          color: #71869b;
+        }
+
+        .workbench .nav-tabs .nav-link:hover {
+          color: #2b598e;
+          border-bottom-color: #c8d8e9;
+        }
+
+        .workbench .nav-tabs .nav-link.active {
+          color: #1d4a7a;
+          background: transparent;
+          border-bottom-color: #2b598e;
+        }
+
+        .workbench .wb-preview-shell > .tabbable > .tab-content {
+          display: flex;
+          flex: 1 1 auto;
           min-height: 0;
         }
 
-        #upload_page .card > .card-body > .tabbable > .tab-content > .tab-pane {
-          flex: 1;
+        .workbench .wb-preview-shell > .tabbable > .tab-content > .tab-pane {
+          flex: 1 1 auto;
+          min-height: 0;
           min-width: 0;
         }
 
-        #upload_page .card > .card-body > .tabbable > .tab-content > .active {
-          display: flex;
-          flex-direction: column;
-          min-height: 0;
-        }
-
-        #upload_page[data-sync-panels='ready'] #upload_result_card {
-          height: var(--upload-panel-height);
-        }
-
-        #upload_page[data-sync-panels='ready'] #upload_result_card > .card-body {
-          min-height: 0;
-          overflow: hidden;
-        }
-
-        #upload_page .upload-preview-shell {
-          display: flex;
-          flex: 1 1 auto;
-          min-height: 0;
-          flex-direction: column;
-        }
-
-        #upload_page .upload-preview-shell > .tabbable {
-          display: flex;
-          flex: 1 1 auto;
-          min-height: 0;
-          flex-direction: column;
-        }
-
-        #upload_page .upload-preview-shell > .tabbable > .tab-content {
-          display: flex;
-          flex: 1 1 auto;
-          min-height: 0;
-        }
-
-        #upload_page .upload-preview-shell > .tabbable > .tab-content > .tab-pane {
-          flex: 1 1 auto;
-          min-height: 0;
-        }
-
-        #upload_page .upload-preview-shell > .tabbable > .tab-content > .active {
+        .workbench .wb-preview-shell > .tabbable > .tab-content > .active {
           display: flex;
           flex-direction: column;
           min-height: 0;
           overflow: hidden;
         }
 
-        #upload_page .upload-preview-table {
+        .workbench .wb-preview-table {
           flex: 1 1 auto;
           min-height: 0;
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+          padding: 0;
+        }
+
+        .workbench .wb-preview-table > .shiny-html-output,
+        .workbench .wb-preview-table > .datatables {
+          flex: 1 1 auto;
+          min-height: 0;
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+        }
+
+        /* =========== DataTables chrome =========== */
+        .workbench .dataTables_wrapper {
+          flex: 1 1 auto;
+          min-height: 0;
+          display: flex;
+          flex-direction: column;
+          width: 100%;
+        }
+
+        .workbench .wb-dt-scroll {
+          flex: 1 1 auto;
+          min-height: 0;
+          height: 100%;
           overflow: auto;
         }
 
-        #upload_page .upload-preview-table .dataTables_wrapper {
+        .workbench .wb-dt-bottom {
+          flex: 0 0 auto;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 18px;
+          padding: 11px 26px;
+          border-top: 1px solid #eef2f7;
+          background: #fcfdfe;
+        }
+
+        /* rows-per-page */
+        .workbench .dataTables_length {
+          margin: 0;
+        }
+
+        .workbench .dataTables_length label {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin: 0;
+          font-size: 12.5px;
+          font-weight: 500;
+          color: #7b8fa3;
+        }
+
+        .workbench .dataTables_length select {
+          border: 1px solid #d7e0ea;
+          border-radius: 7px;
+          padding: 5px 26px 5px 9px;
+          font-size: 12.5px;
+          font-weight: 600;
+          color: #34485f;
+          background-color: #ffffff;
+          height: auto;
+        }
+
+        /* pagination: Prev | page jump | Next */
+        .workbench .dataTables_paginate {
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+
+        .workbench .dataTables_paginate ul.pagination {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin: 0;
+          padding: 0;
+        }
+
+        .workbench .dataTables_paginate .paginate_button,
+        .workbench .dataTables_paginate .page-item {
+          margin: 0 !important;
+          border: 0 !important;
+          background: transparent !important;
+          box-shadow: none !important;
+        }
+
+        .workbench .dataTables_paginate .page-link,
+        .workbench .dataTables_paginate a.paginate_button {
+          display: inline-block;
+          margin: 0 !important;
+          padding: 6px 14px !important;
+          border: 1px solid #d7e0ea !important;
+          border-radius: 7px !important;
+          background: #ffffff !important;
+          box-shadow: none !important;
+          font-size: 12.5px;
+          font-weight: 600;
+          color: #4a627c !important;
+          cursor: pointer;
+        }
+
+        .workbench .dataTables_paginate .page-link:hover,
+        .workbench .dataTables_paginate a.paginate_button:hover {
+          background: #eef4fb !important;
+          border-color: #9fb8d2 !important;
+          color: #2b598e !important;
+        }
+
+        .workbench .dataTables_paginate .disabled .page-link,
+        .workbench .dataTables_paginate .disabled .page-link:hover,
+        .workbench .dataTables_paginate a.paginate_button.disabled,
+        .workbench .dataTables_paginate a.paginate_button.disabled:hover {
+          background: #f7f9fc !important;
+          border-color: #e6ecf3 !important;
+          color: #b6c2cf !important;
+          cursor: default;
+        }
+
+        /* injected page-jump control */
+        .workbench .wb-page-jump {
+          display: flex !important;
+          align-items: center;
+          gap: 7px;
+          margin: 0 2px;
+          font-size: 12.5px;
+          color: #7b8fa3;
+          white-space: nowrap;
+        }
+
+        .workbench .wb-page-input {
+          width: 58px;
+          padding: 6px 8px;
+          border: 1px solid #d7e0ea;
+          border-radius: 7px;
+          background: #ffffff;
+          font-size: 12.5px;
+          font-weight: 700;
+          color: #26415e;
+          text-align: center;
+          font-variant-numeric: tabular-nums;
+        }
+
+        .workbench .wb-page-input:focus {
+          outline: none;
+          border-color: #9fb8d2;
+          box-shadow: 0 0 0 3px rgba(43, 89, 142, 0.10);
+        }
+
+        .workbench .wb-page-total {
+          font-weight: 600;
+          color: #8296ab;
+          font-variant-numeric: tabular-nums;
+        }
+
+        .workbench .dataTables_info {
+          display: none;
+        }
+
+        /* =========== The table itself =========== */
+        .workbench table.dataTable {
+          width: 100% !important;
+          min-width: 100%;
+          margin: 0 !important;
+          border-collapse: separate;
+          border-spacing: 0;
+        }
+
+        .workbench table.dataTable thead th,
+        .workbench table.dataTable tbody td {
+          white-space: nowrap;
+        }
+
+        .workbench table.dataTable thead th {
+          position: sticky;
+          top: 0;
+          z-index: 2;
+          background: #f5f8fb;
+          border-top: 0;
+          border-bottom: 1px solid #e1e9f1;
+          padding: 11px 18px;
+          font-size: 12px;
+          font-weight: 700;
+          letter-spacing: 0.01em;
+          color: #64798f;
+          white-space: nowrap;
+        }
+
+        .workbench table.dataTable tbody td {
+          padding: 10px 18px;
+          font-size: 13.5px;
+          line-height: 1.45;
+          color: #3a4f66;
+          border-top: 0;
+          border-bottom: 1px solid #f1f5f9;
+          background: transparent;
+        }
+
+        .workbench table.dataTable tbody tr:hover td {
+          background: #f6fafd;
+        }
+
+        .workbench table.dataTable tbody tr:last-child td {
+          border-bottom: 0;
+        }
+
+        /* empty-state table */
+        .workbench table.dataTable.wb-dt-empty thead {
+          display: none;
+        }
+
+        .workbench table.dataTable.wb-dt-empty tbody td {
+          padding: 46px 26px;
+          text-align: center;
+          color: #9aabbd;
+          font-size: 13.5px;
+          border-bottom: 0;
+        }
+
+        .workbench table.dataTable.wb-dt-empty tbody tr:hover td {
+          background: transparent;
+        }
+
+        .workbench #module_network_ui {
+          display: flex;
           flex: 1 1 auto;
           min-height: 0;
-          width: 100%;
-        }
-
-        #upload_page .upload-status-wrap {
-          flex: 0 0 auto;
-        }
-        
-        /* Annotation: lock row height to the left panel and scroll inside the right panel */
-        #annotation_page .step-main-row {
-          align-items: flex-start;
-        }
-
-        #annotation_page .step-main-row > [class*='col-'] {
-          display: block;
-        }
-
-        #annotation_page .step-main-row > [class*='col-'] > .card {
-          width: 100%;
-        }
-
-        #annotation_page .card > .card-body {
-          display: flex;
-          flex-direction: column;
-          min-height: 0;
-        }
-        
-        #annotation_page .card > .card-body > .tabbable {
-          display: flex;
-          flex-direction: column;
-          flex: 1;
-          min-height: 0;
-        }
-        
-        #annotation_page .card > .card-body > .tabbable > .tab-content {
-          display: flex;
-          flex: 1;
-          min-height: 0;
-        }
-        
-        #annotation_page .card > .card-body > .tabbable > .tab-content > .tab-pane {
-          flex: 1;
-          min-width: 0;
-        }
-        
-        #annotation_page .card > .card-body > .tabbable > .tab-content > .active {
-          display: flex;
-          flex-direction: column;
-          min-height: 0;
-        }
-        
-        #annotation_page .annotation-summary-stack {
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-          flex: 1;
-          min-height: 0;
-          width: 100%;
-          min-width: 0;
-        }
-        
-        #annotation_page .annotation-summary-stack > .shiny-html-output {
-          display: flex;
-          flex: 1;
-          min-height: 0;
-          width: 100%;
-          min-width: 0;
-        }
-
-        #annotation_page[data-sync-panels='ready'] #annotation_param_card,
-        #annotation_page[data-sync-panels='ready'] #annotation_result_card {
-          height: var(--annotation-panel-height);
-        }
-
-        #annotation_page[data-sync-panels='ready'] #annotation_param_card > .card-body,
-        #annotation_page[data-sync-panels='ready'] #annotation_result_card > .card-body {
-          min-height: 0;
-        }
-
-        #annotation_page[data-sync-panels='ready'] #annotation_result_card > .card-body {
+          border: 1px solid #e6edf4;
+          border-radius: 10px;
           overflow: hidden;
         }
 
-        #annotation_page[data-sync-panels='ready'] #annotation_result_card > .card-body > .tabbable,
-        #annotation_page[data-sync-panels='ready'] #annotation_result_card > .card-body > .tabbable > .tab-content {
-          min-height: 0;
-          height: 100%;
-        }
-
-        #annotation_page[data-sync-panels='ready'] #annotation_result_card > .card-body > .tabbable > .tab-content > .tab-pane,
-        #annotation_page[data-sync-panels='ready'] #annotation_result_card > .card-body > .tabbable > .tab-content > .active,
-        #annotation_page[data-sync-panels='ready'] #annotation_result_card .annotation-summary-stack {
+        /* a plain scrolling work area (function / results pages) */
+        .wb-scroll-area {
+          flex: 1 1 auto;
           min-height: 0;
           overflow-y: auto;
           overflow-x: hidden;
+          padding: 22px 28px 26px 28px;
         }
-        
+
+        /* ---- Narrow screens: stack the two regions ---- */
+        @media (max-width: 991.98px) {
+          .workbench {
+            height: auto;
+          }
+
+          .wb-body {
+            flex-direction: column;
+          }
+
+          .wb-side {
+            flex: 0 0 auto;
+            width: 100%;
+            border-right: 0;
+            border-bottom: 1px solid #e3eaf2;
+          }
+
+          .wb-side-scroll {
+            overflow: visible;
+          }
+
+          .wb-stepper {
+            display: none;
+          }
+
+          .workbench .wb-preview-table {
+            min-height: 320px;
+          }
+        }
+
+        @media (max-width: 1400px) {
+          .wb-step-name {
+            display: none;
+          }
+
+          .wb-step-line {
+            width: 16px;
+            margin: 0 6px;
+          }
+        }
+
         /* Modules */
-        #modules_page .step-main-row {
-          align-items: flex-start;
-        }
 
-        #modules_page .step-main-row > [class*='col-'] {
-          display: block;
-        }
 
-        #modules_page .step-main-row > [class*='col-'] > .card {
-          width: 100%;
-        }
 
-        #modules_page .card > .card-body {
-          display: flex;
-          flex-direction: column;
-          min-height: 0;
-        }
         
-        #modules_page .card > .card-body > .tabbable {
-          display: flex;
-          flex-direction: column;
-          flex: 1;
-          min-height: 0;
-        }
         
-        #modules_page .card > .card-body > .tabbable > .tab-content {
-          display: flex;
-          flex: 1;
-          min-height: 0;
-        }
         
-        #modules_page .card > .card-body > .tabbable > .tab-content > .tab-pane {
-          flex: 1;
-          min-width: 0;
-        }
         
-        #modules_page .card > .card-body > .tabbable > .tab-content > .active {
-          display: flex;
-          flex-direction: column;
-          min-height: 0;
-        }
 
-        #modules_page[data-sync-panels='ready'] #modules_result_card {
-          height: var(--modules-panel-height);
-        }
 
-        #modules_page[data-sync-panels='ready'] #modules_result_card > .card-body {
-          min-height: 0;
-          overflow: hidden;
-        }
 
-        #modules_page[data-sync-panels='ready'] #modules_result_card > .card-body > .tabbable,
-        #modules_page[data-sync-panels='ready'] #modules_result_card > .card-body > .tabbable > .tab-content {
-          min-height: 0;
-          height: 100%;
-        }
 
-        #modules_page[data-sync-panels='ready'] #modules_result_card > .card-body > .tabbable > .tab-content > .tab-pane,
-        #modules_page[data-sync-panels='ready'] #modules_result_card > .card-body > .tabbable > .tab-content > .active {
-          min-height: 0;
-        }
 
         #modules_page .module-visual-shell,
         #modules_page .module-table-shell {
@@ -810,6 +2164,7 @@ ui <- fluidPage(
           flex-direction: column;
           flex: 1 1 auto;
           min-height: 0;
+          padding: 16px 26px 20px 26px;
         }
 
         #modules_page .module-visual-filter-row {
@@ -903,56 +2258,12 @@ ui <- fluidPage(
           justify-content: flex-end;
         }
 
-        #function_page .function-visual-filter-row {
-          display: flex;
-          align-items: center;
-          justify-content: flex-end;
-          gap: 20px;
-          flex-wrap: nowrap;
-          margin-bottom: 14px;
-          width: 100%;
-        }
 
-        #function_page .function-visual-filter-row #function_module_selector_ui,
-        #function_page .function-visual-filter-row #function_hypothesis_selector_ui {
-          flex: 0 1 200px;
-          width: 200px;
-          max-width: 100%;
-          min-width: 0;
-        }
 
-        #function_page .function-visual-filter-row .pcsf-selector-input {
-          display: flex;
-          align-items: flex-start;
-          gap: 8px;
-        }
 
-        #function_page .function-visual-filter-row .pcsf-selector-field {
-          flex: 1;
-          min-width: 0;
-        }
 
-        #function_page .function-visual-filter-row .pcsf-selector-field .form-group,
-        #function_page .function-visual-filter-row .pcsf-selector-field .selectize-control {
-          margin-bottom: 0;
-        }
 
-        #function_page .function-visual-filter-row .selectize-input {
-          height: 38px;
-          min-height: 38px;
-          max-height: 38px;
-          overflow: hidden;
-          display: flex;
-          align-items: center;
-          flex-wrap: nowrap;
-        }
 
-        #function_page .function-visual-filter-row .selectize-input > .item {
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          max-width: 100%;
-        }
 
         #modules_page .module-visual-shell > hr,
         #modules_page .module-table-shell > hr {
@@ -970,11 +2281,15 @@ ui <- fluidPage(
           flex: 0 0 auto;
         }
         
+        /* framed canvas, matching the PCSF subnetwork stage */
         #modules_page #module_network_ui {
           display: flex;
           flex: 1;
-          min-height: 0;
+          min-height: 460px;
           width: 100%;
+          border: 1px solid #e6edf4;
+          border-radius: 10px;
+          overflow: hidden;
         }
 
         #modules_page #module_network_ui > .shiny-vis-network,
@@ -988,38 +2303,12 @@ ui <- fluidPage(
         }
         
         /* Function */
-        #function_page .step-main-row {
-          align-items: flex-start;
-        }
 
-        #function_page .step-main-row > [class*='col-'] {
-          display: block;
-        }
 
-        #function_page .step-main-row > [class*='col-'] > .card {
-          width: 100%;
-        }
 
-        #function_page .card > .card-body {
-          display: flex;
-          flex-direction: column;
-          min-height: 0;
-        }
 
-        #function_page[data-sync-panels='ready'] #function_result_card {
-          height: var(--function-panel-height);
-        }
 
-        #function_page[data-sync-panels='ready'] #function_result_card > .card-body {
-          min-height: 0;
-          overflow: hidden;
-        }
 
-        #function_page[data-sync-panels='ready'] #function_result_card > .card-body > .shiny-html-output {
-          display: flex;
-          flex: 1 1 auto;
-          min-height: 0;
-        }
         
         #function_page #function_main_ui {
           display: flex;
@@ -1036,19 +2325,6 @@ ui <- fluidPage(
         width: 100%;
         max-width: 100%;
         overflow-x: auto;
-      }
-
-      #annotation_page .annotation-table-wrap .dataTables_wrapper {
-        width: 100%;
-        max-width: 100%;
-      }
-
-      #annotation_page .annotation-summary-stack .shiny-plot-output,
-      #annotation_page .annotation-summary-stack .shiny-plotly-output,
-      #annotation_page .annotation-summary-stack .plotly,
-      #annotation_page .annotation-summary-stack .html-widget {
-        width: 100% !important;
-        max-width: 100% !important;
       }
 
       #network_page .annotation-table-wrap .dataTables_wrapper {
@@ -1094,6 +2370,8 @@ ui <- fluidPage(
         padding: 15px 28px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         margin-bottom: 0;
+        position: relative;
+        z-index: 1050;
       }
       
       .navbar-brand {
@@ -1139,6 +2417,148 @@ ui <- fluidPage(
       .nav-pills .nav-link.active {
         background-color: rgba(255,255,255,0.2);
         color: white;
+      }
+
+      /* ---- Analysis dropdown ---- */
+      .nav-pills .nav-item.nav-dropdown {
+        position: relative;
+      }
+
+      .nav-dropdown-toggle {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        cursor: pointer;
+        text-decoration: none !important;
+      }
+
+      .nav-caret {
+        font-size: 10px;
+        opacity: 0.7;
+        transition: transform 0.2s ease;
+      }
+
+      .nav-dropdown.open .nav-caret {
+        transform: rotate(180deg);
+      }
+
+      .nav-dropdown.open > .nav-link {
+        background-color: rgba(255,255,255,0.2);
+        color: #ffffff;
+      }
+
+      .nav-dropdown-menu {
+        position: absolute;
+        top: calc(100% + 12px);
+        left: 50%;
+        transform: translateX(-50%) translateY(-6px);
+        width: max-content;
+        min-width: 0;
+        margin: 0;
+        padding: 6px;
+        list-style: none;
+        background: #ffffff;
+        border: 1px solid #dde5ef;
+        border-radius: 12px;
+        box-shadow: 0 18px 38px rgba(20, 42, 68, 0.20);
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
+        z-index: 1080;
+      }
+
+      .nav-dropdown.open .nav-dropdown-menu {
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+        transform: translateX(-50%) translateY(0);
+      }
+
+      .nav-dropdown-menu::before {
+        content: \"\";
+        position: absolute;
+        top: -6px;
+        left: 50%;
+        margin-left: -6px;
+        width: 11px;
+        height: 11px;
+        background: #ffffff;
+        border-left: 1px solid #dde5ef;
+        border-top: 1px solid #dde5ef;
+        transform: rotate(45deg);
+        border-radius: 2px 0 0 0;
+      }
+
+      .nav-dropdown-menu li {
+        list-style: none;
+      }
+
+      a.nav-dropdown-item {
+        display: flex !important;
+        flex-wrap: nowrap;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 14px 8px 10px;
+        border-radius: 8px;
+        color: #33475f !important;
+        font-size: 14px;
+        font-weight: 500;
+        line-height: 1.2;
+        white-space: nowrap;
+        text-decoration: none !important;
+        transition: background-color 0.16s ease, color 0.16s ease;
+      }
+
+      a.nav-dropdown-item:hover {
+        background-color: #eef4fb;
+        color: #1d4a7a !important;
+      }
+
+      a.nav-dropdown-item.active {
+        background-color: #e4eef9;
+        color: #1d4a7a !important;
+        font-weight: 600;
+      }
+
+      .nav-step-num {
+        flex: 0 0 auto;
+        width: 21px;
+        height: 21px;
+        border-radius: 50%;
+        background: #e3ecf7;
+        color: #2b598e;
+        font-size: 11.5px;
+        font-weight: 700;
+        line-height: 1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        vertical-align: middle;
+        transition: background-color 0.16s ease, color 0.16s ease;
+      }
+
+      .nav-step-label {
+        display: inline-block;
+        vertical-align: middle;
+        white-space: nowrap;
+      }
+
+      a.nav-dropdown-item:hover .nav-step-num,
+      a.nav-dropdown-item.active .nav-step-num {
+        background: #2b598e;
+        color: #ffffff;
+      }
+
+      /* ---- Sign In pill ---- */
+      .nav-pills .nav-link.nav-link-signin {
+        border: 1px solid rgba(255,255,255,0.45);
+        margin-left: 10px;
+      }
+
+      .nav-pills .nav-link.nav-link-signin:hover {
+        background-color: rgba(255,255,255,0.18);
+        border-color: rgba(255,255,255,0.7);
       }
       
       /* Home page redesign */
@@ -1379,7 +2799,7 @@ ui <- fluidPage(
         background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
         border: 1px solid #d8e2ee;
         border-radius: 14px;
-        padding: 22px 18px;
+        padding: 28px 18px 26px 18px;
         text-align: center;
         box-shadow: 0 8px 18px rgba(48, 75, 105, 0.12);
         transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -1406,25 +2826,23 @@ ui <- fluidPage(
       }
 
       #home_page .feature-number {
-        font-size: 34px;
+        font-size: 40px;
+        line-height: 1.1;
         font-weight: 700;
         color: #224d7b;
-        letter-spacing: 0.01em;
+        letter-spacing: -0.01em;
+        font-variant-numeric: tabular-nums;
         margin-bottom: 6px;
       }
 
       #home_page .feature-title {
-        font-size: 17px;
-        font-weight: 700;
-        color: #2a425a;
-        margin-bottom: 4px;
+        font-size: 18px;
+        font-weight: 600;
+        color: #728aa2;
+        letter-spacing: 0.01em;
+        margin-bottom: 0;
       }
 
-      #home_page .feature-desc {
-        margin: 0;
-        font-size: 13px;
-        color: #5b7085;
-      }
 
       #home_page .workflow-section {
         background: transparent;
@@ -1943,37 +3361,125 @@ ui <- fluidPage(
         margin: 0;
       }
 
+      /* =====================================================
+         Function interpretation report
+         Same language as the rest of the workbench: flat white
+         surfaces, hairline borders, one blue accent, no drop shadows.
+         ===================================================== */
       .fast-function-report {
         display: flex;
         flex-direction: column;
-        gap: 14px;
+        gap: 16px;
       }
 
+      .function-result-shell > .tabbable > .tab-content {
+        padding-top: 26px;
+      }
+
+      /* ---- header bar: mode badge on the left, selectors on the right,
+             so a single short dropdown no longer owns a whole row ---- */
+      .fast-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 14px;
+        margin-bottom: 16px;
+      }
+
+      .fast-toolbar-right {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+
+      .fast-select {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+      }
+
+      .fast-select-label {
+        font-size: 10.5px;
+        font-weight: 700;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+        color: #93a5b8;
+        white-space: nowrap;
+      }
+
+      .fast-select-field {
+        width: 128px;
+      }
+
+      .fast-select-field.is-wide {
+        width: 196px;
+      }
+
+      .fast-select-field .form-group,
+      .fast-select-field .selectize-control {
+        margin-bottom: 0;
+      }
+
+      .fast-select-field .selectize-input {
+        display: flex;
+        align-items: center;
+        flex-wrap: nowrap;
+        min-height: 34px;
+        height: 34px;
+        padding: 0 26px 0 12px;
+        border-radius: 8px;
+        border-color: #d7e0ea;
+        font-size: 13px;
+        overflow: hidden;
+      }
+
+      .fast-select-field .selectize-input > .item,
+      .fast-select-field .selectize-input > input {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+      }
+
+      /* ---- header block ---- */
       .fast-function-hero {
-        border: 1px solid #d8e2ee;
-        border-radius: 12px;
-        background: #f8fafc;
-        padding: 18px 20px;
+        position: relative;
+        padding: 19px 22px;
+        background: #f7fafd;
+        border: 1px solid #e3ecf5;
+        border-radius: 14px;
       }
 
       .fast-function-eyebrow {
-        display: flex;
+        display: inline-flex;
         align-items: center;
-        gap: 8px;
-        margin-bottom: 8px;
-        color: #52677e;
-        font-size: 12px;
+        gap: 7px;
+        padding: 4px 11px;
+        border-radius: 999px;
+        background: #2b598e;
+        border: 1px solid #2b598e;
+        color: #ffffff;
+        font-size: 10.5px;
         font-weight: 700;
-        letter-spacing: 0.04em;
+        letter-spacing: 0.08em;
         text-transform: uppercase;
+        white-space: nowrap;
+      }
+
+      .fast-function-eyebrow i {
+        font-size: 10px;
+        color: #a8d8dd;
       }
 
       .fast-function-hero h3 {
-        margin: 0 0 12px 0;
-        color: #162f49;
-        font-size: 24px;
+        margin: 0 0 14px 0;
+        color: #14304f;
+        font-size: 23px;
         font-weight: 750;
-        line-height: 1.28;
+        line-height: 1.34;
+        letter-spacing: -0.015em;
       }
 
       .fast-function-meta {
@@ -1982,128 +3488,187 @@ ui <- fluidPage(
         gap: 8px;
       }
 
+      /* ---- pills and chips ---- */
       .fast-meta-pill,
       .fast-chip {
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        border: 1px solid #d6e0ec;
+        padding: 5px 12px;
         border-radius: 999px;
         background: #ffffff;
-        color: #2a4662;
-        font-size: 13px;
-        font-weight: 650;
-        line-height: 1.2;
-        padding: 6px 10px;
+        border: 1px solid #dbe6f2;
+        color: #2b598e;
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1.5;
+        white-space: nowrap;
+      }
+
+      .fast-meta-pill i,
+      .fast-chip i {
+        font-size: 10.5px;
+        color: #7ba8cd;
+      }
+
+      .fast-chip {
+        white-space: normal;
+        background: #eef5fb;
+        border-color: #dbe8f4;
       }
 
       .fast-meta-pill.conf-high,
       .fast-chip.conf-high {
-        background: #eaf7ef;
-        border-color: #bddfc9;
-        color: #21643a;
+        background: #e4f4ee;
+        border-color: #bfe3d5;
+        color: #1c7a63;
       }
+
+      .fast-meta-pill.conf-high i,
+      .fast-chip.conf-high i { color: #3aa588; }
 
       .fast-meta-pill.conf-medium,
       .fast-chip.conf-medium {
-        background: #fff6e6;
-        border-color: #f2d29a;
-        color: #80551b;
+        background: #fdf2e3;
+        border-color: #f2ddc0;
+        color: #9c6a22;
       }
+
+      .fast-meta-pill.conf-medium i,
+      .fast-chip.conf-medium i { color: #cf9a48; }
 
       .fast-meta-pill.conf-low,
       .fast-chip.conf-low {
-        background: #fdeeee;
-        border-color: #efc0c0;
-        color: #8c3030;
+        background: #fdecec;
+        border-color: #f6d4d4;
+        color: #ad4a45;
       }
+
+      .fast-meta-pill.conf-low i,
+      .fast-chip.conf-low i { color: #d47b76; }
 
       .fast-chip.dir-up {
-        background: #eaf7ef;
-        border-color: #bddfc9;
-        color: #21643a;
+        background: #fdecec;
+        border-color: #f6d4d4;
+        color: #ad4a45;
       }
+
+      .fast-chip.dir-up i { color: #d47b76; }
 
       .fast-chip.dir-down {
-        background: #faece7;
-        border-color: #f0997b;
-        color: #993c1d;
+        background: #e8f0fa;
+        border-color: #cfe0f2;
+        color: #1f4f86;
       }
+
+      .fast-chip.dir-down i { color: #5b8fc4; }
 
       .fast-chip.dir-mixed {
-        background: #f1f3f5;
-        border-color: #dbe5f2;
-        color: #52677e;
+        background: #f1f3f8;
+        border-color: #e2e7ef;
+        color: #66748c;
       }
 
+      /* ---- sections, each with its own accent ---- */
       .fast-function-sections {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr);
+        display: flex;
+        flex-direction: column;
         gap: 14px;
       }
 
       .fast-info-section {
-        border: 1px solid #dbe5f2;
-        border-radius: 12px;
+        --accent: #2b598e;
+        --accent-soft: #eef4fb;
+        border: 1px solid #e8eef5;
+        border-radius: 14px;
         background: #ffffff;
         overflow: hidden;
+        box-shadow: 0 1px 2px rgba(16, 40, 70, 0.04),
+                    0 8px 20px rgba(16, 40, 70, 0.045);
       }
+
+      .fast-info-section.accent-blue   { --accent: #2b598e; --accent-soft: #eef4fb; }
+      .fast-info-section.accent-teal   { --accent: #21867f; --accent-soft: #e9f5f3; }
+      .fast-info-section.accent-violet { --accent: #6055b8; --accent-soft: #f0eefb; }
+      .fast-info-section.accent-amber  { --accent: #b4712f; --accent-soft: #fdf3e7; }
+      .fast-info-section.accent-green  { --accent: #2a8f6d; --accent-soft: #e8f5ef; }
 
       .fast-section-head {
         display: flex;
         align-items: center;
-        gap: 10px;
-        padding: 13px 16px;
-        border-bottom: 1px solid #edf2f7;
-        background: #fbfdff;
+        gap: 11px;
+        padding: 13px 18px;
+        border-bottom: 1px solid #eef2f7;
       }
 
       .fast-section-icon {
-        width: 30px;
-        height: 30px;
-        border-radius: 8px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        background: #edf4fb;
-        color: #2d5d86;
+        width: 28px;
+        height: 28px;
+        border-radius: 9px;
+        background: var(--accent);
+        color: #ffffff;
+        font-size: 12px;
         flex: 0 0 auto;
       }
 
       .fast-section-head h4 {
         margin: 0;
-        color: #1c3957;
-        font-size: 17px;
+        font-size: 13px;
         font-weight: 700;
+        letter-spacing: -0.005em;
+        color: #23405f;
       }
 
       .fast-section-body {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-        padding: 14px 16px 16px 16px;
+        padding: 6px 18px 18px 18px;
       }
 
+      /* ---- the headline claim ---- */
+      .fast-callout {
+        margin: 12px 0 4px 0;
+        padding: 15px 17px;
+        border: 1px solid #e6edf4;
+        border-radius: 11px;
+        background: #fafcfe;
+      }
+
+      .fast-callout p {
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.75;
+        color: #2c4762;
+      }
+
+      /* ---- label / value rows ---- */
       .fast-field {
         display: grid;
-        grid-template-columns: 180px minmax(0, 1fr);
-        gap: 12px;
-        align-items: start;
+        grid-template-columns: 172px minmax(0, 1fr);
+        gap: 18px;
+        padding: 15px 0;
+        border-bottom: 1px solid #f2f6fa;
+      }
+
+      .fast-field:last-child {
+        border-bottom: 0;
+        padding-bottom: 0;
       }
 
       .fast-field-label {
-        color: #587088;
-        font-size: 12px;
-        font-weight: 750;
-        letter-spacing: 0.03em;
-        text-transform: uppercase;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: #6d8299;
+        line-height: 1.5;
+        padding-top: 2px;
       }
 
       .fast-field-value {
         min-width: 0;
-        color: #26394c;
-        font-size: 15px;
-        line-height: 1.6;
+        font-size: 13.5px;
+        line-height: 1.7;
+        color: #35506d;
       }
 
       .fast-field-value p {
@@ -2111,8 +3676,8 @@ ui <- fluidPage(
       }
 
       .fast-muted {
-        color: #738497;
-        font-style: italic;
+        font-size: 13px;
+        color: #9fb0c2;
       }
 
       .fast-chip-list {
@@ -2121,150 +3686,197 @@ ui <- fluidPage(
         gap: 7px;
       }
 
+      /* ---- compact tables ---- */
       .fast-mini-table {
         width: 100%;
-        border-collapse: collapse;
-        font-size: 13px;
-        line-height: 1.45;
+        border-collapse: separate;
+        border-spacing: 0;
+        border: 1px solid #e8eef5;
+        border-radius: 11px;
+        overflow: hidden;
       }
 
       .fast-mini-table th {
-        padding: 7px 8px;
-        border-bottom: 1px solid #dce6f1;
-        color: #52677e;
-        background: #f6f9fc;
-        font-size: 11px;
-        font-weight: 750;
-        letter-spacing: 0.03em;
+        padding: 10px 13px;
+        background: var(--accent-soft);
+        border-bottom: 1px solid #e8eef5;
+        font-size: 10.5px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
         text-transform: uppercase;
+        color: var(--accent);
+        text-align: left;
+        white-space: nowrap;
       }
 
       .fast-mini-table td {
-        padding: 8px;
-        border-bottom: 1px solid #eef2f6;
-        color: #2d4053;
+        padding: 10px 13px;
+        border-bottom: 1px solid #f2f6fa;
+        font-size: 12.5px;
+        line-height: 1.55;
+        color: #35506d;
         vertical-align: top;
       }
 
       .fast-mini-table tr:last-child td {
-        border-bottom: none;
+        border-bottom: 0;
       }
 
-      .fast-pathway-group {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-      }
-
+      /* ---- pathway cards ---- */
       .fast-pathway-group + .fast-pathway-group {
-        margin-top: 4px;
+        margin-top: 16px;
       }
 
       .fast-pathway-group-title {
-        font-size: 13px;
+        margin-bottom: 9px;
+        font-size: 10.5px;
         font-weight: 700;
-        color: #1c3957;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+        color: var(--accent);
       }
 
       .fast-pathway-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-        gap: 10px;
+        grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));
+        gap: 9px;
       }
 
       .fast-pathway-card {
-        background: #f7f8fb;
-        border: 1px solid #e4e7ee;
-        border-radius: 10px;
-        padding: 12px 14px;
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        padding: 10px 13px;
+        border: 1px solid #e8eef5;
+        border-radius: 11px;
+        background: #fbfdfe;
+        transition: border-color 0.16s ease, background-color 0.16s ease;
+      }
+
+      .fast-pathway-card:hover {
+        border-color: #cfe0ee;
+        background: var(--accent-soft);
       }
 
       .fast-pathway-id {
-        font-size: 13px;
+        flex: 0 0 auto;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 11px;
         font-weight: 700;
-        color: #2f4b99;
-        margin-bottom: 4px;
+        color: var(--accent);
       }
 
       .fast-pathway-desc {
-        font-size: 14px;
-        color: #33404f;
-        line-height: 1.5;
+        min-width: 0;
+        font-size: 12.5px;
+        line-height: 1.55;
+        color: #5c7186;
+        overflow-wrap: anywhere;
       }
 
-      .fast-origin-wrap {
+      /* ---- embedded transcript / synthesis frames ---- */
+      .fast-embed-frame {
+        width: 100%;
+        display: block;
+        border: 1px solid #e6edf4;
+        border-radius: 14px;
+        background: #ffffff;
+        box-shadow: 0 1px 2px rgba(16, 40, 70, 0.04),
+                    0 8px 20px rgba(16, 40, 70, 0.045);
+      }
+
+      .fast-tab-placeholder {
+        max-width: 520px;
+        margin: 40px auto;
+        padding: 30px 28px;
+        text-align: center;
+        border: 1px solid #e8eef5;
+        border-radius: 14px;
+        background: #ffffff;
+      }
+
+      .fast-tab-placeholder-icon {
+        width: 52px;
+        height: 52px;
+        margin: 0 auto 16px auto;
+        border-radius: 14px;
         display: flex;
-        flex-direction: column;
-        gap: 10px;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        color: #4a7bb0;
+        background: #eef4fb;
+        border: 1px solid #e0eaf3;
+      }
+
+      .fast-tab-placeholder h4 {
+        margin: 0 0 8px 0;
+        font-size: 16px;
+        font-weight: 700;
+        color: #24405e;
+      }
+
+      .fast-tab-placeholder-text {
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.7;
+        color: #8296ab;
+      }
+
+      /* ---- origin bar ---- */
+      .fast-origin-wrap {
+        max-width: 560px;
       }
 
       .fast-origin-bar {
         display: flex;
-        width: 100%;
         height: 14px;
         border-radius: 999px;
         overflow: hidden;
-        background: #e3e5ee;
+        background: #eef2f7;
       }
 
-      .fast-origin-seg {
-        height: 100%;
-      }
-
-      .fast-origin-seg-endo {
-        background: #2f9e6a;
-      }
-
-      .fast-origin-seg-exo {
-        background: #c1602e;
-      }
-
-      .fast-origin-seg-unknown {
-        background: #dcdfe8;
-      }
+      .fast-origin-seg { height: 100%; }
+      .fast-origin-seg-endo { background: #21867f; }
+      .fast-origin-seg-exo { background: #6fbfa4; }
+      .fast-origin-seg-unknown { background: #dde5ec; }
 
       .fast-origin-legend {
         display: flex;
         flex-wrap: wrap;
         gap: 18px;
+        margin-top: 11px;
       }
 
       .fast-origin-legend-item {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
-        font-size: 14px;
-        color: #33404f;
+        gap: 7px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #5c7186;
+        font-variant-numeric: tabular-nums;
       }
 
       .fast-origin-dot {
-        width: 9px;
-        height: 9px;
+        width: 10px;
+        height: 10px;
         border-radius: 50%;
-        display: inline-block;
         flex: 0 0 auto;
       }
 
-      .fast-origin-dot-endo {
-        background: #2f9e6a;
-      }
+      .fast-origin-dot-endo { background: #21867f; }
+      .fast-origin-dot-exo { background: #6fbfa4; }
+      .fast-origin-dot-unknown { background: #dde5ec; }
 
-      .fast-origin-dot-exo {
-        background: #c1602e;
-      }
-
-      .fast-origin-dot-unknown {
-        background: #dcdfe8;
-      }
-
-      @media (max-width: 760px) {
+      @media (max-width: 900px) {
         .fast-field {
           grid-template-columns: 1fr;
-          gap: 4px;
+          gap: 6px;
         }
 
         .fast-function-hero h3 {
-          font-size: 21px;
+          font-size: 19px;
         }
       }
       
@@ -2334,6 +3946,17 @@ ui <- fluidPage(
       }
 
       
+      body.fm-workbench .app-footer {
+        display: none;
+      }
+
+      /* fluidPage wraps everything in .container-fluid; its gutters would
+         stop the navbar and the analysis workbench from reaching the edges. */
+      .container-fluid {
+        padding-left: 0;
+        padding-right: 0;
+      }
+
       /* Content container */
       .content-wrapper {
         max-width: none;
@@ -2391,15 +4014,15 @@ ui <- fluidPage(
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 12px;
-        margin-bottom: 16px;
+        margin-bottom: 18px;
       }
 
       #results_page .results-overview-card {
         background: white;
         border: 1px solid #dbe4f1;
-        border-radius: 12px;
+        border-radius: 8px;
         padding: 14px 16px;
-        box-shadow: 0 5px 18px rgba(34, 66, 105, 0.08);
+        box-shadow: 0 1px 2px rgba(34, 66, 105, 0.06);
       }
 
       #results_page .results-overview-label {
@@ -2423,16 +4046,7 @@ ui <- fluidPage(
         color: #6b7786;
       }
 
-      #results_page .results-export-card,
-      #results_page .results-params-card {
-        border: 1px solid #d8e2ef;
-        box-shadow: 0 12px 24px rgba(34, 66, 105, 0.09);
-      }
 
-      #results_page .results-export-card .card-body,
-      #results_page .results-params-card .card-body {
-        background: linear-gradient(180deg, #ffffff 0%, #f9fbfe 100%);
-      }
 
       #results_page .results-card-note {
         font-size: 13px;
@@ -2468,96 +4082,16 @@ ui <- fluidPage(
         color: #2a3f58;
       }
 
-      #results_page .results-preview-wrap {
-        margin-top: 14px;
-        margin-bottom: 14px;
-        border: 1px solid #d6e3f2;
-        border-radius: 10px;
-        padding: 12px;
-        background: #f7fbff;
-      }
-
-      #results_page .results-preview-title {
-        display: flex;
-        align-items: center;
-        gap: 7px;
-        font-size: 13px;
-        font-weight: 700;
-        color: #224a72;
-        margin-bottom: 10px;
-      }
-
-      #results_page .results-preview-list {
-        list-style: none;
-        padding: 0;
-        margin: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-      }
-
-      #results_page .results-preview-item {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 10px;
-        background: white;
-        border: 1px solid #d8e4f2;
-        border-radius: 9px;
-        padding: 8px 10px;
-      }
-
-      #results_page .results-preview-item-label {
-        font-size: 14px;
-        color: #1f3f60;
-      }
-
-      #results_page .results-preview-status {
-        font-size: 12px;
-        font-weight: 700;
-        border-radius: 999px;
-        padding: 4px 10px;
-      }
-
-      #results_page .results-preview-status.ready {
-        color: #21603b;
-        background: #e6f6ec;
-        border: 1px solid #c1e8d0;
-      }
-
-      #results_page .results-preview-status.pending {
-        color: #8a5a15;
-        background: #fff3de;
-        border: 1px solid #f6dfb7;
-      }
-
-      #results_page .results-preview-item .btn.results-preview-download-btn {
-        font-size: 12px;
-        font-weight: 700;
-        border-radius: 999px;
-        padding: 4px 12px;
-        color: #21603b;
-        background: #e6f6ec;
-        border: 1px solid #c1e8d0;
-        line-height: 1.4;
-      }
-
-      #results_page .results-preview-item .btn.results-preview-download-btn:hover {
-        color: #21603b;
-        background: #d7f0e0;
-        border-color: #a9dcbc;
-      }
-
-      #results_page .results-empty-preview {
-        font-size: 13px;
-        color: #6b7684;
-        margin: 0;
-      }
-
       #results_page .results-download-btn {
         font-size: 17px;
         font-weight: 700;
         border-radius: 10px;
+      }
+
+      #results_page .results-empty-preview {
+        margin: 0;
+        font-size: 13px;
+        color: #6b7684;
       }
 
       #results_page .results-network-wrap {
@@ -2572,30 +4106,150 @@ ui <- fluidPage(
         margin-top: 18px;
       }
 
-      #results_page #analysis_parameters h5 {
-        margin: 0 0 8px 0;
-        padding: 7px 10px;
-        border-left: 4px solid #4f84b7;
-        background: #eef4fb;
-        border-radius: 6px;
-        color: #234a72;
-        font-size: 15px;
+      /* ---- run-parameter spec sheet ---- */
+      #results_page #results_params_card .wb-scroll-area {
+        gap: 18px;
+        overflow-y: auto;
+        padding: 22px;
+        background: #f6f8fb;
+      }
+
+      #results_page .rp-wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      #results_page .rp-topbar {
+        padding: 2px 2px 14px 2px;
+        border-bottom: 1px solid #dfe7f0;
+      }
+
+      #results_page .rp-title {
+        margin: 0;
+        font-size: 20px;
+        line-height: 1.2;
+        font-weight: 750;
+        color: #1c3450;
+      }
+
+      #results_page .rp-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+        gap: 12px;
+        align-items: stretch;
+      }
+
+      #results_page .rp-card {
+        background: #fff;
+        border: 1px solid #dfe7f0;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 1px 2px rgba(18, 38, 66, 0.05);
+      }
+
+      #results_page .rp-head {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        padding: 12px 14px;
+        background: #fbfcfe;
+        border-bottom: 1px solid #edf2f7;
+      }
+
+      #results_page .rp-num {
+        flex: 0 0 25px;
+        width: 25px;
+        height: 25px;
+        border-radius: 8px;
+        background: #eaf1f9;
+        border: 1px solid #d8e6f4;
+        color: #2f6fb0;
+        font-size: 11px;
         font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
 
-      #results_page #analysis_parameters ul {
-        margin: 0 0 14px 0;
-        padding-left: 20px;
+      #results_page .rp-name {
+        font-size: 13.5px;
+        font-weight: 700;
+        color: #1c3450;
+        letter-spacing: -0.005em;
       }
 
-      #results_page #analysis_parameters li {
-        margin-bottom: 5px;
-        color: #364a5f;
+      #results_page .rp-status {
+        margin-left: auto;
+        flex-shrink: 0;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        padding: 3px 10px;
+        border-radius: 999px;
       }
 
-      #results_page #analysis_parameters p {
-        margin-bottom: 12px;
-        color: #5d6b7a;
+      #results_page .rp-status.is-done {
+        background: #e8f5ed;
+        color: #2e8055;
+        border: 1px solid #d1e7db;
+      }
+
+      #results_page .rp-status.is-skip {
+        background: #eef1f5;
+        color: #7b8b9f;
+        border: 1px solid #e2e8f0;
+      }
+
+      #results_page .rp-status.is-pending {
+        background: #fdf3e7;
+        color: #b56c2b;
+        border: 1px solid #f0dcc4;
+      }
+
+      #results_page .rp-row {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 9px 14px;
+        border-bottom: 1px solid #f2f6fa;
+      }
+
+      #results_page .rp-row:last-child {
+        border-bottom: none;
+      }
+
+      #results_page .rp-label {
+        font-size: 12.5px;
+        color: #8296ab;
+        flex: 0 1 auto;
+      }
+
+      #results_page .rp-value {
+        font-size: 13px;
+        font-weight: 600;
+        color: #1c3450;
+        text-align: right;
+        word-break: break-word;
+        font-variant-numeric: tabular-nums;
+      }
+
+      #results_page .rp-empty {
+        padding: 13px 16px;
+        font-size: 12.5px;
+        color: #93a5b8;
+      }
+
+      #results_page .rp-none {
+        font-size: 13px;
+        color: #8296ab;
+        margin: 0;
+        padding: 16px;
+        background: #ffffff;
+        border: 1px solid #dfe7f0;
+        border-radius: 8px;
       }
 
       @media (max-width: 991px) {
@@ -2736,6 +4390,46 @@ ui <- fluidPage(
       }
       
       /* Compress visNetwork legend width */
+      /* vis.js tooltip: a long InChI on one line ran off the canvas */
+      div.vis-tooltip {
+        max-width: 420px;
+        white-space: normal !important;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        padding: 10px 12px;
+        border: 1px solid #d7e1ec;
+        border-radius: 10px;
+        background: #ffffff;
+        box-shadow: 0 12px 26px rgba(28, 49, 74, 0.18);
+        font-family: inherit;
+        font-size: 12px;
+        line-height: 1.5;
+        color: #415366;
+      }
+
+      .pcsf-tip-kind {
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #8fa3b8;
+        margin-bottom: 3px;
+      }
+
+      .pcsf-tip-name {
+        font-size: 13px;
+        font-weight: 700;
+        color: #1c3450;
+        margin-bottom: 5px;
+      }
+
+      .pcsf-tip-id {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 11px;
+        color: #6d8299;
+        overflow-wrap: anywhere;
+      }
+
       .vis-network .vis-legend {
         max-width: 120px !important;
         padding: 6px 6px !important;
@@ -2756,6 +4450,66 @@ ui <- fluidPage(
 
     tags$script(HTML("
       (function() {
+        var GAP = 12;
+        var EDGE = 8;
+
+        // Same placement rule as the quick-start dialog: sit beside the
+        // anchor, vertically centred on it, flipping side or dropping
+        // below when there is no room. The card is position:fixed, so a
+        // scrolling sidebar can never clip it.
+        function placeCard(wrap) {
+          var card = wrap.querySelector('.inline-info-card');
+          if (!card) return;
+
+          card.style.position = 'fixed';
+          card.style.margin = '0';
+          card.style.transform = 'none';
+          card.style.visibility = 'hidden';
+          card.style.display = 'block';
+          card.style.left = '0px';
+          card.style.top = '0px';
+
+          var tr = wrap.getBoundingClientRect();
+          var vw = window.innerWidth || document.documentElement.clientWidth;
+          var vh = window.innerHeight || document.documentElement.clientHeight;
+          var dw = card.offsetWidth || 320;
+          var dh = card.offsetHeight || 160;
+
+          var left = tr.right + GAP;
+          var top = tr.top + (tr.height - dh) / 2;
+
+          if (left + dw + EDGE > vw) {
+            left = tr.left - dw - GAP;
+          }
+          if (left < EDGE) {
+            left = Math.max(EDGE, vw - dw - EDGE);
+          }
+          if (top + dh + EDGE > vh) {
+            top = vh - dh - EDGE;
+          }
+          if (top < EDGE) {
+            top = EDGE;
+          }
+
+          // Still overlapping the anchor? Drop below it, else above.
+          if (
+            left < tr.right &&
+            left + dw > tr.left &&
+            top < tr.bottom &&
+            top + dh > tr.top
+          ) {
+            top = tr.bottom + GAP;
+            if (top + dh + EDGE > vh) {
+              top = Math.max(EDGE, tr.top - dh - GAP);
+            }
+          }
+
+          card.style.left = Math.round(left) + 'px';
+          card.style.top = Math.round(top) + 'px';
+          card.style.removeProperty('display');
+          card.style.removeProperty('visibility');
+        }
+
         function clearPinnedInfo(exceptEl) {
           document.querySelectorAll('.inline-info-wrap.is-pinned').forEach(function(el) {
             if (!exceptEl || el !== exceptEl) {
@@ -2773,6 +4527,7 @@ ui <- fluidPage(
             clearPinnedInfo(trigger);
             if (shouldPin) {
               trigger.classList.add('is-pinned');
+              placeCard(trigger);
             } else {
               trigger.classList.remove('is-pinned');
             }
@@ -2871,311 +4626,6 @@ ui <- fluidPage(
 	        window.addEventListener('resize', function() {
 	          setTimeout(function() { window.forcePlotlyResize(); }, 20);
 	        });
-	      })();
-	    ")),
-	    
-	    tags$script(HTML("
-	      (function() {
-	        var resizeObserver = null;
-	        var resizeTimer = null;
-
-	        function applyUploadPanelHeight() {
-	          var page = document.getElementById('upload_page');
-	          var leftCard = document.getElementById('upload_param_card');
-	          if (!page || !leftCard) return;
-
-	          if (window.innerWidth < 992 || page.offsetParent === null) {
-	            page.removeAttribute('data-sync-panels');
-	            page.style.removeProperty('--upload-panel-height');
-	            return;
-	          }
-
-	          page.removeAttribute('data-sync-panels');
-	          page.style.removeProperty('--upload-panel-height');
-
-	          window.requestAnimationFrame(function() {
-	            var height = Math.ceil(leftCard.getBoundingClientRect().height);
-	            if (!height || height < 1) return;
-	            page.style.setProperty('--upload-panel-height', height + 'px');
-	            page.setAttribute('data-sync-panels', 'ready');
-	          });
-	        }
-
-	        function queueUploadPanelSync() {
-	          clearTimeout(resizeTimer);
-	          resizeTimer = setTimeout(applyUploadPanelHeight, 30);
-	        }
-
-	        function initUploadPanelSync() {
-	          var leftCard = document.getElementById('upload_param_card');
-	          if (!leftCard || typeof ResizeObserver === 'undefined') return;
-	          if (resizeObserver) {
-	            resizeObserver.disconnect();
-	          }
-	          resizeObserver = new ResizeObserver(function() {
-	            queueUploadPanelSync();
-	          });
-	          resizeObserver.observe(leftCard);
-	        }
-
-	        document.addEventListener('DOMContentLoaded', function() {
-	          initUploadPanelSync();
-	          queueUploadPanelSync();
-	        });
-
-	        document.addEventListener('shown.bs.tab', function() {
-	          queueUploadPanelSync();
-	        });
-
-	        window.addEventListener('resize', function() {
-	          queueUploadPanelSync();
-	        });
-
-	        window.syncUploadPanels = queueUploadPanelSync;
-	      })();
-	    ")),
-	    
-	    tags$script(HTML("
-	      (function() {
-	        var resizeObserver = null;
-	        var resizeTimer = null;
-
-	        function applyAnnotationPanelHeight() {
-	          var page = document.getElementById('annotation_page');
-	          var leftCard = document.getElementById('annotation_param_card');
-	          if (!page || !leftCard) return;
-
-	          if (window.innerWidth < 992 || page.offsetParent === null) {
-	            page.removeAttribute('data-sync-panels');
-	            page.style.removeProperty('--annotation-panel-height');
-	            return;
-	          }
-
-	          page.removeAttribute('data-sync-panels');
-	          page.style.removeProperty('--annotation-panel-height');
-
-	          window.requestAnimationFrame(function() {
-	            var height = Math.ceil(leftCard.getBoundingClientRect().height);
-	            if (!height || height < 1) return;
-	            page.style.setProperty('--annotation-panel-height', height + 'px');
-	            page.setAttribute('data-sync-panels', 'ready');
-	          });
-	        }
-
-	        function queueAnnotationPanelSync() {
-	          clearTimeout(resizeTimer);
-	          resizeTimer = setTimeout(applyAnnotationPanelHeight, 30);
-	        }
-
-	        function initAnnotationPanelSync() {
-	          var leftCard = document.getElementById('annotation_param_card');
-	          if (!leftCard || typeof ResizeObserver === 'undefined') return;
-	          if (resizeObserver) {
-	            resizeObserver.disconnect();
-	          }
-	          resizeObserver = new ResizeObserver(function() {
-	            queueAnnotationPanelSync();
-	          });
-	          resizeObserver.observe(leftCard);
-	        }
-
-	        document.addEventListener('DOMContentLoaded', function() {
-	          initAnnotationPanelSync();
-	          queueAnnotationPanelSync();
-	        });
-
-	        document.addEventListener('shown.bs.tab', function() {
-	          queueAnnotationPanelSync();
-	        });
-
-	        window.addEventListener('resize', function() {
-	          queueAnnotationPanelSync();
-	        });
-
-	        window.syncAnnotationPanels = queueAnnotationPanelSync;
-	      })();
-	    ")),
-	    
-	    tags$script(HTML("
-	      (function() {
-	        var resizeObserver = null;
-	        var resizeTimer = null;
-
-	        function applyNetworkPanelHeight() {
-	          var page = document.getElementById('network_page');
-	          var leftCard = document.getElementById('network_param_card');
-	          if (!page || !leftCard) return;
-
-	          if (window.innerWidth < 992 || page.offsetParent === null) {
-	            page.removeAttribute('data-sync-panels');
-	            page.style.removeProperty('--network-panel-height');
-	            return;
-	          }
-
-	          page.removeAttribute('data-sync-panels');
-	          page.style.removeProperty('--network-panel-height');
-
-	          window.requestAnimationFrame(function() {
-	            var height = Math.ceil(leftCard.getBoundingClientRect().height);
-	            if (!height || height < 1) return;
-	            page.style.setProperty('--network-panel-height', height + 'px');
-	            page.setAttribute('data-sync-panels', 'ready');
-	          });
-	        }
-
-	        function queueNetworkPanelSync() {
-	          clearTimeout(resizeTimer);
-	          resizeTimer = setTimeout(applyNetworkPanelHeight, 30);
-	        }
-
-	        function initNetworkPanelSync() {
-	          var leftCard = document.getElementById('network_param_card');
-	          if (!leftCard || typeof ResizeObserver === 'undefined') return;
-	          if (resizeObserver) {
-	            resizeObserver.disconnect();
-	          }
-	          resizeObserver = new ResizeObserver(function() {
-	            queueNetworkPanelSync();
-	          });
-	          resizeObserver.observe(leftCard);
-	        }
-
-	        document.addEventListener('DOMContentLoaded', function() {
-	          initNetworkPanelSync();
-	          queueNetworkPanelSync();
-	        });
-
-	        document.addEventListener('shown.bs.tab', function() {
-	          queueNetworkPanelSync();
-	        });
-
-	        window.addEventListener('resize', function() {
-	          queueNetworkPanelSync();
-	        });
-
-	        window.syncNetworkPanels = queueNetworkPanelSync;
-	      })();
-	    ")),
-
-	    tags$script(HTML("
-	      (function() {
-	        var resizeObserver = null;
-	        var resizeTimer = null;
-
-	        function applyModulesPanelHeight() {
-	          var page = document.getElementById('modules_page');
-	          var leftCard = document.getElementById('modules_param_card');
-	          if (!page || !leftCard) return;
-
-	          if (window.innerWidth < 992 || page.offsetParent === null) {
-	            page.removeAttribute('data-sync-panels');
-	            page.style.removeProperty('--modules-panel-height');
-	            return;
-	          }
-
-	          page.removeAttribute('data-sync-panels');
-	          page.style.removeProperty('--modules-panel-height');
-
-	          window.requestAnimationFrame(function() {
-	            var height = Math.ceil(leftCard.getBoundingClientRect().height);
-	            if (!height || height < 1) return;
-	            page.style.setProperty('--modules-panel-height', height + 'px');
-	            page.setAttribute('data-sync-panels', 'ready');
-	          });
-	        }
-
-	        function queueModulesPanelSync() {
-	          clearTimeout(resizeTimer);
-	          resizeTimer = setTimeout(applyModulesPanelHeight, 30);
-	        }
-
-	        function initModulesPanelSync() {
-	          var leftCard = document.getElementById('modules_param_card');
-	          if (!leftCard || typeof ResizeObserver === 'undefined') return;
-	          if (resizeObserver) {
-	            resizeObserver.disconnect();
-	          }
-	          resizeObserver = new ResizeObserver(function() {
-	            queueModulesPanelSync();
-	          });
-	          resizeObserver.observe(leftCard);
-	        }
-
-	        document.addEventListener('DOMContentLoaded', function() {
-	          initModulesPanelSync();
-	          queueModulesPanelSync();
-	        });
-
-	        document.addEventListener('shown.bs.tab', function() {
-	          queueModulesPanelSync();
-	        });
-
-	        window.addEventListener('resize', function() {
-	          queueModulesPanelSync();
-	        });
-
-	        window.syncModulesPanels = queueModulesPanelSync;
-	      })();
-	    ")),
-
-	    tags$script(HTML("
-	      (function() {
-	        var resizeObserver = null;
-	        var resizeTimer = null;
-
-	        function applyFunctionPanelHeight() {
-	          var page = document.getElementById('function_page');
-	          var leftCard = document.getElementById('function_param_card');
-	          if (!page || !leftCard) return;
-
-	          if (window.innerWidth < 992 || page.offsetParent === null) {
-	            page.removeAttribute('data-sync-panels');
-	            page.style.removeProperty('--function-panel-height');
-	            return;
-	          }
-
-	          page.removeAttribute('data-sync-panels');
-	          page.style.removeProperty('--function-panel-height');
-
-	          window.requestAnimationFrame(function() {
-	            var height = Math.ceil(leftCard.getBoundingClientRect().height);
-	            if (!height || height < 1) return;
-	            page.style.setProperty('--function-panel-height', height + 'px');
-	            page.setAttribute('data-sync-panels', 'ready');
-	          });
-	        }
-
-	        function queueFunctionPanelSync() {
-	          clearTimeout(resizeTimer);
-	          resizeTimer = setTimeout(applyFunctionPanelHeight, 30);
-	        }
-
-	        function initFunctionPanelSync() {
-	          var leftCard = document.getElementById('function_param_card');
-	          if (!leftCard || typeof ResizeObserver === 'undefined') return;
-	          if (resizeObserver) {
-	            resizeObserver.disconnect();
-	          }
-	          resizeObserver = new ResizeObserver(function() {
-	            queueFunctionPanelSync();
-	          });
-	          resizeObserver.observe(leftCard);
-	        }
-
-	        document.addEventListener('DOMContentLoaded', function() {
-	          initFunctionPanelSync();
-	          queueFunctionPanelSync();
-	        });
-
-	        document.addEventListener('shown.bs.tab', function() {
-	          queueFunctionPanelSync();
-	        });
-
-	        window.addEventListener('resize', function() {
-	          queueFunctionPanelSync();
-	        });
-
-	        window.syncFunctionPanels = queueFunctionPanelSync;
 	      })();
 	    ")),
 	    
@@ -3358,6 +4808,47 @@ ui <- fluidPage(
           window.positionQuickstartDialog(window.__quickstartDialogTargetId);
         }
       }, true);
+    ")),
+
+    tags$script(HTML("
+      window.closeAnalysisMenu = function() {
+        var dd = document.getElementById('analysis_dropdown');
+        if (dd) { dd.classList.remove('open'); }
+      };
+
+      window.toggleAnalysisMenu = function(e) {
+        if (e) { e.preventDefault(); e.stopPropagation(); }
+        var dd = document.getElementById('analysis_dropdown');
+        if (dd) { dd.classList.toggle('open'); }
+      };
+
+      document.addEventListener('click', function(e) {
+        var dd = document.getElementById('analysis_dropdown');
+        if (dd && !dd.contains(e.target)) { dd.classList.remove('open'); }
+      });
+
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') { window.closeAnalysisMenu(); }
+      });
+    ")),
+
+    tags$script(HTML("
+      (function() {
+        function setNavHeight() {
+          var bar = document.querySelector('.top-navbar');
+          if (!bar) return;
+          var h = Math.ceil(bar.getBoundingClientRect().height);
+          if (h > 0) {
+            document.documentElement.style.setProperty('--fm-nav-h', h + 'px');
+          }
+        }
+        document.addEventListener('DOMContentLoaded', function() {
+          setNavHeight();
+          setTimeout(setNavHeight, 250);
+        });
+        window.addEventListener('resize', setNavHeight);
+        window.setFeaturemapNavHeight = setNavHeight;
+      })();
     "))
     
     
@@ -3382,12 +4873,109 @@ ui <- fluidPage(
         class = "nav nav-pills",
         style = "margin: 0;",
         tags$li(class = "nav-item", actionLink("nav_home", "Home", class = "nav-link active")),
-        tags$li(class = "nav-item", actionLink("nav_upload", "Data Upload", class = "nav-link")),
-        tags$li(class = "nav-item", actionLink("nav_annotation", "Feature Annotation", class = "nav-link")),
-        tags$li(class = "nav-item", actionLink("nav_network", "PCSF Subnetwork", class = "nav-link")),
-        tags$li(class = "nav-item", actionLink("nav_modules", "Module Identification", class = "nav-link")),
-        tags$li(class = "nav-item", actionLink("nav_function", "Function Interpretation", class = "nav-link")),
-        tags$li(class = "nav-item", actionLink("nav_results", "Results Download", class = "nav-link"))
+        tags$li(
+          class = "nav-item",
+          tags$a(
+            id = "nav_about",
+            class = "nav-link",
+            href = "#",
+            onclick = paste0(
+              "Shiny.setInputValue('footer_nav', 'home', {priority: 'event'}); ",
+              "setTimeout(function(){ ",
+              "document.querySelector('#home_page .workflow-section')",
+              "?.scrollIntoView({behavior: 'smooth', block: 'start'}); ",
+              "}, 120); return false;"
+            ),
+            "About"
+          )
+        ),
+        tags$li(
+          class = "nav-item nav-dropdown",
+          id = "analysis_dropdown",
+          tags$a(
+            id = "nav_analysis",
+            class = "nav-link nav-dropdown-toggle",
+            href = "#",
+            onclick = "window.toggleAnalysisMenu(event); return false;",
+            "Analysis",
+            icon("chevron-down", class = "nav-caret")
+          ),
+          tags$ul(
+            class = "nav-dropdown-menu",
+            tags$li(
+              actionLink(
+                "nav_upload",
+                tagList(
+                  tags$span(class = "nav-step-num", "1"),
+                  tags$span(class = "nav-step-label", "Data Upload")
+                ),
+                class = "nav-dropdown-item"
+              )
+            ),
+            tags$li(
+              actionLink(
+                "nav_annotation",
+                tagList(
+                  tags$span(class = "nav-step-num", "2"),
+                  tags$span(class = "nav-step-label", "Feature Annotation")
+                ),
+                class = "nav-dropdown-item"
+              )
+            ),
+            tags$li(
+              actionLink(
+                "nav_network",
+                tagList(
+                  tags$span(class = "nav-step-num", "3"),
+                  tags$span(class = "nav-step-label", "PCSF Subnetwork")
+                ),
+                class = "nav-dropdown-item"
+              )
+            ),
+            tags$li(
+              actionLink(
+                "nav_modules",
+                tagList(
+                  tags$span(class = "nav-step-num", "4"),
+                  tags$span(class = "nav-step-label", "Module Identification")
+                ),
+                class = "nav-dropdown-item"
+              )
+            ),
+            tags$li(
+              actionLink(
+                "nav_function",
+                tagList(
+                  tags$span(class = "nav-step-num", "5"),
+                  tags$span(class = "nav-step-label", "Function Interpretation")
+                ),
+                class = "nav-dropdown-item"
+              )
+            ),
+            tags$li(
+              actionLink(
+                "nav_results",
+                tagList(
+                  tags$span(class = "nav-step-num", "6"),
+                  tags$span(class = "nav-step-label", "Results Download")
+                ),
+                class = "nav-dropdown-item"
+              )
+            )
+          )
+        ),
+        tags$li(class = "nav-item", actionLink("nav_authors", "Authors", class = "nav-link")),
+        tags$li(
+          class = "nav-item",
+          tags$a(
+            class = "nav-link",
+            href = "https://www.shen-lab.org/contact/",
+            target = "_blank",
+            rel = "noopener noreferrer",
+            "Contacts"
+          )
+        ),
+        tags$li(class = "nav-item", actionLink("nav_signin", "Sign In", class = "nav-link nav-link-signin"))
       )
     )
   ),
@@ -3410,7 +4998,7 @@ ui <- fluidPage(
             class = "hero-logo",
             alt = "FeatureMAP Shiny Logo"
           ),
-          tags$h1(class = "hero-title", "FeatureMAP (Online Service)"),
+          tags$h1(class = "hero-title", "FeatureMAP Online"),
           tags$p(
             class = "hero-subtitle",
             "A metabolite feature-based functional module identification and annotation pipeline."
@@ -3450,8 +5038,7 @@ ui <- fluidPage(
                   `data-value` = 9,
                   "0"
                 ),
-                tags$div(class = "feature-title", "Curated Databases"),
-                tags$p(class = "feature-desc", "HMDB, KEGG and supporting resources")
+                tags$div(class = "feature-title", "Curated Databases")
               )
             ),
             column(
@@ -3464,8 +5051,7 @@ ui <- fluidPage(
                   `data-value` = 9730,
                   "0"
                 ),
-                tags$div(class = "feature-title", "Metabolite Nodes"),
-                tags$p(class = "feature-desc", "Reference entities in the merged network")
+                tags$div(class = "feature-title", "Metabolite Nodes")
               )
             ),
             column(
@@ -3478,8 +5064,7 @@ ui <- fluidPage(
                   `data-value` = 31666,
                   "0"
                 ),
-                tags$div(class = "feature-title", "Reaction Edges"),
-                tags$p(class = "feature-desc", "Biochemical links used by module discovery")
+                tags$div(class = "feature-title", "Reaction Edges")
               )
             ),
             column(
@@ -3492,8 +5077,7 @@ ui <- fluidPage(
                   `data-value` = 1,
                   "0"
                 ),
-                tags$div(class = "feature-title", "Comprehensive Network"),
-                tags$p(class = "feature-desc", "One unified graph across the full pipeline")
+                tags$div(class = "feature-title", "Comprehensive Network")
               )
             )
           )
@@ -3566,207 +5150,255 @@ ui <- fluidPage(
       id = "upload_page",
       style = "display: none;",
       tags$div(
-        class = "content-wrapper",
+        class = "workbench",
+
+        # ================= Header rail =================
         tags$div(
-          class = "step-box results-step-box",
+          class = "wb-header",
           tags$div(
-            class = "results-step-top",
-            tags$div(class = "results-kicker", icon("upload"), "Workflow Step"),
-            tags$div(class = "results-step-number", "Step 1")
+            class = "wb-header-left",
+            tags$span(class = "wb-eyebrow", icon("upload"), "Step 1 of 6"),
+            tags$span(class = "wb-header-divider"),
+            tags$h1(class = "wb-title", "Data Upload")
           ),
-          tags$div(class = "step-title", "Data Upload"),
-          tags$div(class = "step-description", "Upload your metabolomics feature table and reference databases")
+          tags$ol(
+            class = "wb-stepper",
+            tags$li(
+              class = "wb-step is-current",
+              title = "Data Upload",
+              tags$span(class = "wb-step-dot", "1"),
+              tags$span(class = "wb-step-name", "Upload")
+            ),
+            tags$li(class = "wb-step-line"),
+            tags$li(
+              class = "wb-step",
+              title = "Feature Annotation",
+              tags$span(class = "wb-step-dot", "2"),
+              tags$span(class = "wb-step-name", "Annotate")
+            ),
+            tags$li(class = "wb-step-line"),
+            tags$li(
+              class = "wb-step",
+              title = "PCSF Subnetwork",
+              tags$span(class = "wb-step-dot", "3"),
+              tags$span(class = "wb-step-name", "Network")
+            ),
+            tags$li(class = "wb-step-line"),
+            tags$li(
+              class = "wb-step",
+              title = "Module Identification",
+              tags$span(class = "wb-step-dot", "4"),
+              tags$span(class = "wb-step-name", "Modules")
+            ),
+            tags$li(class = "wb-step-line"),
+            tags$li(
+              class = "wb-step",
+              title = "Function Interpretation",
+              tags$span(class = "wb-step-dot", "5"),
+              tags$span(class = "wb-step-name", "Function")
+            ),
+            tags$li(class = "wb-step-line"),
+            tags$li(
+              class = "wb-step",
+              title = "Results Download",
+              tags$span(class = "wb-step-dot", "6"),
+              tags$span(class = "wb-step-name", "Results")
+            )
+          )
         ),
-        # ================= Step 1: Data Upload =================
-        fluidRow(
-          class = "step-main-row",
-          
-          # ================= LEFT: Data Upload =================
-          column(
-            width = 4,
+
+        # ================= Sidebar + work area =================
+        tags$div(
+          class = "wb-body",
+
+          # ---------------- Sidebar: inputs ----------------
+          tags$div(
+            id = "upload_param_card",
+            class = "wb-side",
             tags$div(
-              id = "upload_param_card",
-              class = "card",
-              tags$div(class = "card-header", "Data Upload"),
+              class = "wb-side-scroll",
+
               tags$div(
-                class = "card-body",
+                class = "wb-section",
+                tags$div(class = "wb-section-title", icon("table-list"), "Data Tables"),
                 tags$div(
-                  class = "param-card",
-                  tags$h4("Data Tables"),
-                  fileInput(
-                    "feature_file",
-                    "Feature Table (.rda, .csv)",
-                    accept = c(".rda", ".csv", ".Rdata")
-                  ),
-                  tags$small(
-                    style = "color:#6c757d;",
-                    "Required columns: variable_id, mz, rt, polarity, mean_intensity, condition, and pvalue."
-                  ),
-                  tags$br(),
-                  tags$small(
-                    style = "color:#6c757d;",
-                    paste0("Maximum upload size: ", featuremap_max_upload_label(), " per file.")
-                  ),
-                  tags$hr(),
-                  tags$br(),
-                  fileInput(
-                    "ms2_file",
-                    "MS2 Annotation (.rda, .csv)",
-                    accept = c(".rda", ".csv", ".Rdata")
-                  ),
-                  tags$small(
-                    style = "color:#6c757d;",
-                    "This field is optional. Required columns: variable_id, and at least one of HMDB.ID or KEGG.ID."
-                  ),
-                  tags$hr(),
-                  tags$div(
-                    style = "display:flex; gap:8px; flex-wrap:wrap;",
-                    actionButton(
-                      "use_demo_both",
-                      "Use Demo Data",
-                      icon = icon("flask"),
-                      class = "btn btn-outline-secondary"
-                    ),
-                    downloadButton(
-                      "download_demo_data",
-                      "Download Demo",
-                      class = "btn btn-outline-secondary"
+                  class = "wb-field-label",
+                  "Feature Table (.rda, .csv)",
+                  build_info_icon(
+                    paste0(
+                      "<b>Required columns</b><br>",
+                      "<code>variable_id</code>, <code>mz</code>, <code>rt</code>, ",
+                      "<code>polarity</code>, <code>mean_intensity</code>, ",
+                      "<code>condition</code>, <code>pvalue</code>.<br><br>",
+                      "Maximum upload size: ", featuremap_max_upload_label(), " per file."
                     )
                   )
                 ),
-                
+                fileInput(
+                  "feature_file",
+                  NULL,
+                  accept = c(".rda", ".csv", ".Rdata")
+                ),
+
                 tags$div(
-                  class = "param-card",
-                  tags$h4(
-                    "Reference Source",
+                  class = "wb-subfield",
+                  tags$div(
+                    class = "wb-field-label",
+                    "MS2 Annotation (.rda, .csv)",
                     build_info_icon(
                       paste0(
-                        "Choose <code>Default reference</code> to use the built-in MS1 annotation database ",
-                        "and metabolic reaction network provided by FeatureMAP.<br><br>",
-                        "If you want to supplement or replace these built-in resources, ",
-                        "choose <code>Upload reference datasets</code> and provide your own files."
+                        "Optional.<br><br>",
+                        "<b>Required columns</b><br>",
+                        "<code>variable_id</code>, and at least one of ",
+                        "<code>HMDB.ID</code> or <code>KEGG.ID</code>.<br><br>",
+                        "Maximum upload size: ", featuremap_max_upload_label(), " per file."
                       )
                     )
                   ),
-                  radioButtons(
-                    "ref_source",
-                    "",
-                    choices = c(
-                      "Default reference (recommended)" = "default",
-                      "Upload reference datasets" = "upload"
-                    ),
-                    selected = "default"
+                  fileInput(
+                    "ms2_file",
+                    NULL,
+                    accept = c(".rda", ".csv", ".Rdata")
+                  )
+                ),
+
+                tags$div(
+                  class = "wb-inline-actions",
+                  actionButton(
+                    "use_demo_both",
+                    "Use Demo Data",
+                    icon = icon("flask"),
+                    class = "btn btn-wb-ghost"
                   ),
-                  conditionalPanel(
-                    condition = "input.ref_source == 'upload'",
-                    tags$div(
-                      tags$div(
-                        style = "font-weight:600; margin-bottom:6px;",
-                        "MS1 Annotation Database (.rda)",
-                        build_info_icon(
-                          paste0(
-                            "Upload a single object in .rda/.RData format.<br><br>",
-                            "It should be a metid-compatible MS1 annotation database whose ",
-                            "<code>spectra.info</code> contains at least:<br>",
-                            "<code>Lab.ID</code>, <code>Compound.name</code>, <code>Formula</code>, ",
-                            "<code>HMDB.ID</code>, <code>KEGG.ID</code>, <code>CAS.ID</code>, ",
-                            "<code>mz</code>, <code>RT</code>, and <code>Submitter</code>.<br><br>",
-                            "Specific reference-format examples can be downloaded from our GitHub: ",
-                            "<a href='https://github.com/tidymass/featuremap_resources' target='_blank'>featuremap_resources</a>"
-                          )
-                        )
-                      ),
-                      fileInput(
-                        "compound_db_file",
-                        NULL,
-                        accept = c(".rda", ".RData")
-                      )
-                    )
-                  ),
-                  tags$br(),
-                  conditionalPanel(
-                    condition = "input.ref_source == 'upload'",
-                    tags$div(
-                      tags$div(
-                        style = "font-weight:600; margin-bottom:6px;",
-                        "Metabolic Reaction Network (.rda)",
-                        build_info_icon(
-                          paste0(
-                            "Upload a single object in .rda/.RData format.<br><br>",
-                            "It should be an <code>igraph</code> metabolic reaction network.<br><br>",
-                            "Specific reference-format examples can be downloaded from our GitHub: ",
-                            "<a href='https://github.com/tidymass/featuremap_resources' target='_blank'>featuremap_resources</a>"
-                          )
-                        )
-                      ),
-                      fileInput(
-                        "mrn_file",
-                        NULL,
-                        accept = c(".rda", ".RData")
-                      )
+                  downloadButton(
+                    "download_demo_data",
+                    "Download Demo",
+                    class = "btn btn-wb-ghost"
+                  )
+                )
+              ),
+
+              tags$div(
+                class = "wb-section",
+                tags$div(
+                  class = "wb-section-title",
+                  icon("database"),
+                  "Reference Source",
+                  build_info_icon(
+                    paste0(
+                      "Choose <code>Default reference</code> to use the built-in MS1 annotation database ",
+                      "and metabolic reaction network provided by FeatureMAP.<br><br>",
+                      "If you want to supplement or replace these built-in resources, ",
+                      "choose <code>Upload reference datasets</code> and provide your own files."
                     )
                   )
                 ),
-                
-                tags$hr(),
-                tags$div(
-                  class = "run-next-row",
-                  actionButton(
-                    "load_upload_data",
-                    "Load",
-                    icon = icon("upload"),
-                    class = "btn-success btn-lg"
+                radioButtons(
+                  "ref_source",
+                  NULL,
+                  choices = c(
+                    "Default reference (recommended)" = "default",
+                    "Upload reference datasets" = "upload"
                   ),
-                  actionButton(
-                    "next_to_annotation",
-                    "Next Step",
-                    icon = icon("arrow-right-from-bracket"),
-                    class = "btn btn-primary btn-lg",
-                    disabled = "disabled"
+                  selected = "default"
+                ),
+                conditionalPanel(
+                  condition = "input.ref_source == 'upload'",
+                  tags$div(
+                    class = "wb-subfield",
+                    tags$div(
+                      class = "wb-field-label",
+                      "MS1 Annotation Database (.rda)",
+                      build_info_icon(
+                        paste0(
+                          "Upload a single object in .rda/.RData format.<br><br>",
+                          "It should be a metid-compatible MS1 annotation database whose ",
+                          "<code>spectra.info</code> contains at least:<br>",
+                          "<code>Lab.ID</code>, <code>Compound.name</code>, <code>Formula</code>, ",
+                          "<code>HMDB.ID</code>, <code>KEGG.ID</code>, <code>CAS.ID</code>, ",
+                          "<code>mz</code>, <code>RT</code>, and <code>Submitter</code>.<br><br>",
+                          "Specific reference-format examples can be downloaded from our GitHub: ",
+                          "<a href='https://github.com/tidymass/featuremap_resources' target='_blank'>featuremap_resources</a>"
+                        )
+                      )
+                    ),
+                    fileInput(
+                      "compound_db_file",
+                      NULL,
+                      accept = c(".rda", ".RData")
+                    )
+                  )
+                ),
+                conditionalPanel(
+                  condition = "input.ref_source == 'upload'",
+                  tags$div(
+                    class = "wb-subfield",
+                    tags$div(
+                      class = "wb-field-label",
+                      "Metabolic Reaction Network (.rda)",
+                      build_info_icon(
+                        paste0(
+                          "Upload a single object in .rda/.RData format.<br><br>",
+                          "It should be an <code>igraph</code> metabolic reaction network.<br><br>",
+                          "Specific reference-format examples can be downloaded from our GitHub: ",
+                          "<a href='https://github.com/tidymass/featuremap_resources' target='_blank'>featuremap_resources</a>"
+                        )
+                      )
+                    ),
+                    fileInput(
+                      "mrn_file",
+                      NULL,
+                      accept = c(".rda", ".RData")
+                    )
                   )
                 )
+              )
+            ),
+
+            # ---------------- Sticky actions ----------------
+            tags$div(
+              class = "wb-actions",
+              actionButton(
+                "load_upload_data",
+                "Load",
+                icon = icon("upload"),
+                class = "btn btn-wb-primary"
+              ),
+              actionButton(
+                "next_to_annotation",
+                "Next Step",
+                icon = icon("arrow-right-from-bracket"),
+                class = "btn btn-wb-next",
+                disabled = "disabled"
               )
             )
           ),
-          
-          # ================= RIGHT: Data Preview =================
-          column(
-            width = 8,
+
+          # ---------------- Work area: preview + status ----------------
+          tags$div(
+            id = "upload_result_card",
+            class = "wb-main",
             tags$div(
-              id = "upload_result_card",
-              class = "card",
-              tags$div(class = "card-header card-header-result", 
-                       icon("table"),
-                       "Data Preview"),
-              tags$div(
-                class = "card-body",
-                tags$div(
-                  class = "upload-preview-shell",
-                  tabsetPanel(
-                    id = "upload_preview_tabs",
-                    tabPanel(
-                      "Feature Table",
-                      tags$div(
-                        class = "upload-preview-table",
-                        DTOutput("feature_preview")
-                      )
-                    ),
-                    tabPanel(
-                      "MS2 Table",
-                      tags$div(
-                        class = "upload-preview-table",
-                        DTOutput("ms2_preview")
-                      )
-                    )
+              class = "wb-main-inner wb-preview-shell",
+              tabsetPanel(
+                id = "upload_preview_tabs",
+                tabPanel(
+                  "Feature Table",
+                  tags$div(
+                    class = "wb-preview-table",
+                    DTOutput("feature_preview")
                   )
                 ),
-                tags$hr(),
-                tags$div(
-                  class = "upload-status-wrap",
-                  uiOutput("upload_status_ui")
+                tabPanel(
+                  "MS2 Table",
+                  tags$div(
+                    class = "wb-preview-table",
+                    DTOutput("ms2_preview")
+                  )
                 )
               )
-            )
+            ),
+            uiOutput("upload_empty_state")
           )
         )
       )
@@ -3777,868 +5409,979 @@ ui <- fluidPage(
       id = "annotation_page",
       style = "display: none;",
       tags$div(
-        class = "content-wrapper",
+        class = "workbench",
+
+        # ================= Header rail =================
         tags$div(
-          class = "step-box results-step-box",
+          class = "wb-header",
           tags$div(
-            class = "results-step-top",
-            tags$div(class = "results-kicker", icon("magnifying-glass"), "Workflow Step"),
-            tags$div(class = "results-step-number", "Step 2")
+            class = "wb-header-left",
+            tags$span(class = "wb-eyebrow", icon("magnifying-glass"), "Step 2 of 6"),
+            tags$span(class = "wb-header-divider"),
+            tags$h1(class = "wb-title", "Feature Annotation")
           ),
-          tags$div(class = "step-title", "Feature Annotation"),
-          tags$div(class = "step-description", "Match features to metabolite databases using MS1 or MS2 information")
+          tags$ol(
+            class = "wb-stepper",
+            tags$li(
+              class = "wb-step is-done",
+              title = "Data Upload",
+              tags$span(class = "wb-step-dot", "1"),
+              tags$span(class = "wb-step-name", "Upload")
+            ),
+            tags$li(class = "wb-step-line"),
+            tags$li(
+              class = "wb-step is-current",
+              title = "Feature Annotation",
+              tags$span(class = "wb-step-dot", "2"),
+              tags$span(class = "wb-step-name", "Annotate")
+            ),
+            tags$li(class = "wb-step-line"),
+            tags$li(
+              class = "wb-step",
+              title = "PCSF Subnetwork",
+              tags$span(class = "wb-step-dot", "3"),
+              tags$span(class = "wb-step-name", "Network")
+            ),
+            tags$li(class = "wb-step-line"),
+            tags$li(
+              class = "wb-step",
+              title = "Module Identification",
+              tags$span(class = "wb-step-dot", "4"),
+              tags$span(class = "wb-step-name", "Modules")
+            ),
+            tags$li(class = "wb-step-line"),
+            tags$li(
+              class = "wb-step",
+              title = "Function Interpretation",
+              tags$span(class = "wb-step-dot", "5"),
+              tags$span(class = "wb-step-name", "Function")
+            ),
+            tags$li(class = "wb-step-line"),
+            tags$li(
+              class = "wb-step",
+              title = "Results Download",
+              tags$span(class = "wb-step-dot", "6"),
+              tags$span(class = "wb-step-name", "Results")
+            )
+          )
         ),
-        fluidRow(
-          class = "step-main-row",
-          column(
-            width = 4,
+
+        # ================= Sidebar + work area =================
+        tags$div(
+          class = "wb-body",
+
+          # ---------------- Sidebar: parameters ----------------
+          tags$div(
+            id = "annotation_param_card",
+            class = "wb-side",
             tags$div(
-              id = "annotation_param_card",
-              class = "card",
-              tags$div(class = "card-header", "Parameters"),
+              class = "wb-side-scroll",
+
               tags$div(
-                class = "card-body",
+                class = "wb-section",
                 tags$div(
-                  class = "param-card",
-                  tags$h4("Matching Tolerance"),
-                  sliderInput("ms1_ppm", "MS1 Match (ppm)", 
-                              min = 5, max = 30, value = 15, step = 1),
-                  sliderInput("rt_tol", "RT Tolerance (second)",
-                              min = 1, max = 10, value = 5, step = 1)
-                ),
-                tags$div(
-                  class = "param-card",
-                  tags$h4("Advanced Options"),
-                  selectInput("column_type", "Column Type",
-                              choices = c("Reverse Phase" = "rp", "HILIC" = "hilic")),
-                  numericInput("isotope_num", "Isotope Number", 
-                               value = 3, min = 1, max = 5),
-                  numericInput("workers", "Threads",
-                               value = 4, min = 1, max = 16)
-                ),
-                tags$hr(),
-                tags$div(
-                  class = "run-next-row",
-                  actionButton(
-                    "run_annotation", "Run",
-                    icon = icon("play-circle"),
-                    class = "btn-success btn-lg"
-                  ),
-                  actionButton(
-                    "next_to_network", "Next Step",
-                    icon = icon("arrow-right-from-bracket"),
-                    class = "btn btn-primary btn-lg",
-                    disabled = "disabled"
+                  class = "wb-section-title",
+                  icon("ruler-horizontal"),
+                  "Matching Tolerance",
+                  build_info_icon(
+                    paste0(
+                      "Windows used to match each feature against the MS1 ",
+                      "annotation database.<br><br>",
+                      "Tighter values give fewer but more confident matches."
+                    )
                   )
+                ),
+                sliderInput(
+                  "ms1_ppm", "MS1 match (ppm)",
+                  min = 5, max = 30, value = 15, step = 1
+                ),
+                sliderInput(
+                  "rt_tol", "RT tolerance (second)",
+                  min = 1, max = 10, value = 5, step = 1
                 )
+              ),
+
+              tags$div(
+                class = "wb-section",
+                tags$div(
+                  class = "wb-section-title",
+                  icon("sliders"),
+                  "Advanced Options",
+                  build_info_icon(
+                    paste0(
+                      "<b>Column type</b> selects the retention-time model.<br><br>",
+                      "<b>Isotope number</b> is how many isotope peaks are ",
+                      "annotated per feature.<br><br>",
+                      "<b>Threads</b> controls parallel workers."
+                    )
+                  )
+                ),
+                selectInput(
+                  "column_type", "Column type",
+                  choices = c("Reverse Phase" = "rp", "HILIC" = "hilic")
+                ),
+                numericInput("isotope_num", "Isotope number", value = 3, min = 1, max = 5),
+                numericInput("workers", "Threads", value = 4, min = 1, max = 16)
+              )
+            ),
+
+            # ---------------- Sticky actions ----------------
+            tags$div(
+              class = "wb-actions",
+              actionButton(
+                "run_annotation",
+                "Run",
+                icon = icon("play"),
+                class = "btn btn-wb-primary"
+              ),
+              actionButton(
+                "next_to_network",
+                "Next Step",
+                icon = icon("arrow-right-from-bracket"),
+                class = "btn btn-wb-next",
+                disabled = "disabled"
               )
             )
           ),
-          column(
-            width = 8,
+
+          # ---------------- Work area ----------------
+          tags$div(
+            id = "annotation_result_card",
+            class = "wb-main",
             tags$div(
-              id = "annotation_result_card",
-              class = "card",
-              tags$div(
-                class = "card-header card-header-result",
-                icon("layer-group"),
-                "Annotation Results"
-              ),
-              tags$div(
-                class = "card-body",
-                # ===== Tabs: content-level =====
-                  tabsetPanel(
-                  id = "annotation_tabs",
-                  type = "tabs",
-                  
-                  tabPanel(
-                    title = tagList(icon("chart-simple"), "Summary"),
-                    value = "summary",
-                    tags$div(
-                      class = "annotation-summary-stack",
-                      uiOutput("annotation_mfc_ui"),
-                      uiOutput("annotation_feature_ui")
-                    )
-                  ),
-                  
-                  tabPanel(
-                    title = tagList(icon("table"), "Annotation Table 1"),
-                    value = "table1",
-                    tags$div(
-                      class = "annotation-table-wrap",
-                      DTOutput("annotated_table")
-                    ),
-                    tags$hr(),
-                    uiOutput("annotation_status_ui")
+              class = "wb-main-inner wb-preview-shell",
+              tabsetPanel(
+                id = "annotation_tabs",
+                type = "tabs",
+                tabPanel(
+                  title = "Summary",
+                  value = "summary",
+                  tags$div(
+                    class = "wb-plot-stack",
+                    uiOutput("annotation_summary_ui")
+                  )
+                ),
+                tabPanel(
+                  title = "Annotation Table",
+                  value = "table1",
+                  tags$div(
+                    class = "wb-preview-table",
+                    DTOutput("annotated_table")
                   )
                 )
               )
-            )
+            ),
+            uiOutput("annotation_empty_state")
           )
         )
       )
     ),
-    
-    # Network Extraction Page
+
+    # ================= Step 3: Subnetwork Extraction =================
     tags$div(
       id = "network_page",
       style = "display: none;",
       tags$div(
-        class = "content-wrapper",
-        tags$div(
-          class = "step-box results-step-box",
-          tags$div(
-            class = "results-step-top",
-            tags$div(class = "results-kicker", icon("network-wired"), "Workflow Step"),
-            tags$div(class = "results-step-number", "Step 3")
-          ),
-          tags$div(class = "step-title", "Subnetwork Extraction"),
-          tags$div(class = "step-description", "Extract optimal subnetwork using Prize-Collecting Steiner Forest algorithm")
-        ),
-        fluidRow(
-          class = "step-main-row",
-          
-          # ===== LEFT: Parameters =====
-          column(
-            width = 4,
-            tags$div(
-              id = "network_param_card",
-              class = "card",
-              tags$div(class = "card-header", "Parameters"),
-              tags$div(
-                class = "card-body",
-                
-                tags$div(
-                  class = "param-card",
-                  tags$h4("Feature Selection"),
-                  selectInput(
-                    "pcsf_feature",
-                    "Features used as terminals",
-                    choices = c(
-                      "Significant only" = "sig",
-                      "All features" = "all"
-                    ),
-                    selected = "sig"
-                  ),
-                  conditionalPanel(
-                    condition = "input.pcsf_feature == 'sig'",
-                    sliderInput(
-                      "pcsf_pcutoff",
-                      "Significance cutoff (p-value)",
-                      min = 0,
-                      max = 1,
-                      value = 0.05,
-                      step = 0.01
-                    )
-                  )
-                ),
-                
-                tags$div(
-                  class = "param-card",
-                  tags$h4("PCSF Parameters"),
-                  
-                  checkboxInput(
-                    "pcsf_grid_tune",
-                    "Enable grid tuning",
-                    value = FALSE
-                  ),
-                  
-                  conditionalPanel(
-                    condition = "input.pcsf_grid_tune",
-                    
-                    tags$div(
-                      style = "margin-left: 5px;",
-                      
-                      tags$h5("Grid tuning range", style = "margin-top:10px;"),
-                      
-                      fluidRow(
-                        column(
-                          4,
-                          numericInput(
-                            "pcsf_b_min",
-                            "b min",
-                            value = 20,
-                            min = 0,
-                            step = 1
-                          )
-                        ),
-                        column(
-                          4,
-                          numericInput(
-                            "pcsf_b_max",
-                            "b max",
-                            value = 40,
-                            min = 0,
-                            step = 1
-                          )
-                        ),
-                        column(
-                          4,
-                          numericInput(
-                            "pcsf_b_step",
-                            "b step",
-                            value = 5,
-                            min = 1,
-                            step = 1
-                          )
-                        )
-                      ),
-                      
-                      fluidRow(
-                        column(
-                          4,
-                          numericInput(
-                            "pcsf_w_min",
-                            "w min",
-                            value = 20,
-                            min = 0,
-                            step = 1
-                          )
-                        ),
-                        column(
-                          4,
-                          numericInput(
-                            "pcsf_w_max",
-                            "w max",
-                            value = 40,
-                            min = 0,
-                            step = 1
-                          )
-                        ),
-                        column(
-                          4,
-                          numericInput(
-                            "pcsf_w_step",
-                            "w step",
-                            value = 5,
-                            min = 1,
-                            step = 1
-                          )
-                        )
-                      )
-                    )
-                  ),
-                  
-                  conditionalPanel(
-                    condition = "!input.pcsf_grid_tune",
-                    numericInput(
-                      "pcsf_b",
-                      "Node prize weight (b)",
-                      min = 20, max = 60, value = 20, step = 1
-                    ),
-                    numericInput(
-                      "pcsf_w",
-                      "Steiner penalty (w)",
-                      min = 20, max = 60, value = 25, step = 5
-                    )
-                  ),
-                  
-                  numericInput(
-                    "pcsf_times",
-                    "Iterations (final)",
-                    value = 100,
-                    min = 1,
-                    step = 1
-                  ),
-                  
-                  conditionalPanel(
-                    condition = "input.pcsf_grid_tune",
-                    numericInput(
-                      "pcsf_times_tune",
-                      "Iterations (grid tuning)",
-                      value = 10,
-                      min = 1,
-                      step = 1
-                    )
-                  ),
-                  
-                  numericInput(
-                    "pcsf_workers",
-                    "Threads",
-                    value = 4,
-                    min = 1,
-                    max = 16
-                  ),
-                  
-                  checkboxInput(
-                    "pcsf_show_network",
-                    "Visualize PCSF subnetwork",
-                    value = TRUE
-                  )
-                  
-                ),
-                
-                tags$hr(),
-                tags$div(
-                  class = "run-next-row",
-                  actionButton(
-                    "run_pcsf",
-                    "Run PCSF",
-                    icon = icon("play-circle"),
-                    class = "btn-success btn-lg"
-                  ),
-                  actionButton(
-                    "next_to_modules",
-                    "Next Step",
-                    icon = icon("arrow-right-from-bracket"),
-                    class = "btn btn-primary btn-lg",
-                    disabled = "disabled"
-                  )
-                )
-              )
-            )
-          ),
-          
-          # ===== RIGHT: Status + Network =====
-          column(
-            width = 8,
-            tags$div(
-              id = "network_result_card",
-              class = "card",
-              tags$div(
-                class = "card-header card-header-result",
-                icon("chart-line"),
-                "PCSF Subnetwork"
-              ),
-              tags$div(
-                class = "card-body",
+        class = "workbench",
 
-                # ===== Tabs（content-level）=====
-                tabsetPanel(
-                  id = "pcsf_tabs",
-                  type = "tabs",
-                  
-                  # ---- Tab 1: Subnetwork ----
-                  tabPanel(
-                    title = tagList(icon("network-wired"), "Subnetwork"),
-                    tags$div(
-                      class = "pcsf-network-shell",
-                      tags$div(
-                        class = "pcsf-network-topbar",
-                        uiOutput("pcsf_node_selectors"),
-                        uiOutput("pcsf_network_legend")
-                      ),
-                      uiOutput("pcsf_network_container"),
-                      uiOutput("pcsf_tuning_summary"),
-                      uiOutput("pcsf_selected_annotation_ui")
+        tags$div(
+          class = "wb-header",
+          tags$div(
+            class = "wb-header-left",
+            tags$span(class = "wb-eyebrow", icon("network-wired"), "Step 3 of 6"),
+            tags$span(class = "wb-header-divider"),
+            tags$h1(class = "wb-title", "Subnetwork Extraction")
+          ),
+          tags$ol(
+            class = "wb-stepper",
+            tags$li(
+              class = "wb-step is-done",
+              title = "Data Upload",
+              tags$span(class = "wb-step-dot", "1"),
+              tags$span(class = "wb-step-name", "Upload")
+            ),
+            tags$li(class = "wb-step-line"),
+            tags$li(
+              class = "wb-step is-done",
+              title = "Feature Annotation",
+              tags$span(class = "wb-step-dot", "2"),
+              tags$span(class = "wb-step-name", "Annotate")
+            ),
+            tags$li(class = "wb-step-line"),
+            tags$li(
+              class = "wb-step is-current",
+              title = "PCSF Subnetwork",
+              tags$span(class = "wb-step-dot", "3"),
+              tags$span(class = "wb-step-name", "Network")
+            ),
+            tags$li(class = "wb-step-line"),
+            tags$li(
+              class = "wb-step",
+              title = "Module Identification",
+              tags$span(class = "wb-step-dot", "4"),
+              tags$span(class = "wb-step-name", "Modules")
+            ),
+            tags$li(class = "wb-step-line"),
+            tags$li(
+              class = "wb-step",
+              title = "Function Interpretation",
+              tags$span(class = "wb-step-dot", "5"),
+              tags$span(class = "wb-step-name", "Function")
+            ),
+            tags$li(class = "wb-step-line"),
+            tags$li(
+              class = "wb-step",
+              title = "Results Download",
+              tags$span(class = "wb-step-dot", "6"),
+              tags$span(class = "wb-step-name", "Results")
+            )
+          )
+        ),
+
+        tags$div(
+          class = "wb-body",
+
+          # ---------------- Sidebar ----------------
+          tags$div(
+            id = "network_param_card",
+            class = "wb-side",
+            tags$div(
+              class = "wb-side-scroll",
+
+              tags$div(
+                class = "wb-section",
+                tags$div(
+                  class = "wb-section-title",
+                  icon("filter"),
+                  "Feature Selection",
+                  build_info_icon(
+                    paste0(
+                      "Which annotated features are handed to PCSF as terminals ",
+                      "(the nodes the algorithm is rewarded for keeping).<br><br>",
+                      "<b>Significant only</b> uses features below the p-value cutoff; ",
+                      "<b>All features</b> lets every feature carry a prize."
                     )
-                  ),
-                  
-                  # ---- Tab 2: Annotation Table 2 ----
-                  tabPanel(
-                    title = tagList(icon("table"), "Annotation Table 2"),
-                    tags$div(
-                      class = "annotation-table-wrap",
-                      DTOutput("annotation_table2")
+                  )
+                ),
+                selectInput(
+                  "pcsf_feature",
+                  "Features used as terminals",
+                  choices = c("Significant only" = "sig", "All features" = "all"),
+                  selected = "sig"
+                ),
+                conditionalPanel(
+                  condition = "input.pcsf_feature == 'sig'",
+                  numericInput(
+                    "pcsf_pcutoff",
+                    "Significance cutoff (p-value)",
+                    value = 0.05, min = 0, max = 1, step = 0.01
+                  )
+                )
+              ),
+
+              tags$div(
+                class = "wb-section",
+                tags$div(
+                  class = "wb-section-title",
+                  icon("sliders"),
+                  "PCSF Parameters",
+                  build_info_icon(
+                    paste0(
+                      "<b>b</b> scales the node prizes: higher keeps more terminals.<br><br>",
+                      "<b>w</b> penalises extra Steiner trees: higher gives fewer, ",
+                      "larger connected components.<br><br>",
+                      "<b>Grid tuning</b> sweeps a range of b and w and keeps the ",
+                      "most robust combination."
                     )
+                  )
+                ),
+                checkboxInput("pcsf_grid_tune", "Enable grid tuning", value = FALSE),
+
+                conditionalPanel(
+                  condition = "input.pcsf_grid_tune",
+                  tags$div(
+                    class = "wb-subfield",
+                    tags$div(class = "wb-field-label", "Grid tuning range"),
+                    fluidRow(
+                      column(4, numericInput("pcsf_b_min", "b min", value = 20, min = 0, step = 1)),
+                      column(4, numericInput("pcsf_b_max", "b max", value = 40, min = 0, step = 1)),
+                      column(4, numericInput("pcsf_b_step", "b step", value = 5, min = 1, step = 1))
+                    ),
+                    fluidRow(
+                      column(4, numericInput("pcsf_w_min", "w min", value = 20, min = 0, step = 1)),
+                      column(4, numericInput("pcsf_w_max", "w max", value = 40, min = 0, step = 1)),
+                      column(4, numericInput("pcsf_w_step", "w step", value = 5, min = 1, step = 1))
+                    )
+                  )
+                ),
+
+                conditionalPanel(
+                  condition = "!input.pcsf_grid_tune",
+                  numericInput("pcsf_b", "Node prize weight (b)", min = 20, max = 60, value = 20, step = 1),
+                  numericInput("pcsf_w", "Steiner penalty (w)", min = 20, max = 60, value = 25, step = 5)
+                ),
+
+                numericInput("pcsf_times", "Iterations (final)", value = 100, min = 1, step = 1),
+
+                conditionalPanel(
+                  condition = "input.pcsf_grid_tune",
+                  numericInput("pcsf_times_tune", "Iterations (grid tuning)", value = 10, min = 1, step = 1)
+                ),
+
+                numericInput("pcsf_workers", "Threads", value = 4, min = 1, max = 16),
+                checkboxInput("pcsf_show_network", "Visualize PCSF subnetwork", value = TRUE)
+              )
+            ),
+
+            tags$div(
+              class = "wb-actions",
+              actionButton(
+                "run_pcsf", "Run PCSF",
+                icon = icon("play"), class = "btn btn-wb-primary"
+              ),
+              actionButton(
+                "next_to_modules", "Next Step",
+                icon = icon("arrow-right-from-bracket"),
+                class = "btn btn-wb-next", disabled = "disabled"
+              )
+            )
+          ),
+
+          # ---------------- Work area ----------------
+          tags$div(
+            id = "network_result_card",
+            class = "wb-main",
+            tags$div(
+              class = "wb-main-inner wb-preview-shell",
+              tabsetPanel(
+                id = "pcsf_tabs",
+                type = "tabs",
+                tabPanel(
+                  title = "Subnetwork",
+                  tags$div(
+                    class = "pcsf-network-shell",
+                    tags$div(
+                      class = "pcsf-network-topbar",
+                      uiOutput("pcsf_node_selectors"),
+                      uiOutput("pcsf_network_legend")
+                    ),
+                    uiOutput("pcsf_network_container")
+                  )
+                ),
+                tabPanel(
+                  title = "Annotation Table 2",
+                  tags$div(
+                    class = "wb-preview-table",
+                    DTOutput("annotation_table2")
                   )
                 )
               )
-            )
+            ),
+            uiOutput("network_empty_state")
           )
         )
       )
     ),
-    
-    # Module Identification Page
-    # ================= Module Identification Page =================
+
+    # ================= Step 4: Module Identification =================
     tags$div(
       id = "modules_page",
       style = "display: none;",
-      
       tags$div(
-        class = "content-wrapper",
-        
-        # ---------- Step header ----------
+        class = "workbench",
+
         tags$div(
-          class = "step-box results-step-box",
+          class = "wb-header",
           tags$div(
-            class = "results-step-top",
-            tags$div(class = "results-kicker", icon("layer-group"), "Workflow Step"),
-            tags$div(class = "results-step-number", "Step 4")
+            class = "wb-header-left",
+            tags$span(class = "wb-eyebrow", icon("layer-group"), "Step 4 of 6"),
+            tags$span(class = "wb-header-divider"),
+            tags$h1(class = "wb-title", "Module Identification")
           ),
-          tags$div(class = "step-title", "Module Identification"),
-          tags$div(
-            class = "step-description",
-            "Identify functional modules using community detection on the PCSF subnetwork"
+          tags$ol(
+            class = "wb-stepper",
+            tags$li(
+              class = "wb-step is-done",
+              title = "Data Upload",
+              tags$span(class = "wb-step-dot", "1"),
+              tags$span(class = "wb-step-name", "Upload")
+            ),
+            tags$li(class = "wb-step-line"),
+            tags$li(
+              class = "wb-step is-done",
+              title = "Feature Annotation",
+              tags$span(class = "wb-step-dot", "2"),
+              tags$span(class = "wb-step-name", "Annotate")
+            ),
+            tags$li(class = "wb-step-line"),
+            tags$li(
+              class = "wb-step is-done",
+              title = "PCSF Subnetwork",
+              tags$span(class = "wb-step-dot", "3"),
+              tags$span(class = "wb-step-name", "Network")
+            ),
+            tags$li(class = "wb-step-line"),
+            tags$li(
+              class = "wb-step is-current",
+              title = "Module Identification",
+              tags$span(class = "wb-step-dot", "4"),
+              tags$span(class = "wb-step-name", "Modules")
+            ),
+            tags$li(class = "wb-step-line"),
+            tags$li(
+              class = "wb-step",
+              title = "Function Interpretation",
+              tags$span(class = "wb-step-dot", "5"),
+              tags$span(class = "wb-step-name", "Function")
+            ),
+            tags$li(class = "wb-step-line"),
+            tags$li(
+              class = "wb-step",
+              title = "Results Download",
+              tags$span(class = "wb-step-dot", "6"),
+              tags$span(class = "wb-step-name", "Results")
+            )
           )
         ),
-        
-        # ================= Main panel =================
-        fluidRow(
-          class = "step-main-row",
-          
-          # ========== LEFT: Parameters ==========
-          column(
-            width = 4,
-            tags$div(
-              id = "modules_param_card",
-              class = "card",
-              tags$div(class = "card-header", "Parameters"),
-              tags$div(
-                class = "card-body",
-                
-                # ---- Algorithm ----
-                # ================= Algorithm =================
-                tags$div(
-                  class = "param-card",
-                  tags$h4("Algorithm"),
-                  
-                  selectInput(
-                    "module_method",
-                    "Community detection method",
-                    choices = c(
-                      "Louvain"        = "louvain",
-                      "Walktrap"       = "walktrap",
-                      "Fast greedy"    = "fast_greedy",
-                      "Leading eigen"  = "leading_eigen"
-                    ),
-                    selected = "louvain"
-                  ),
-                  
-                  # ---- Sub-parameters (conditional) ----
-                  conditionalPanel(
-                    condition = "input.module_method == 'louvain'",
-                    numericInput(
-                      "louvain_res",
-                      "Resolution",
-                      value = 1, min = 0.1, max = 10
-                    )
-                  ),
-                  
-                  conditionalPanel(
-                    condition = "input.module_method == 'walktrap'",
-                    numericInput(
-                      "walktrap_steps",
-                      "Number of steps",
-                      value = 4, min = 1, max = 10
-                    )
-                  )
-                ),
-                
-                # ================= Filtering =================
-                tags$div(
-                  class = "param-card",
-                  tags$h4("Filtering"),
-                  
-                  sliderInput(
-                    "node_freq",
-                    "Node frequency threshold",
-                    min = 0, max = 1, value = 0.05, step = 0.01
-                  )
-                ),
-                
-                # ================= Module size =================
-                tags$div(
-                  class = "param-card",
-                  tags$h4("Module size constraint"),
 
-                  numericInput(
-                    "min_module_size",
-                    "Minimum size",
-                    value = 3, min = 2
+        tags$div(
+          class = "wb-body",
+
+          # ---------------- Sidebar ----------------
+          tags$div(
+            id = "modules_param_card",
+            class = "wb-side",
+            tags$div(
+              class = "wb-side-scroll",
+
+              tags$div(
+                class = "wb-section",
+                tags$div(
+                  class = "wb-section-title",
+                  icon("diagram-project"),
+                  "Algorithm",
+                  build_info_icon(
+                    paste0(
+                      "Community-detection method run on the PCSF subnetwork.<br><br>",
+                      "<b>Louvain</b> is fast and resolution-tunable; ",
+                      "<b>Walktrap</b> uses random walks; ",
+                      "<b>Fast greedy</b> and <b>Leading eigen</b> optimise modularity directly."
+                    )
                   )
                 ),
-                
-                # ================= Computation =================
-                tags$div(
-                  class = "param-card",
-                  tags$h4("Computation"),
-                  
-                  numericInput(
-                    "n_perm",
-                    "Permutations",
-                    value = 100, min = 10, max = 1000
+                selectInput(
+                  "module_method",
+                  "Community detection method",
+                  choices = c(
+                    "Louvain"       = "louvain",
+                    "Walktrap"      = "walktrap",
+                    "Fast greedy"   = "fast_greedy",
+                    "Leading eigen" = "leading_eigen"
                   ),
-                  
-                  numericInput(
-                    "module_seed",
-                    "Random seed",
-                    value = 123
-                  ),
-                  
-                  numericInput(
-                    "module_workers",
-                    "Threads",
-                    value = 4, min = 1, max = 16
-                  )
+                  selected = "louvain"
                 ),
-                
-                tags$hr(),
-                tags$div(
-                  class = "run-next-row",
-                  actionButton(
-                    "run_modules",
-                    "Run",
-                    icon = icon("play-circle"),
-                    class = "btn-success btn-lg"
-                  ),
-                  actionButton(
-                    "next_to_function",
-                    "Next Step",
-                    icon = icon("arrow-right-from-bracket"),
-                    class = "btn btn-primary btn-lg",
-                    disabled = "disabled"
-                  )
+                conditionalPanel(
+                  condition = "input.module_method == 'louvain'",
+                  numericInput("louvain_res", "Resolution", value = 1, min = 0.1, max = 10)
+                ),
+                conditionalPanel(
+                  condition = "input.module_method == 'walktrap'",
+                  numericInput("walktrap_steps", "Number of steps", value = 4, min = 1, max = 10)
                 )
+              ),
+
+              tags$div(
+                class = "wb-section",
+                tags$div(
+                  class = "wb-section-title",
+                  icon("filter"),
+                  "Filtering",
+                  build_info_icon(
+                    paste0(
+                      "Nodes appearing in fewer than this fraction of PCSF iterations ",
+                      "are dropped before community detection, which removes unstable ",
+                      "parts of the subnetwork."
+                    )
+                  )
+                ),
+                sliderInput(
+                  "node_freq", "Node frequency threshold",
+                  min = 0, max = 1, value = 0.05, step = 0.01
+                ),
+                numericInput("min_module_size", "Minimum module size", value = 3, min = 2)
+              ),
+
+              tags$div(
+                class = "wb-section",
+                tags$div(
+                  class = "wb-section-title",
+                  icon("gauge-high"),
+                  "Computation",
+                  build_info_icon(
+                    paste0(
+                      "Module activity is tested against a null built by permutation. ",
+                      "More permutations give a finer p-value at the cost of runtime; ",
+                      "the seed makes a run reproducible."
+                    )
+                  )
+                ),
+                numericInput("n_perm", "Permutations", value = 100, min = 10, max = 1000),
+                numericInput("module_seed", "Random seed", value = 123),
+                numericInput("module_workers", "Threads", value = 4, min = 1, max = 16)
+              )
+            ),
+
+            tags$div(
+              class = "wb-actions",
+              actionButton(
+                "run_modules", "Run",
+                icon = icon("play"), class = "btn btn-wb-primary"
+              ),
+              actionButton(
+                "next_to_function", "Next Step",
+                icon = icon("arrow-right-from-bracket"),
+                class = "btn btn-wb-next", disabled = "disabled"
               )
             )
           ),
-          
-          # ================= RIGHT: Outputs =================
-          column(
-            width = 8,
-            tags$div(
-              id = "modules_result_card",
-              class = "card",
-              tags$div(
-                class = "card-header card-header-result",
-                icon("layer-group"),
-                "Module Results"
-              ),
-              tags$div(
-                class = "card-body",
 
-                # ===== Tabs（content-level）=====
-                tabsetPanel(
-                  id = "module_tabs",
-                  type = "tabs",
-                  
-                  # ---- Tab 1: Visualization ----
-                  tabPanel(
-                    title = tagList(icon("network-wired"), "Visualization"),
+          # ---------------- Work area ----------------
+          tags$div(
+            id = "modules_result_card",
+            class = "wb-main",
+            tags$div(
+              class = "wb-main-inner wb-preview-shell",
+              tabsetPanel(
+                id = "module_tabs",
+                type = "tabs",
+
+                tabPanel(
+                  title = "Visualization",
+                  tags$div(
+                    class = "module-visual-shell",
                     tags$div(
-                      class = "module-visual-shell",
+                      class = "module-visual-filter-row",
                       tags$div(
-                        class = "module-visual-filter-row",
+                        id = "module_selector_ui",
+                        class = "pcsf-selector-item",
                         tags$div(
-                          id = "module_selector_ui",
-                          class = "pcsf-selector-item",
+                          class = "pcsf-selector-input",
                           tags$div(
-                            class = "pcsf-selector-input",
-                            tags$div(
-                              class = "pcsf-selector-field",
-                              selectizeInput(
-                                "selected_module",
-                                label = NULL,
-                                choices = character(0),
-                                selected = NULL,
-                                multiple = FALSE,
-                                width = "100%",
-                                options = list(
-                                  placeholder = "Module"
-                                )
-                              )
-                            ),
-                            build_info_icon("Select which detected module to display in the network below.")
-                          )
-                        ),
+                            class = "pcsf-selector-field",
+                            selectizeInput(
+                              "selected_module",
+                              label = NULL,
+                              choices = character(0),
+                              selected = NULL,
+                              multiple = FALSE,
+                              width = "100%",
+                              options = list(placeholder = "Module")
+                            )
+                          ),
+                          build_info_icon("Select which detected module to display in the network below.")
+                        )
+                      ),
+                      tags$div(
+                        id = "module_node_selector_ui",
+                        class = "pcsf-selector-item",
                         tags$div(
-                          id = "module_node_selector_ui",
-                          class = "pcsf-selector-item",
+                          class = "pcsf-selector-input",
                           tags$div(
-                            class = "pcsf-selector-input",
-                            tags$div(
-                              class = "pcsf-selector-field",
-                              selectizeInput(
-                                "module_metabolite_select",
-                                label = NULL,
-                                choices = character(0),
-                                selected = NULL,
-                                multiple = FALSE,
-                                width = "100%",
-                                options = list(
-                                  placeholder = "Metabolite"
-                                )
-                              )
-                            ),
-                            build_info_icon("Select a metabolite to highlight its directly connected metabolites in the network.")
-                          )
-                        ),
-                        uiOutput("module_network_legend")
+                            class = "pcsf-selector-field",
+                            selectizeInput(
+                              "module_metabolite_select",
+                              label = NULL,
+                              choices = character(0),
+                              selected = NULL,
+                              multiple = FALSE,
+                              width = "100%",
+                              options = list(placeholder = "Metabolite")
+                            )
+                          ),
+                          build_info_icon("Select a metabolite to highlight its directly connected metabolites in the network.")
+                        )
                       ),
-                      uiOutput("module_network_ui")
-                    )
-                  ),
-                  
-                  # ---- Tab 2: Module Score ----
-                  tabPanel(
-                    title = tagList(icon("chart-line"), "Module Score"),
-                    tags$div(
-                      class = "module-table-shell",
-                      tags$div(
-                        class = "module-table-wrap annotation-table-wrap",
-                        DTOutput("module_score")
-                      ),
-                      tags$hr(),
-                      tags$div(
-                        class = "module-status-wrap",
-                        uiOutput("module_score_status_ui")
-                      )
-                    )
-                  ),
-                  
-                  # ---- Tab 3: Module Table ----
-                  tabPanel(
-                    title = tagList(icon("table"), "Module Table"),
-                    tags$div(
-                      class = "module-table-shell",
-                      tags$div(
-                        class = "module-table-wrap annotation-table-wrap",
-                        DTOutput("module_table")
-                      ),
-                      tags$hr(),
-                      tags$div(
-                        class = "module-status-wrap",
-                        uiOutput("module_table_status_ui")
-                      )
-                    )
+                      uiOutput("module_network_legend")
+                    ),
+                    uiOutput("module_network_ui")
+                  )
+                ),
+
+                tabPanel(
+                  title = "Module Score",
+                  tags$div(
+                    class = "wb-preview-table",
+                    DTOutput("module_score")
+                  )
+                ),
+
+                tabPanel(
+                  title = "Module Table",
+                  tags$div(
+                    class = "wb-preview-table",
+                    DTOutput("module_table")
                   )
                 )
               )
-            )
+            ),
+            uiOutput("modules_empty_state")
           )
         )
       )
     ),
-    
-    # Function Interpretation Page
+
+    # ================= Step 5: Function Interpretation =================
     tags$div(
       id = "function_page",
       style = "display: none;",
       tags$div(
-        class = "content-wrapper",
+        class = "workbench",
+
         tags$div(
-          class = "step-box results-step-box",
+          class = "wb-header",
           tags$div(
-            class = "results-step-top",
-            tags$div(class = "results-kicker", icon("robot"), "Workflow Step"),
-            tags$div(class = "results-step-number", "Step 5")
+            class = "wb-header-left",
+            tags$span(class = "wb-eyebrow", icon("robot"), "Step 5 of 6"),
+            tags$span(class = "wb-header-divider"),
+            tags$h1(class = "wb-title", "Function Interpretation")
           ),
-          tags$div(class = "step-title", "AI-Powered Function Interpretation"),
-          tags$div(class = "step-description", "Automatically annotate module functions using large language models")
-        ),
-        
-        fluidRow(
-          class = "step-main-row",
-          
-          # ===== LEFT: Parameters =====
-          column(
-            width = 4,
-            tags$div(
-              id = "function_param_card",
-              class = "card",
-              tags$div(class = "card-header", "Parameters"),
-              tags$div(
-                class = "card-body",
-                
-                # ================= Module selection =================
-                tags$div(
-                  class = "param-card",
-                  tags$h4("Module Selection"),
-                  
-                  selectInput(
-                    "func_p_type",
-                    "Significance metric",
-                    choices = c("p-value" = "p", "FDR" = "fdr"),
-                    selected = "fdr"
-                  ),
-                  
-                  numericInput(
-                    "func_p_cutoff",
-                    "Significance cutoff",
-                    value = 0.05,
-                    min = 0,
-                    max = 1,
-                    step = 0.01
-                  ),
-                  
-                  helpText("Only significant modules will be annotated.")
-                ),
-
-                # ================= Annotation mode =================
-                tags$div(
-                  class = "param-card",
-                  tags$h4(
-                    "Annotation Mode",
-                    build_info_icon(
-                      paste0(
-                        "<b>Fast</b>: single-hypothesis pipeline with pathway coverage, ",
-                        "origin profiling, and directed confidence scoring.<br><br>",
-                        "<b>Advanced</b>: multi-agent debate pipeline &mdash; a Proposer drafts 1-3 ",
-                        "candidate hypotheses, a Skeptic challenges them (up to 2 rounds), and an ",
-                        "Arbiter delivers final accepted/rejected verdicts with confidence scores."
-                      )
-                    )
-                  ),
-
-                  radioButtons(
-                    "func_mode",
-                    NULL,
-                    choices = c("Fast" = "fast", "Advanced" = "advanced"),
-                    selected = "fast"
-                  ),
-
-                  conditionalPanel(
-                    condition = "input.func_mode == 'advanced'",
-                    checkboxInput(
-                      "func_synthesize",
-                      "Run cross-module synthesis",
-                      value = FALSE
-                    )
-                  )
-                ),
-
-                # ================= Study context =================
-                tags$div(
-                  class = "param-card",
-                  tags$h4("Study Context"),
-                  
-                  textInput(
-                    "func_species",
-                    "Species (optional)",
-                    placeholder = "e.g. human"
-                  ),
-                  
-                  textInput(
-                    "func_biospecimen",
-                    "Biospecimen (optional)",
-                    placeholder = "e.g. plasma, serum, liver"
-                  ),
-                  
-                  textInput(
-                    "func_phenotype",
-                    "Phenotype (optional)",
-                    placeholder = "e.g. diabetes, cancer"
-                  )
-                ),
-                
-                # ================= PubMed =================
-                tags$div(
-                  class = "param-card",
-                  tags$h4("Literature-based Annotation"),
-                  
-                  checkboxInput(
-                    "func_use_pubmed",
-                    "Use PubMed literature",
-                    value = FALSE
-                  ),
-                  
-                  conditionalPanel(
-                    condition = "input.func_use_pubmed",
-
-                    numericInput(
-                      "func_pubmed_years",
-                      "Years to search",
-                      value = 5, min = 1, max = 20
-                    ),
-
-                  passwordInput(
-                    "func_ncbi_key",
-                    "NCBI API Key"
-                  )
-                  )
-                ),
-                
-                # ================= LLM =================
-                tags$div(
-                  class = "param-card",
-                  tags$h4("Large Language Model"),
-                  
-                  selectInput(
-                    "func_provider",
-                    "Provider",
-                    choices = c(
-                      "OpenAI" = "openai",
-                      "Google Gemini" = "gemini",
-                      "SiliconFlow" = "siliconflow",
-                      "Local" = "local"
-                    )
-                  ),
-                  
-                  tags$div(
-                    style = "font-weight: 600; margin-bottom: 6px; display: flex; align-items: center; gap: 8px;",
-                    "LLM model",
-                    build_info_icon(
-                      paste0(
-                        "Use the exact chat/generation-model ID supported by the selected provider.<br><br>",
-                        "You can look up available model names here:<br>",
-                        "<a href='https://platform.openai.com/docs/models' target='_blank'>OpenAI models</a><br>",
-                        "<a href='https://ai.google.dev/gemini-api/docs/models' target='_blank'>Gemini API models</a><br>",
-                        "<a href='https://siliconflow.cn/models' target='_blank'>SiliconFlow models</a>"
-                      )
-                    )
-                  ),
-                  textInput(
-                    "func_llm_model",
-                    NULL,
-                    placeholder = "e.g. gpt-5.4"
-                  ),
-
-                  conditionalPanel(
-                    condition = "input.func_provider == 'local'",
-                    textInput(
-                      "func_base_url",
-                      "Local Base URL",
-                      placeholder = "e.g. http://localhost:8000"
-                    )
-                  ),
-                  
-                  
-                  passwordInput(
-                    "func_llm_key",
-                    "LLM API Key (optional for Local)"
-                  )
-                ),
-                
-                tags$hr(),
-                tags$div(
-                  class = "run-next-row",
-                  actionButton(
-                    "run_function_annotation",
-                    "Run",
-                    icon = icon("play-circle"),
-                    class = "btn-success btn-lg"
-                  ),
-                  actionButton(
-                    "next_to_results",
-                    "Go to Results",
-                    icon = icon("download"),
-                    class = "btn btn-primary btn-lg"
-                  )
-                )
-              )
-            )
-          ),
-          
-          
-          # ===== RIGHT: Outputs =====
-          column(
-            width = 8,
-            
-            tags$div(
-              id = "function_result_card",
-              class = "card",
-              tags$div(
-                class = "card-header card-header-result",
-                icon("robot"),
-                "Module Functional Interpretation"
-              ),
-              tags$div(
-                class = "card-body",
-                uiOutput("function_main_ui")
-              )
-              
+          tags$ol(
+            class = "wb-stepper",
+            tags$li(
+              class = "wb-step is-done",
+              title = "Data Upload",
+              tags$span(class = "wb-step-dot", "1"),
+              tags$span(class = "wb-step-name", "Upload")
+            ),
+            tags$li(class = "wb-step-line"),
+            tags$li(
+              class = "wb-step is-done",
+              title = "Feature Annotation",
+              tags$span(class = "wb-step-dot", "2"),
+              tags$span(class = "wb-step-name", "Annotate")
+            ),
+            tags$li(class = "wb-step-line"),
+            tags$li(
+              class = "wb-step is-done",
+              title = "PCSF Subnetwork",
+              tags$span(class = "wb-step-dot", "3"),
+              tags$span(class = "wb-step-name", "Network")
+            ),
+            tags$li(class = "wb-step-line"),
+            tags$li(
+              class = "wb-step is-done",
+              title = "Module Identification",
+              tags$span(class = "wb-step-dot", "4"),
+              tags$span(class = "wb-step-name", "Modules")
+            ),
+            tags$li(class = "wb-step-line"),
+            tags$li(
+              class = "wb-step is-current",
+              title = "Function Interpretation",
+              tags$span(class = "wb-step-dot", "5"),
+              tags$span(class = "wb-step-name", "Function")
+            ),
+            tags$li(class = "wb-step-line"),
+            tags$li(
+              class = "wb-step",
+              title = "Results Download",
+              tags$span(class = "wb-step-dot", "6"),
+              tags$span(class = "wb-step-name", "Results")
             )
           )
         ),
-        tags$br()
+
+        tags$div(
+          class = "wb-body",
+
+          # ---------------- Sidebar ----------------
+          tags$div(
+            id = "function_param_card",
+            class = "wb-side",
+            tags$div(
+              class = "wb-side-scroll",
+
+              tags$div(
+                class = "wb-section",
+                tags$div(
+                  class = "wb-section-title",
+                  icon("filter"),
+                  "Module Selection",
+                  build_info_icon("Only modules below this significance cutoff are sent to the model.")
+                ),
+                selectInput(
+                  "func_p_type", "Significance metric",
+                  choices = c("p-value" = "p", "FDR" = "fdr"), selected = "fdr"
+                ),
+                numericInput(
+                  "func_p_cutoff", "Significance cutoff",
+                  value = 0.05, min = 0, max = 1, step = 0.01
+                )
+              ),
+
+              tags$div(
+                class = "wb-section",
+                tags$div(
+                  class = "wb-section-title",
+                  icon("wand-magic-sparkles"),
+                  "Annotation Mode",
+                  build_info_icon(
+                    paste0(
+                      "<b>Fast</b>: single-hypothesis pipeline with pathway coverage, ",
+                      "origin profiling, and directed confidence scoring.<br><br>",
+                      "<b>Advanced</b>: multi-agent debate pipeline &mdash; a Proposer drafts 1-3 ",
+                      "candidate hypotheses, a Skeptic challenges them (up to 2 rounds), and an ",
+                      "Arbiter delivers final accepted/rejected verdicts with confidence scores."
+                    )
+                  )
+                ),
+                radioButtons(
+                  "func_mode", NULL,
+                  choices = c("Fast" = "fast", "Advanced" = "advanced"),
+                  selected = "fast"
+                )
+              ),
+
+              tags$div(
+                class = "wb-section",
+                tags$div(
+                  class = "wb-section-title",
+                  icon("flask"),
+                  "Study Context",
+                  build_info_icon("Optional, but a species / biospecimen / phenotype makes the interpretation far more specific.")
+                ),
+                textInput("func_species", "Species", placeholder = "e.g. human"),
+                textInput("func_biospecimen", "Biospecimen", placeholder = "e.g. plasma, serum, liver"),
+                textInput("func_phenotype", "Phenotype", placeholder = "e.g. diabetes, cancer")
+              ),
+
+              tags$div(
+                class = "wb-section",
+                tags$div(
+                  class = "wb-section-title",
+                  icon("book"),
+                  "Literature",
+                  build_info_icon("Retrieves and embeds recent PubMed abstracts for each metabolite, then feeds the distilled evidence to the model.")
+                ),
+                checkboxInput("func_use_pubmed", "Use PubMed literature", value = FALSE),
+                conditionalPanel(
+                  condition = "input.func_use_pubmed",
+                  numericInput("func_pubmed_years", "Years to search", value = 5, min = 1, max = 20),
+                  passwordInput("func_ncbi_key", "NCBI API key")
+                )
+              ),
+
+              tags$div(
+                class = "wb-section",
+                tags$div(
+                  class = "wb-section-title",
+                  icon("microchip"),
+                  "Large Language Model",
+                  build_info_icon(
+                    paste0(
+                      "Use the exact chat/generation-model ID supported by the selected provider.<br><br>",
+                      "Model lists:<br>",
+                      "<a href='https://platform.openai.com/docs/models' target='_blank'>OpenAI</a><br>",
+                      "<a href='https://ai.google.dev/gemini-api/docs/models' target='_blank'>Gemini</a><br>",
+                      "<a href='https://siliconflow.cn/models' target='_blank'>SiliconFlow</a>"
+                    )
+                  )
+                ),
+                selectInput(
+                  "func_provider", "Provider",
+                  choices = c(
+                    "OpenAI" = "openai",
+                    "Google Gemini" = "gemini",
+                    "SiliconFlow" = "siliconflow",
+                    "Local" = "local"
+                  )
+                ),
+                textInput("func_llm_model", "Model ID", placeholder = "e.g. gpt-5.4"),
+                conditionalPanel(
+                  condition = "input.func_provider == 'local'",
+                  textInput("func_base_url", "Local base URL", placeholder = "e.g. http://localhost:8000")
+                ),
+                passwordInput("func_llm_key", "API key (optional for Local)")
+              )
+            ),
+
+            tags$div(
+              class = "wb-actions",
+              actionButton(
+                "run_function_annotation", "Run",
+                icon = icon("play"), class = "btn btn-wb-primary"
+              ),
+              actionButton(
+                "next_to_results", "Results",
+                icon = icon("download"), class = "btn btn-wb-next"
+              )
+            )
+          ),
+
+          # ---------------- Work area ----------------
+          tags$div(
+            id = "function_result_card",
+            class = "wb-main",
+            tags$div(
+              class = "wb-main-inner wb-scroll-area",
+              uiOutput("function_main_ui")
+            ),
+            uiOutput("function_empty_state")
+          )
+        )
       )
     ),
-    
-    # Results Export Page
+
+    # ================= Step 6: Results Download =================
     tags$div(
       id = "results_page",
+      style = "display: none;",
+      tags$div(
+        class = "workbench",
+
+        tags$div(
+          class = "wb-header",
+          tags$div(
+            class = "wb-header-left",
+            tags$span(class = "wb-eyebrow", icon("download"), "Step 6 of 6"),
+            tags$span(class = "wb-header-divider"),
+            tags$h1(class = "wb-title", "Results Download")
+          ),
+          tags$ol(
+            class = "wb-stepper",
+            tags$li(
+              class = "wb-step is-done",
+              title = "Data Upload",
+              tags$span(class = "wb-step-dot", "1"),
+              tags$span(class = "wb-step-name", "Upload")
+            ),
+            tags$li(class = "wb-step-line"),
+            tags$li(
+              class = "wb-step is-done",
+              title = "Feature Annotation",
+              tags$span(class = "wb-step-dot", "2"),
+              tags$span(class = "wb-step-name", "Annotate")
+            ),
+            tags$li(class = "wb-step-line"),
+            tags$li(
+              class = "wb-step is-done",
+              title = "PCSF Subnetwork",
+              tags$span(class = "wb-step-dot", "3"),
+              tags$span(class = "wb-step-name", "Network")
+            ),
+            tags$li(class = "wb-step-line"),
+            tags$li(
+              class = "wb-step is-done",
+              title = "Module Identification",
+              tags$span(class = "wb-step-dot", "4"),
+              tags$span(class = "wb-step-name", "Modules")
+            ),
+            tags$li(class = "wb-step-line"),
+            tags$li(
+              class = "wb-step is-done",
+              title = "Function Interpretation",
+              tags$span(class = "wb-step-dot", "5"),
+              tags$span(class = "wb-step-name", "Function")
+            ),
+            tags$li(class = "wb-step-line"),
+            tags$li(
+              class = "wb-step is-current",
+              title = "Results Download",
+              tags$span(class = "wb-step-dot", "6"),
+              tags$span(class = "wb-step-name", "Results")
+            )
+          )
+        ),
+
+        tags$div(
+          class = "wb-body",
+
+          # ---------------- Sidebar: what to export ----------------
+          tags$div(
+            id = "results_export_card",
+            class = "wb-side",
+            tags$div(
+              class = "wb-side-scroll",
+
+              tags$div(
+                class = "wb-section",
+                tags$div(class = "wb-section-title", icon("table"), "Tables"),
+                checkboxGroupInput(
+                  "export_items",
+                  NULL,
+                  choices = c(
+                    "Annotation table 1" = "anno1",
+                    "Annotation table 2" = "anno2",
+                    "Module score"       = "module_score",
+                    "Module table"       = "module_table",
+                    "Module function"    = "module_function"
+                  )
+                ),
+                selectInput(
+                  "export_format", "Table format",
+                  choices = c(
+                    "Excel (.xlsx)" = "xlsx",
+                    "CSV (multiple files)" = "csv",
+                    "RData" = "rdata"
+                  )
+                )
+              ),
+
+              tags$div(
+                class = "wb-section",
+                tags$div(class = "wb-section-title", icon("sitemap"), "Networks"),
+                checkboxGroupInput(
+                  "network_export_items",
+                  NULL,
+                  choices = c(
+                    "PCSF subnetwork" = "pcsf",
+                    "Module network" = "module"
+                  )
+                ),
+                uiOutput("results_module_export_selector"),
+                selectInput(
+                  "network_export_format", "Network format",
+                  choices = c(
+                    "Interactive HTML (.html)" = "html",
+                    "GraphML (.graphml)" = "graphml"
+                  ),
+                  selected = "html"
+                )
+              ),
+
+              uiOutput("results_reports_section")
+            ),
+
+            tags$div(
+              class = "wb-actions",
+              downloadButton(
+                "download_results", "Download",
+                class = "btn btn-wb-primary"
+              ),
+              actionButton(
+                "back_home_reset", "Back to Home",
+                icon = icon("house"), class = "btn btn-wb-next"
+              )
+            )
+          ),
+
+          # ---------------- Work area ----------------
+          tags$div(
+            id = "results_params_card",
+            class = "wb-main",
+            tags$div(
+              class = "wb-main-inner wb-scroll-area",
+              uiOutput("results_overview"),
+              uiOutput("analysis_parameters")
+            )
+          )
+        )
+      )
+    ),
+
+    # Authors Page
+    tags$div(
+      id = "authors_page",
       style = "display: none;",
       tags$div(
         class = "content-wrapper",
@@ -4646,105 +6389,30 @@ ui <- fluidPage(
           class = "step-box results-step-box",
           tags$div(
             class = "results-step-top",
-            tags$div(class = "results-kicker", icon("check-circle"), "Pipeline complete"),
-            tags$div(class = "results-step-number", "Step 6")
+            tags$div(class = "results-kicker", icon("users"), "About"),
+            tags$div(class = "results-step-number", "Team")
           ),
-          tags$div(class = "step-title", "Download & Report Center"),
+          tags$div(class = "step-title", "Authors"),
+          tags$div(class = "step-description", "Coming soon.")
+        )
+      )
+    ),
+
+    # Sign In Page
+    tags$div(
+      id = "signin_page",
+      style = "display: none;",
+      tags$div(
+        class = "content-wrapper",
+        tags$div(
+          class = "step-box results-step-box",
           tags$div(
-            class = "step-description",
-            "Review generated outputs, pick the tables you need, and download a packaged archive."
-          )
-        ),
-        uiOutput("results_overview"),
-        fluidRow(
-          class = "step-main-row",
-          
-          # ===== LEFT: Export options =====
-          column(
-            width = 4,
-            tags$div(
-              id = "results_export_card",
-              class = "card results-export-card",
-              tags$div(class = "card-header", icon("file-export"), " Export Options"),
-              tags$div(
-                class = "card-body",
-                tags$p(
-                  class = "results-card-note",
-                  "Select table format and network format. A single ZIP package will include selected tables and selected networks."
-                ),
-                tags$div(
-                  class = "results-network-wrap",
-                  tags$div(class = "results-preview-title", icon("table"), "Table Export"),
-                  checkboxGroupInput(
-                    "export_items",
-                    "Select Tables to Export",
-                    choices = c(
-                      "Annotation table 1"   = "anno1",
-                      "Annotation table 2"   = "anno2",
-                      "Module score"         = "module_score",
-                      "Module table"         = "module_table",
-                      "Module function"      = "module_function"
-                    )
-                  ),
-                  selectInput("export_format", "Table Format",
-                              choices = c("Excel (.xlsx)" = "xlsx",
-                                          "CSV (multiple files)" = "csv",
-                                          "RData" = "rdata"))
-                ),
-                tags$div(
-                  class = "results-network-wrap",
-                  tags$div(class = "results-preview-title", icon("sitemap"), "Network Export"),
-                  checkboxGroupInput(
-                    "network_export_items",
-                    "Select Networks to Export",
-                    choices = c(
-                      "PCSF subnetwork" = "pcsf",
-                      "Module network" = "module"
-                    )
-                  ),
-                  uiOutput("results_module_export_selector"),
-                  selectInput(
-                    "network_export_format",
-                    "Network Format",
-                    choices = c(
-                      "Interactive HTML (.html)" = "html",
-                      "GraphML (.graphml)" = "graphml"
-                    ),
-                    selected = "html"
-                  )
-                ),
-                uiOutput("results_advanced_mode_downloads"),
-                tags$div(
-                  class = "run-next-row",
-                  downloadButton("download_results", "Download Results",
-                                 class = "btn-success btn-lg results-download-btn"),
-                  actionButton(
-                    "back_home_reset",
-                    "Back to Home",
-                    icon = icon("house"),
-                    class = "btn btn-outline-danger btn-lg"
-                  )
-                )
-              )
-            )
+            class = "results-step-top",
+            tags$div(class = "results-kicker", icon("right-to-bracket"), "Account"),
+            tags$div(class = "results-step-number", "Sign In")
           ),
-          # ===== RIGHT: Analysis Parameters =====
-          column(
-            width = 8,
-            tags$div(
-              id = "results_params_card",
-              class = "card results-params-card",
-              tags$div(
-                class = "card-header card-header-result",
-                icon("sliders-h"),
-                " Analysis Parameters"
-              ),
-              tags$div(
-                class = "card-body",
-                uiOutput("analysis_parameters")
-              )
-            )
-          )
+          tags$div(class = "step-title", "Sign In"),
+          tags$div(class = "step-description", "Coming soon.")
         )
       )
     ),
@@ -4960,50 +6628,48 @@ server <- function(input, output, session) {
   })
   
   # Navigation system
-  pages <- c("home", "upload", "annotation", "network", "modules", "function", "results", "docs")
-  
-  # Function to switch pages
-  switch_page <- function(page) {
-    lapply(pages, function(p) {
-      shinyjs::hide(paste0(p, "_page"))
-    })
-    shinyjs::show(paste0(page, "_page"))
-    
-    # Update nav link active states
-    lapply(pages, function(p) {
-      shinyjs::removeClass(paste0("nav_", p), "active")
-    })
-    shinyjs::addClass(paste0("nav_", page), "active")
+  pages <- c("home", "upload", "annotation", "network", "modules", "function",
+             "results", "docs", "authors", "signin")
 
-	    shinyjs::runjs(
-	      "setTimeout(function() {
-	        window.dispatchEvent(new Event('resize'));
-	        if (window.syncUploadPanels) {
-	          window.syncUploadPanels();
-	        }
-	        if (window.syncAnnotationPanels) {
-	          window.syncAnnotationPanels();
-	        }
-	        if (window.syncNetworkPanels) {
-	          window.syncNetworkPanels();
-	        }
-	        if (window.syncModulesPanels) {
-	          window.syncModulesPanels();
-	        }
-	        if (window.syncFunctionPanels) {
-	          window.syncFunctionPanels();
-	        }
-	        if (window.forcePlotlyResize) {
-	          window.forcePlotlyResize();
-	        } else if (window.Plotly && window.Plotly.Plots && window.Plotly.Plots.resize) {
-	          document.querySelectorAll('.js-plotly-plot').forEach(function(el) {
-	            try { window.Plotly.Plots.resize(el); } catch (e) {}
-          });
-        }
-      }, 140);"
-    )
-    
+  # Steps grouped under the "Analysis" dropdown
+  analysis_pages <- c("upload", "annotation", "network", "modules", "function", "results")
+
+  # Pages already converted to the full-bleed workbench layout
+  workbench_pages <- c("upload", "annotation", "network", "modules", "function", "results")
+  
+  # Function to switch pages.
+  # Everything is done in a single browser call: the old version sent one
+  # websocket message per page and per nav link (~22 round trips), which is
+  # what made switching feel sluggish.
+  switch_page <- function(page) {
     rv$current_page <- page
+
+    js_pages <- paste0("['", paste(pages, collapse = "','"), "']")
+
+    shinyjs::runjs(sprintf(
+      "(function() {
+         var target = '%s';
+         %s.forEach(function(p) {
+           var el = document.getElementById(p + '_page');
+           if (el) { el.style.display = (p === target) ? '' : 'none'; }
+           var nav = document.getElementById('nav_' + p);
+           if (nav) { nav.classList.toggle('active', p === target); }
+         });
+         var an = document.getElementById('nav_analysis');
+         if (an) { an.classList.toggle('active', %s); }
+         document.body.classList.toggle('fm-workbench', %s);
+         if (window.closeAnalysisMenu) { window.closeAnalysisMenu(); }
+         if (window.setFeaturemapNavHeight) { window.setFeaturemapNavHeight(); }
+         setTimeout(function() {
+           window.dispatchEvent(new Event('resize'));
+           if (window.forcePlotlyResize) { window.forcePlotlyResize(); }
+         }, 120);
+       })();",
+      page,
+      js_pages,
+      if (page %in% analysis_pages) "true" else "false",
+      if (page %in% workbench_pages) "true" else "false"
+    ))
   }
 
   reset_pipeline_state <- function() {
@@ -5111,21 +6777,55 @@ server <- function(input, output, session) {
     )
   }
   
-  show_process_modal <- function(title, text) {
+  # One card for the whole run: it opens in the running state and is
+  # switched to the success (or error) state in place, so the two never
+  # overlap. It stays open until the user dismisses it.
+  # Shared row for the card body (defined before the builders that use it).
+  proc_row <- function(icon_name, label, value) {
+    tags$div(
+      class = "wb-done-row",
+      tags$span(class = "wb-done-row-label", icon(icon_name), label),
+      tags$span(class = "wb-done-row-value", value)
+    )
+  }
+
+  # One card for the whole run. All three faces (running / success / error)
+  # are rendered into the modal up front and swapped by a class, so the card
+  # can never replay a previous step's state -- which is what happened when
+  # the body was a uiOutput and Shiny replayed its last cached value on
+  # re-binding.
+  proc_modal_body <- function(state, title, text, rows = NULL) {
+    tags$div(
+      id = "fm_proc_card",
+      class = paste0("fm-process-modal is-", state),
+      tags$div(class = "fm-modal-icon running", icon("spinner", class = "fa-spin")),
+      HTML(
+        paste0(
+          "<svg class='wb-check' viewBox='0 0 52 52'>",
+          "<circle class='wb-check-halo' cx='26' cy='26' r='24'/>",
+          "<circle class='wb-check-ring' cx='26' cy='26' r='24'/>",
+          "<path class='wb-check-mark' d='M15 26.5 l7.5 7.5 l14.5 -15.5'/>",
+          "</svg>"
+        )
+      ),
+      tags$div(class = "fm-modal-icon error", icon("times")),
+      tags$div(id = "fm_proc_title", class = "fm-modal-title", title),
+      tags$div(id = "fm_proc_text", class = "fm-modal-text", text),
+      tags$div(id = "fm_proc_rows", class = "wb-done-rows",
+               if (!is.null(rows) && length(rows) > 0) rows else NULL),
+      tags$div(
+        class = "fm-modal-actions",
+        actionButton("process_modal_close", "Close", class = "btn btn-wb-primary")
+      )
+    )
+  }
+
+  open_process_modal <- function(state, title, text, rows = NULL) {
     showModal(
       modalDialog(
         easyClose = FALSE,
         footer = NULL,
-        tags$div(
-          class = "fm-process-modal",
-          tags$div(
-            id = "fm_modal_icon",
-            class = "fm-modal-icon running",
-            icon("spinner", class = "fa-spin")
-          ),
-          tags$div(id = "fm_modal_title", class = "fm-modal-title", title),
-          tags$div(id = "fm_modal_text", class = "fm-modal-text", text)
-        )
+        proc_modal_body(state, title, text, rows)
       )
     )
     shinyjs::runjs(
@@ -5148,38 +6848,55 @@ server <- function(input, output, session) {
       })();"
     )
   }
-  
+
+  # Switch the already-open card to another state, in place.
+  set_process_state <- function(state, title, text, rows = NULL) {
+    shinyjs::html("fm_proc_title", htmltools::htmlEscape(title %||% ""))
+    shinyjs::html("fm_proc_text",  htmltools::htmlEscape(text  %||% ""))
+    shinyjs::html(
+      "fm_proc_rows",
+      if (!is.null(rows) && length(rows) > 0) as.character(tagList(rows)) else ""
+    )
+    shinyjs::runjs(sprintf(
+      "(function() {
+         var c = document.getElementById('fm_proc_card');
+         if (c) { c.className = 'fm-process-modal is-%s'; }
+       })();", state))
+  }
+
+  show_process_modal <- function(title, text) {
+    open_process_modal("running", title, text)
+  }
+
   update_process_modal <- function(status = c("success", "error"), title, text) {
     status <- match.arg(status)
-    icon_html <- if (status == "success") {
-      as.character(icon("check"))
-    } else {
-      as.character(icon("times"))
-    }
-    
-    shinyjs::runjs(
-      glue::glue(
-        "(function() {{
-          var icon = document.getElementById('fm_modal_icon');
-          var titleEl = document.getElementById('fm_modal_title');
-          var textEl = document.getElementById('fm_modal_text');
-          if (icon) {{
-            icon.className = 'fm-modal-icon {status}';
-            icon.innerHTML = {jsonlite::toJSON(icon_html, auto_unbox = TRUE)};
-          }}
-          if (titleEl) {{
-            titleEl.textContent = {jsonlite::toJSON(title, auto_unbox = TRUE)};
-          }}
-          if (textEl) {{
-            textEl.textContent = {jsonlite::toJSON(text, auto_unbox = TRUE)};
-          }}
-        }})();"
-      )
-    )
+    set_process_state(status, title, text)
   }
-  
+
+  # Switch the already-open card to its success state and keep it there.
+  finish_process_modal <- function(title, text, rows = NULL) {
+    set_process_state("success", title, text, rows)
+  }
+
+  # For steps with no running phase (Data Upload): open the same card
+  # straight in its success state.
+  show_result_modal <- function(title, text, rows = NULL) {
+    open_process_modal("success", title, text, rows)
+  }
+
+  observeEvent(input$process_modal_close, {
+    removeModal()
+  })
+
   close_process_modal <- function(delay_ms = 900) {
     shinyjs::delay(delay_ms, removeModal())
+  }
+
+  # Corner toasts were removed; anything the user must see uses the same
+  # centred card as the running/failed states.
+  show_error_modal <- function(title, text) {
+    open_process_modal("error", title, text)
+    close_process_modal(2600)
   }
   
   # Navigation observers
@@ -5191,6 +6908,8 @@ server <- function(input, output, session) {
   observeEvent(input$nav_function, { switch_page("function") })
   observeEvent(input$nav_results, { switch_page("results") })
   observeEvent(input$nav_docs, { switch_page("docs") })
+  observeEvent(input$nav_authors, { switch_page("authors") })
+  observeEvent(input$nav_signin, { switch_page("signin") })
 
   observeEvent(input$back_home_reset, {
     showModal(
@@ -5212,7 +6931,6 @@ server <- function(input, output, session) {
     reset_pipeline_state()
     shinyjs::runjs("window.clearQuickstartTargets && window.clearQuickstartTargets(); window.__quickstartDialogTargetId = null;")
     switch_page("home")
-    showNotification("Analysis results cleared. Returned to Home.", type = "message")
   })
 
   show_quickstart_phase_modal <- function() {
@@ -5487,6 +7205,18 @@ server <- function(input, output, session) {
 
     rv$feature_data <- loaded$feature_tbl
     rv$ms2_data <- loaded$ms2_tbl
+
+    show_result_modal(
+      "Data loaded successfully",
+      "You can continue to Feature Annotation.",
+      list(
+        proc_row("table", "Feature table",
+                 paste0(format(nrow(loaded$feature_tbl), big.mark = ","), " rows")),
+        proc_row("vials", "MS2 table",
+                 if (is.null(loaded$ms2_tbl)) "not provided"
+                 else paste0(format(nrow(loaded$ms2_tbl), big.mark = ","), " rows"))
+      )
+    )
     rv$mrn <- loaded$mrn_obj
     rv$ref_database <- loaded$ref_db_obj
     rv$ref_database_type <- loaded$ref_label
@@ -5538,11 +7268,7 @@ server <- function(input, output, session) {
     if (inherits(staged, "error")) {
       rv$upload_note <- paste("Demo prepare failed:", staged$message)
       rv$upload_note_type <- "error"
-      showNotification(
-        paste("Demo prepare failed:", staged$message),
-        type = "error",
-        duration = 4
-      )
+      show_error_modal("Demo data unavailable", paste("Demo prepare failed:", staged$message))
       return()
     }
 
@@ -5551,69 +7277,91 @@ server <- function(input, output, session) {
 
     rv$upload_note <- "Demo data is prepared. Click Load to continue."
     rv$upload_note_type <- "info"
-    showNotification(
-      "Demo data is prepared. Click Load to continue.",
-      type = "message",
-      duration = 3
+
+    # Show the staged demo files in the two upload fields rather than
+    # popping a notification in the corner.
+    shinyjs::runjs(
+      paste0(
+        "(function() {",
+        "  function setFileName(id, name) {",
+        "    var el = document.getElementById(id);",
+        "    if (!el) { return; }",
+        "    var wrap = el.closest('.input-group') || el.closest('.form-group');",
+        "    if (!wrap) { return; }",
+        "    var box = wrap.querySelector('input[type=text]');",
+        "    if (box) { box.value = name; box.classList.add('wb-file-demo'); }",
+        "  }",
+        "  setFileName('feature_file', 'demo_feature_table.rda');",
+        "  setFileName('ms2_file', 'demo_ms2.rda');",
+        "})();"
+      )
     )
   })
   
   
   
-  output$upload_status_ui <- renderUI({
-    if (is.null(rv$feature_data)) {
+  # Shown over the preview area until anything is loaded, so the page
+  # explains what it wants instead of sitting empty.
+  output$upload_empty_state <- renderUI({
+    if (!is.null(rv$feature_data)) {
       return(NULL)
     }
 
-    ms2_supported_n <- 0L
-    if (!is.null(rv$ms2_data) && is.data.frame(rv$ms2_data) && "variable_id" %in% colnames(rv$ms2_data)) {
-      ms2_tbl <- rv$ms2_data
-
-      has_hmdb <- "HMDB.ID" %in% colnames(ms2_tbl)
-      has_kegg <- "KEGG.ID" %in% colnames(ms2_tbl)
-
-      if (has_hmdb || has_kegg) {
-        ms2_tbl <- ms2_tbl %>%
-          dplyr::mutate(
-            HMDB.ID = if (has_hmdb) HMDB.ID else NA_character_,
-            KEGG.ID = if (has_kegg) KEGG.ID else NA_character_
-          ) %>%
-          dplyr::filter(
-            (!is.na(HMDB.ID) & HMDB.ID != "") |
-              (!is.na(KEGG.ID) & KEGG.ID != "")
-          ) %>%
-          dplyr::distinct(variable_id)
-
-        ms2_supported_n <- nrow(ms2_tbl)
-      }
+    empty_step <- function(num, text, tag = NULL, tag_class = NULL) {
+      tags$div(
+        class = "wb-empty-step",
+        tags$span(class = "wb-empty-step-num", num),
+        tags$span(
+          class = "wb-empty-step-text",
+          HTML(text),
+          if (!is.null(tag)) {
+            tags$span(class = paste("wb-empty-tag", tag_class), tag)
+          }
+        )
+      )
     }
 
     tags$div(
-      class = "param-card",
-      tags$h4(icon("circle-check"), "Upload Status"),
-      tags$p(
-        style = "margin-bottom:6px;",
-        paste0("Features loaded: ", format(nrow(rv$feature_data), big.mark = ","))
-      ),
-      tags$p(
-        style = "margin-bottom:0;",
-        paste0("MS2-supported features: ", format(ms2_supported_n, big.mark = ","))
+      class = "wb-empty-layer",
+      tags$div(
+        class = "wb-empty",
+        tags$div(class = "wb-empty-icon", icon("file-arrow-up")),
+        tags$div(class = "wb-empty-title", "Start by loading your data"),
+        tags$div(
+          class = "wb-empty-steps",
+          empty_step(
+            "1",
+            "Choose a <b>feature table</b> with m/z, RT, polarity and phenotype association",
+            "required", "is-required"
+          ),
+          empty_step(
+            "2",
+            "Add an <b>MS2 annotation table</b> to raise annotation confidence",
+            "optional", "is-optional"
+          ),
+          empty_step(
+            "3",
+            "Keep the <b>default reference</b>, or upload your own database and reaction network"
+          ),
+          empty_step(
+            "4",
+            "Click <b>Load</b> to validate the input and preview it here"
+          )
+        ),
+        tags$p(
+          class = "wb-empty-foot",
+          "No data at hand? Try ", tags$b("Use Demo Data"), " to run the full pipeline."
+        )
       )
     )
   })
 
+
   output$feature_preview <- renderDT({
     if (is.null(rv$feature_data)) {
-      return(render_table_message("No data loaded yet"))
+      return(render_table_message("No feature table loaded yet"))
     }
-    datatable(
-      rv$feature_data,
-      options = list(
-        pageLength = 10,
-        scrollX = TRUE
-      ),
-      rownames = FALSE
-    )
+    wb_preview_table(rv$feature_data)
   })
 
   output$download_demo_data <- downloadHandler(
@@ -5651,24 +7399,111 @@ server <- function(input, output, session) {
 
   output$ms2_preview <- renderDT({
     if (is.null(rv$ms2_data)) {
-      return(render_table_message("No data loaded yet"))
+      return(render_table_message("No MS2 table loaded yet"))
     }
-    datatable(
-      rv$ms2_data,
-      options = list(
-        pageLength = 10,
-        scrollX = TRUE
-      ),
-      rownames = FALSE
-    )
+    wb_preview_table(rv$ms2_data)
   })
 
   render_table_message <- function(msg) {
     datatable(
-      data.frame(Message = msg),
-      options = list(dom = "t"),
+      data.frame(msg = msg),
+      options = list(dom = "t", ordering = FALSE),
+      class = "wb-dt-empty",
+      colnames = "",
       rownames = FALSE
     )
+  }
+
+  # Shared empty state: icon, headline and a numbered list of what to do.
+  wb_empty_state <- function(icon_name, title, steps, foot = NULL) {
+    tags$div(
+      class = "wb-empty-layer",
+      tags$div(
+        class = "wb-empty",
+        tags$div(class = "wb-empty-icon", icon(icon_name)),
+        tags$div(class = "wb-empty-title", title),
+        tags$div(class = "wb-empty-steps", steps),
+        if (!is.null(foot)) tags$p(class = "wb-empty-foot", foot)
+      )
+    )
+  }
+
+  wb_empty_step <- function(num, text, tag = NULL, tag_class = NULL) {
+    tags$div(
+      class = "wb-empty-step",
+      tags$span(class = "wb-empty-step-num", num),
+      tags$span(
+        class = "wb-empty-step-text",
+        HTML(text),
+        if (!is.null(tag)) tags$span(class = paste("wb-empty-tag", tag_class), tag)
+      )
+    )
+  }
+
+  # Shared chrome for every preview table: search on top, rows-per-page and
+  # pagination on the bottom, no "Showing x to y of z" line.
+  wb_preview_table <- function(df) {
+    show_signif <- vapply(
+      df,
+      function(x) {
+        is.numeric(x) && !is.integer(x) &&
+          any(is.finite(x) & (x %% 1 != 0))
+      },
+      logical(1)
+    )
+
+    dt <- datatable(
+      df,
+      rownames = FALSE,
+      class = "row-border",
+      options = list(
+        pageLength = 15,
+        lengthMenu = c(15, 25, 50, 100),
+        pagingType = "simple",
+        dom = "r<'wb-dt-scroll't><'wb-dt-bottom'lp>",
+        ordering = FALSE,
+        autoWidth = FALSE,
+        language = list(
+          lengthMenu = "Rows _MENU_",
+          paginate = list(previous = "Prev", `next` = "Next")
+        ),
+        # DataTables has no "jump to page" control, so build one between
+        # the Prev/Next buttons and keep it in sync on every redraw.
+        drawCallback = DT::JS(
+          "function(settings) {",
+          "  var api = this.api();",
+          "  var info = api.page.info();",
+          "  var pag = $(api.table().container()).find('.dataTables_paginate');",
+          "  if (pag.length === 0) { return; }",
+          "  var host = pag.find('ul.pagination');",
+          "  if (host.length === 0) { host = pag; }",
+          "  var box = host.find('.wb-page-jump');",
+          "  if (box.length === 0) {",
+          "    box = $('<li class=\"wb-page-jump\"><input type=\"number\" class=\"wb-page-input\" min=\"1\"><span class=\"wb-page-total\"></span></li>');",
+          "    var nextBtn = host.find('.next');",
+          "    if (nextBtn.length) { nextBtn.before(box); } else { host.append(box); }",
+          "    box.find('.wb-page-input').on('change keyup', function(ev) {",
+          "      if (ev.type === 'keyup' && ev.key !== 'Enter') { return; }",
+          "      var total = api.page.info().pages;",
+          "      var v = parseInt(this.value, 10);",
+          "      if (isNaN(v) || v < 1) { v = 1; }",
+          "      if (v > total) { v = total; }",
+          "      this.value = v;",
+          "      api.page(v - 1).draw('page');",
+          "    });",
+          "  }",
+          "  box.find('.wb-page-input').attr('max', info.pages).val(info.page + 1);",
+          "  box.find('.wb-page-total').text('of ' + info.pages);",
+          "}"
+        )
+      )
+    )
+
+    if (any(show_signif)) {
+      dt <- DT::formatSignif(dt, columns = names(df)[show_signif], digits = 4)
+    }
+
+    dt
   }
   
   observeEvent(input$next_to_annotation, {
@@ -5704,7 +7539,6 @@ server <- function(input, output, session) {
       
       if (inherits(res, "error")) {
         rv$annotation_status <- "error"
-        showNotification(res$message, type = "error")
         update_process_modal("error", "Step 2 Failed", res$message)
         close_process_modal(1800)
         shinyjs::enable("run_annotation")
@@ -5713,15 +7547,32 @@ server <- function(input, output, session) {
         rv$annotated_table    <- res$anno_feature_table1
         rv$annotation_summary <- res$anno_redundancy
         rv$annotation_status  <- "finished"
-        shinyjs::runjs(
-          "window.forcePlotlyResize && window.forcePlotlyResize(['annotation_mfc_plot','annotation_feature_plot']);"
+
+        tbl <- res$anno_feature_table1
+        n_entries <- if (is.data.frame(tbl)) nrow(tbl) else 0L
+        feature_col <- if (is.data.frame(tbl)) {
+          pick_first_col(tbl, c("variable_id", "feature_id", "feature", "feature_name", "id"))
+        } else NULL
+        n_annotated <- if (!is.null(feature_col)) {
+          length(unique(stats::na.omit(tbl[[feature_col]])))
+        } else n_entries
+        n_total <- if (!is.null(rv$feature_data)) nrow(rv$feature_data) else NA_integer_
+        annotated_txt <- paste0(
+          format(n_annotated, big.mark = ","),
+          if (!is.na(n_total)) {
+            paste0(" / ", format(n_total, big.mark = ","),
+                   if (n_total > 0) sprintf("  (%.1f%%)", 100 * n_annotated / n_total) else "")
+          } else ""
         )
-        update_process_modal(
-          "success",
-          "Step 2 Completed",
-          "Feature annotation finished successfully."
+
+        finish_process_modal(
+          "Annotation finished",
+          "You can continue to PCSF Subnetwork.",
+          list(
+            proc_row("bullseye", "Annotated features", annotated_txt),
+            proc_row("link", "Feature-metabolite pairs", format(n_entries, big.mark = ","))
+          )
         )
-        close_process_modal(900)
         
         shinyjs::enable("run_annotation")
       }
@@ -5735,54 +7586,180 @@ server <- function(input, output, session) {
     switch_page("network")
   })
 
-  observeEvent(input$annotation_tabs, {
-    if (!identical(input$annotation_tabs, "summary")) return()
-    shinyjs::runjs(
-      "window.forcePlotlyResize && window.forcePlotlyResize(['annotation_mfc_plot','annotation_feature_plot']);"
-    )
-  }, ignoreInit = TRUE)
+  # Redundancy summary, told in words first and numbers second: two bar
+  # charts carried very little information for the space they took.
+  output$annotation_summary_ui <- renderUI({
+    if (identical(rv$annotation_status, "running")) {
+      return(
+        tags$div(
+          class = "empty-panel empty-panel-compact",
+          icon("spinner", class = "fa-spin"),
+          "Annotating features ..."
+        )
+      )
+    }
 
-  observeEvent(rv$current_page, {
-    if (!identical(rv$current_page, "annotation")) return()
-    shinyjs::runjs(
-      "window.forcePlotlyResize && window.forcePlotlyResize(['annotation_mfc_plot','annotation_feature_plot']);"
+    if (is.null(rv$annotation_summary)) {
+      return(NULL)
+    }
+
+    smry <- rv$annotation_summary
+    stage <- tolower(as.character(rownames(smry)))
+
+    norm_name <- function(x) gsub("[^a-z0-9]+", "_", tolower(x))
+    smry_cols <- norm_name(colnames(smry))
+
+    get_val <- function(col, which_stage) {
+      idx <- which(stage == which_stage)
+      j <- which(smry_cols == norm_name(col))
+      if (length(idx) != 1 || length(j) != 1) return(NA_real_)
+      suppressWarnings(as.numeric(smry[idx, j]))
+    }
+
+    # Paired columns under the headline number. Tall on purpose: the card
+    # has the vertical room and a squat chart looked unfinished.
+    metric_chart <- function(before, after, digits) {
+      W <- 420
+      H <- 300
+      base_y <- 250
+      top_y <- 22
+      plot_h <- base_y - top_y
+
+      vmax <- suppressWarnings(max(c(before, after)[is.finite(c(before, after))]))
+      if (!is.finite(vmax) || vmax <= 0) vmax <- 1
+
+      bw <- 104
+      x_b <- 76
+      x_a <- 240
+      h_b <- if (is.finite(before)) plot_h * before / vmax else 0
+      h_a <- if (is.finite(after)) plot_h * after / vmax else 0
+
+      col_rect <- function(x, h, fill) {
+        r <- 6
+        y <- base_y - h
+        if (h < r * 2) {
+          return(sprintf(
+            "<rect x='%.1f' y='%.1f' width='%.1f' height='%.1f' fill='%s'/>",
+            x, y, bw, max(h, 2), fill
+          ))
+        }
+        sprintf(
+          paste0(
+            "<path d='M %.1f %.1f V %.1f Q %.1f %.1f %.1f %.1f ",
+            "H %.1f Q %.1f %.1f %.1f %.1f V %.1f Z' fill='%s'/>"
+          ),
+          x, base_y, y + r, x, y, x + r, y,
+          x + bw - r, x + bw, y, x + bw, y + r, base_y, fill
+        )
+      }
+
+      HTML(paste0(
+        "<svg viewBox='0 0 ", W, " ", H, "' role='img'>",
+        # where the bar stood before filtering
+        sprintf(
+          "<line x1='40' y1='%.1f' x2='380' y2='%.1f' stroke='#dbe4ee' stroke-width='1' stroke-dasharray='3 4'/>",
+          base_y - h_b, base_y - h_b
+        ),
+        col_rect(x_b, h_b, "#cbdaea"),
+        col_rect(x_a, h_a, "#2f79af"),
+        sprintf("<line x1='40' y1='%.1f' x2='380' y2='%.1f' stroke='#dde5ee' stroke-width='1'/>",
+                base_y, base_y),
+        sprintf(
+          "<text x='%.1f' y='%.1f' text-anchor='middle' font-size='12.5' font-weight='700' letter-spacing='1.1' fill='#a1b1c2'>BEFORE</text>",
+          x_b + bw / 2, base_y + 26
+        ),
+        sprintf(
+          "<text x='%.1f' y='%.1f' text-anchor='middle' font-size='12.5' font-weight='700' letter-spacing='1.1' fill='#5c7186'>AFTER</text>",
+          x_a + bw / 2, base_y + 26
+        ),
+        "</svg>"
+      ))
+    }
+
+    metric_block <- function(col, name, desc, info, digits) {
+      before <- get_val(col, "before")
+      after <- get_val(col, "after")
+      if (!is.finite(before) && !is.finite(after)) return(NULL)
+
+      fmt <- function(x) {
+        if (!is.finite(x)) "-" else format(round(x, digits), nsmall = digits, trim = TRUE)
+      }
+
+      delta <- if (is.finite(before) && is.finite(after) && before != 0) {
+        (after - before) / before * 100
+      } else {
+        NA_real_
+      }
+
+      delta_tag <- if (!is.finite(delta)) {
+        NULL
+      } else if (delta < -0.05) {
+        tags$span(class = "wb-delta is-good", icon("arrow-down"), sprintf("%.1f%%", abs(delta)))
+      } else if (delta > 0.05) {
+        tags$span(class = "wb-delta is-up", icon("arrow-up"), sprintf("%.1f%%", delta))
+      } else {
+        tags$span(class = "wb-delta is-flat", "no change")
+      }
+
+      tags$div(
+        class = "wb-metric",
+        tags$div(class = "wb-metric-name", name, build_info_icon(info)),
+        tags$div(
+          class = "wb-metric-figure",
+          tags$span(class = "wb-metric-value", fmt(after)),
+          delta_tag
+        ),
+        tags$div(
+          class = "wb-metric-was",
+          "was ", tags$b(fmt(before)), " before filtering"
+        ),
+        tags$div(
+          class = "wb-metric-chart",
+          metric_chart(before, after, digits)
+        ),
+        tags$p(class = "wb-metric-desc", desc)
+      )
+    }
+
+    tags$div(
+      tags$div(
+        class = "wb-metric-grid",
+        metric_block(
+          col = "metabolite_per_feature",
+          name = "Candidate metabolites per feature",
+          desc = paste(
+            "On average, how many different metabolites still match one LC-MS feature.",
+            "Lower means each feature has fewer competing explanations."
+          ),
+          info = paste0(
+            "Mean number of database compounds matched to a single feature ",
+            "(<code>variable_id</code>), averaged over all annotated features."
+          ),
+          digits = 2
+        ),
+        metric_block(
+          col = "mfc_per_metabolite",
+          name = "Feature groups per metabolite",
+          desc = paste(
+            "On average, how many separate groups of co-eluting features are assigned",
+            "to the same metabolite. Lower means its signal is consolidated, not scattered."
+          ),
+          info = paste0(
+            "A <b>metabolite feature cluster (MFC)</b> is a set of features that co-elute ",
+            "and share a mass relationship - isotopes, adducts and in-source fragments of ",
+            "one compound. This is the mean number of distinct clusters mapped to the same ",
+            "compound (<code>Lab.ID</code>); more than one means the same metabolite was ",
+            "matched from unrelated places in the chromatogram."
+          ),
+          digits = 3
+        )
+      ),
+      tags$p(
+        class = "wb-metric-note",
+        icon("circle-info"),
+        " Before and after low-confidence matches were filtered out. Full matches are in the Annotation Table tab."
+      )
     )
-  }, ignoreInit = TRUE)
-  
-  output$annotation_mfc_ui <- renderUI({
-    if (rv$annotation_status == "running") {
-      tags$div(
-        class = "empty-panel empty-panel-compact empty-panel-fill",
-        icon("spinner", class = "fa-spin"),
-        "Preparing metabolite-level summary ..."
-      )
-    } else if (rv$annotation_status == "finished") {
-      plotlyOutput("annotation_mfc_plot", width = "100%", height = 280)
-    } else {
-      tags$div(
-        class = "empty-panel empty-panel-compact empty-panel-fill",
-        icon("chart-bar"),
-        "No metabolite-level summary yet."
-      )
-    }
-  })
-  
-  output$annotation_feature_ui <- renderUI({
-    if (rv$annotation_status == "running") {
-      tags$div(
-        class = "empty-panel empty-panel-compact empty-panel-fill",
-        icon("spinner", class = "fa-spin"),
-        "Preparing feature-level summary ..."
-      )
-    } else if (rv$annotation_status == "finished") {
-      plotlyOutput("annotation_feature_plot", width = "100%", height = 280)
-    } else {
-      tags$div(
-        class = "empty-panel empty-panel-compact empty-panel-fill",
-        icon("chart-line"),
-        "No feature-level summary yet."
-      )
-    }
   })
 
   pick_first_col <- function(df, candidates) {
@@ -5793,215 +7770,166 @@ server <- function(input, output, session) {
     nms[idx[1]]
   }
 
-  output$annotation_status_ui <- renderUI({
-    if (rv$annotation_status == "running") {
-      return(
-        tags$div(
-          class = "param-card",
-          tags$h4(icon("spinner", class = "fa-spin"), "Annotation Status"),
-          tags$p(style = "margin-bottom:0;", "Annotation is running...")
+  output$annotation_empty_state <- renderUI({
+    if (identical(rv$annotation_status, "finished")) {
+      return(NULL)
+    }
+
+    empty_step <- function(num, text, tag = NULL, tag_class = NULL) {
+      tags$div(
+        class = "wb-empty-step",
+        tags$span(class = "wb-empty-step-num", num),
+        tags$span(
+          class = "wb-empty-step-text",
+          HTML(text),
+          if (!is.null(tag)) {
+            tags$span(class = paste("wb-empty-tag", tag_class), tag)
+          }
         )
       )
     }
 
-    if (is.null(rv$annotated_table) || nrow(rv$annotated_table) == 0) {
+    if (is.null(rv$feature_data)) {
       return(
         tags$div(
-          class = "param-card",
-          tags$h4(icon("circle-info"), "Annotation Status"),
-          tags$p(style = "margin-bottom:0;", "No annotation results yet.")
-        )
-      )
-    }
-
-    tbl <- rv$annotated_table
-    n_entries <- nrow(tbl)
-    n_total_features <- if (!is.null(rv$feature_data)) nrow(rv$feature_data) else NA_integer_
-
-    feature_col <- pick_first_col(
-      tbl,
-      c("variable_id", "feature_id", "feature", "feature_name", "id")
-    )
-
-    n_annotated_features <- if (!is.null(feature_col)) {
-      length(unique(stats::na.omit(tbl[[feature_col]])))
-    } else {
-      n_entries
-    }
-
-    coverage_txt <- if (!is.na(n_total_features) && n_total_features > 0) {
-      sprintf("%.1f%%", 100 * n_annotated_features / n_total_features)
-    } else {
-      "NA"
-    }
-
-    avg_txt <- if (n_annotated_features > 0) {
-      sprintf("%.2f", n_entries / n_annotated_features)
-    } else {
-      "NA"
-    }
-
-    tags$div(
-      class = "param-card",
-      tags$h4(icon("circle-check"), "Annotation Status"),
-      tags$p(
-        style = "margin-bottom:6px;",
-        paste0("Annotated features: ", n_annotated_features,
-               if (!is.na(n_total_features)) paste0(" / ", n_total_features, " (", coverage_txt, ")") else "")
-      ),
-      tags$p(
-        style = "margin-bottom:6px;",
-        paste0("Feature-metabolite entries: ", n_entries)
-      ),
-      tags$p(
-        style = "margin-bottom:0;",
-        paste0("Avg metabolites per annotated feature: ", avg_txt)
-      )
-    )
-  })
-  
-  build_annotation_summary_plot <- function(value_col, y_title, digits, colors) {
-    df <- rv$annotation_summary %>%
-      tibble::rownames_to_column("stage") %>%
-      dplyr::mutate(
-        stage = factor(tolower(as.character(stage)), levels = c("before", "after")),
-        stage_label = dplyr::if_else(stage == "before", "Before", "After"),
-        value = as.numeric(.data[[value_col]]),
-        fill_color = dplyr::if_else(stage == "before", colors[1], colors[2]),
-        label = format(round(value, digits), nsmall = digits, trim = TRUE)
-      ) %>%
-      dplyr::arrange(stage)
-    
-    req(nrow(df) > 0)
-    
-    before_val <- df$value[df$stage == "before"]
-    after_val <- df$value[df$stage == "after"]
-    delta_text <- ""
-    if (length(before_val) == 1 && length(after_val) == 1 &&
-        is.finite(before_val) && before_val != 0) {
-      delta_pct <- (after_val - before_val) / before_val * 100
-      sign <- ifelse(delta_pct >= 0, "+", "-")
-      delta_text <- sprintf("After vs before: %s%.1f%%", sign, abs(delta_pct))
-    }
-    
-    y_max <- max(df$value, na.rm = TRUE)
-    if (!is.finite(y_max) || y_max <= 0) y_max <- 1
-    
-    p <- plot_ly(
-      data = df,
-      x = ~stage_label,
-      y = ~value,
-      type = "bar",
-      width = 0.55,
-      marker = list(
-        color = ~fill_color,
-        line = list(color = "rgba(255,255,255,0.95)", width = 1.4)
-      ),
-      text = ~label,
-      textposition = "outside",
-      cliponaxis = FALSE,
-      hovertemplate = paste0(
-        "<b>%{x}</b><br>",
-        y_title, ": %{y:.", digits, "f}<extra></extra>"
-      ),
-      showlegend = FALSE
-    ) %>%
-      add_trace(
-        data = df,
-        x = ~stage_label,
-        y = ~value,
-        type = "scatter",
-        mode = "markers",
-        marker = list(
-          size = 11,
-          color = ~fill_color,
-          line = list(color = "white", width = 2)
-        ),
-        hoverinfo = "skip",
-        showlegend = FALSE,
-        inherit = FALSE
-      ) %>%
-      layout(
-        margin = list(l = 62, r = 6, t = 38, b = 52),
-        plot_bgcolor = "rgba(249,252,255,1)",
-        paper_bgcolor = "rgba(0,0,0,0)",
-        bargap = 0.45,
-        xaxis = list(
-          title = "",
-          tickfont = list(size = 12, color = "#33485f"),
-          showgrid = FALSE
-        ),
-        yaxis = list(
-          title = y_title,
-          range = c(0, y_max * 1.30),
-          gridcolor = "rgba(76,104,132,0.12)",
-          zerolinecolor = "rgba(76,104,132,0.20)",
-          tickfont = list(size = 12, color = "#33485f"),
-          titlefont = list(size = 13, color = "#2f4257")
-        ),
-        shapes = if (length(before_val) == 1 && is.finite(before_val)) list(
-          list(
-            type = "line",
-            x0 = -0.4, x1 = 1.4,
-            y0 = before_val, y1 = before_val,
-            line = list(color = "rgba(79,106,133,0.35)", width = 1, dash = "dot")
-          )
-        ) else list()
-      )
-    
-    if (nzchar(delta_text)) {
-      p <- p %>%
-        layout(
-          annotations = list(
-            list(
-              x = 1,
-              y = 1.08,
-              xref = "paper",
-              yref = "paper",
-              text = delta_text,
-              showarrow = FALSE,
-              font = list(size = 12, color = "#35587a"),
-              bgcolor = "rgba(230,240,249,0.85)",
-              bordercolor = "rgba(83,117,151,0.35)",
-              borderwidth = 1,
-              borderpad = 4
+          class = "wb-empty-layer",
+          tags$div(
+            class = "wb-empty",
+            tags$div(class = "wb-empty-icon", icon("circle-exclamation")),
+            tags$div(class = "wb-empty-title", "No data loaded yet"),
+            tags$div(
+              class = "wb-empty-steps",
+              empty_step("1", "Go back to <b>Data Upload</b> and load a feature table"),
+              empty_step("2", "Then return here to annotate the features")
             )
           )
         )
+      )
     }
-    
-    p %>% config(displayModeBar = FALSE, responsive = TRUE)
-  }
-  
-  output$annotation_mfc_plot <- renderPlotly({
-    req(rv$annotation_summary)
-    build_annotation_summary_plot(
-      value_col = "mfc_per_metabolite",
-      y_title = "MFC per metabolite",
-      digits = 3,
-      colors = c("#bfd6ec", "#2f79af")
+
+    tags$div(
+      class = "wb-empty-layer",
+      tags$div(
+        class = "wb-empty",
+        tags$div(class = "wb-empty-icon", icon("magnifying-glass")),
+        tags$div(class = "wb-empty-title", "Annotate features against the reference"),
+        tags$div(
+          class = "wb-empty-steps",
+          empty_step(
+            "1",
+            "Set the <b>MS1 ppm</b> and <b>RT tolerance</b> windows used for matching"
+          ),
+          empty_step(
+            "2",
+            "Pick the <b>column type</b> so retention time is interpreted correctly"
+          ),
+          empty_step(
+            "3",
+            "Isotope peaks are annotated and redundant matches removed automatically"
+          ),
+          empty_step(
+            "4",
+            "Click <b>Run</b> to score every feature-metabolite pair and preview it here"
+          )
+        ),
+        tags$p(
+          class = "wb-empty-foot",
+          "Annotation runs on ", tags$b(format(nrow(rv$feature_data), big.mark = ",")),
+          " features. Larger tolerances take longer."
+        )
+      )
     )
   })
-  
-  output$annotation_feature_plot <- renderPlotly({
-    req(rv$annotation_summary)
-    build_annotation_summary_plot(
-      value_col = "metabolite_per_feature",
-      y_title = "Metabolites per feature",
-      digits = 2,
-      colors = c("#f0c9bb", "#cf6445")
+
+  output$network_empty_state <- renderUI({
+    if (identical(rv$pcsf_status, "finished")) return(NULL)
+
+    if (!identical(rv$annotation_status, "finished")) {
+      return(wb_empty_state(
+        "circle-exclamation",
+        "Feature annotation has not run yet",
+        list(
+          wb_empty_step("1", "Go back to <b>Feature Annotation</b> and run it"),
+          wb_empty_step("2", "Then return here to extract the subnetwork")
+        )
+      ))
+    }
+
+    wb_empty_state(
+      "diagram-project",
+      "Refine the annotations on the metabolic network",
+      list(
+        wb_empty_step("1", "Choose which features act as <b>terminals</b> - all of them, or only the significant ones"),
+        wb_empty_step("2", "Set <b>b</b> and <b>w</b>, or let <b>grid tuning</b> sweep a range and pick the most robust pair"),
+        wb_empty_step("3", "PCSF keeps well-supported metabolites and the reactions that connect them"),
+        wb_empty_step("4", "Click <b>Run PCSF</b> to build the subnetwork and see it here")
+      ),
+      foot = "Repeated iterations are averaged, so a node's frequency reflects how reliably it is kept."
     )
   })
-  
+
+
+  output$modules_empty_state <- renderUI({
+    if (identical(rv$module_status, "finished")) return(NULL)
+
+    if (!identical(rv$pcsf_status, "finished")) {
+      return(wb_empty_state(
+        "circle-exclamation",
+        "No subnetwork yet",
+        list(
+          wb_empty_step("1", "Go back to <b>Subnetwork Extraction</b> and run PCSF"),
+          wb_empty_step("2", "Then return here to detect modules")
+        )
+      ))
+    }
+
+    wb_empty_state(
+      "layer-group",
+      "Split the subnetwork into functional modules",
+      list(
+        wb_empty_step("1", "Pick a <b>community detection</b> method and its resolution"),
+        wb_empty_step("2", "Drop unstable nodes with the <b>frequency threshold</b> and set a minimum module size"),
+        wb_empty_step("3", "Each module is scored and tested against a <b>permutation null</b>"),
+        wb_empty_step("4", "Click <b>Run</b> to get modules with p-values and FDR")
+      ),
+      foot = "More permutations give finer p-values but take longer."
+    )
+  })
+
+  output$function_empty_state <- renderUI({
+    if (identical(rv$function_status, "finished")) return(NULL)
+
+    if (!identical(rv$module_status, "finished")) {
+      return(wb_empty_state(
+        "circle-exclamation",
+        "No modules yet",
+        list(
+          wb_empty_step("1", "Go back to <b>Module Identification</b> and run it"),
+          wb_empty_step("2", "Then return here to interpret the modules")
+        )
+      ))
+    }
+
+    wb_empty_state(
+      "robot",
+      "Interpret each significant module",
+      list(
+        wb_empty_step("1", "Choose the <b>significance cutoff</b> that decides which modules are interpreted"),
+        wb_empty_step("2", "Pick <b>Fast</b> for a single hypothesis, or <b>Advanced</b> for a proposer/skeptic/arbiter debate"),
+        wb_empty_step("3", "Add <b>study context</b> and optionally PubMed evidence", "optional", "is-optional"),
+        wb_empty_step("4", "Enter your <b>provider, model ID and API key</b>", "required", "is-required"),
+        wb_empty_step("5", "Click <b>Run</b> to generate functional summaries and confidence rationales")
+      ),
+      foot = "Nothing is sent anywhere until you press Run; the API key stays in this session."
+    )
+  })
+
+
   output$annotated_table <- renderDT({
     if (is.null(rv$annotated_table) || nrow(rv$annotated_table) == 0) {
-      return(render_table_message("No annotation table 1 results yet"))
+      return(render_table_message("No annotation results yet"))
     }
-    datatable(
-      rv$annotated_table,
-      options = list(scrollX = TRUE, pageLength = 5),
-      rownames = FALSE
-    )
+    wb_preview_table(rv$annotated_table)
   })
   
   ## Step 3: Extract Subnetwork ======================================
@@ -6035,13 +7963,13 @@ server <- function(input, output, session) {
     
     if (isTRUE(input$pcsf_grid_tune)) {
       if (input$pcsf_b_min > input$pcsf_b_max) {
-        showNotification("b min must be ≤ b max", type = "error")
+        show_error_modal("Invalid grid range", "b min must be less than or equal to b max.")
         shinyjs::enable("run_pcsf")
         rv$pcsf_status <- "idle"
         return()
       }
       if (input$pcsf_w_min > input$pcsf_w_max) {
-        showNotification("w min must be ≤ w max", type = "error")
+        show_error_modal("Invalid grid range", "w min must be less than or equal to w max.")
         shinyjs::enable("run_pcsf")
         rv$pcsf_status <- "idle"
         return()
@@ -6079,7 +8007,6 @@ server <- function(input, output, session) {
       
       if (inherits(res, "error")) {
         rv$pcsf_status <- "idle"
-        showNotification(res$message, type = "error")
         update_process_modal("error", "Step 3 Failed", res$message)
         close_process_modal(1800)
       } else {
@@ -6087,35 +8014,28 @@ server <- function(input, output, session) {
         rv$annotation_table2 <- res$anno_feature_table2
         rv$pcsf_status <- "finished"
         rv$pcsf_selected_node <- NULL
-        update_process_modal(
-          "success",
-          "Step 3 Completed",
-          "Subnetwork extraction finished successfully."
+
+        g <- res$pcsf_subnet
+        fmt_n <- function(x) if (is.null(x) || is.na(x)) "-" else format(x, big.mark = ",")
+        finish_process_modal(
+          "Subnetwork extracted",
+          "You can continue to Module Identification.",
+          list(
+            proc_row("circle-nodes", "Metabolite nodes",
+                     fmt_n(if (methods::is(g, "igraph")) igraph::vcount(g) else NA_integer_)),
+            proc_row("link", "Reaction edges",
+                     fmt_n(if (methods::is(g, "igraph")) igraph::gsize(g) else NA_integer_)),
+            proc_row("table", "Annotation table 2",
+                     fmt_n(if (is.data.frame(res$anno_feature_table2)) nrow(res$anno_feature_table2) else NA_integer_))
+          )
         )
-        close_process_modal(900)
       }
       
       shinyjs::enable("run_pcsf")
     })
   })
   
-  output$pcsf_tuning_summary <- renderUI({
-    
-    req(rv$pcsf_status == "finished")
-    req(!is.null(rv$annotation_object$tuning_best))
-    
-    tb <- rv$annotation_object$tuning_best
-    
-    tags$div(
-      class = "param-card",
-      style = "margin-top:20px;",
-      tags$p(
-        tags$strong("Best parameters for grid tuning: "),
-        glue::glue("b = {tb$b}, w = {tb$w}")
-      ),
-    )
-  })
-  
+
   output$pcsf_network_container <- renderUI({
     stage_style <- "display:flex; flex:1 1 auto; min-height:0; height:100%; width:100%;"
     fill_style <- "display:flex; flex:1 1 auto; min-height:100%; height:100%; width:100%;"
@@ -6135,7 +8055,8 @@ server <- function(input, output, session) {
       tags$div(
         class = "pcsf-network-stage",
         style = stage_style,
-        visNetworkOutput("pcsf_network_plot", height = 560)
+        visNetworkOutput("pcsf_network_plot", height = 560),
+        uiOutput("pcsf_filter_panel")
       )
     } else if (rv$pcsf_status == "finished") {
       tags$div(
@@ -6208,7 +8129,75 @@ server <- function(input, output, session) {
             ),
           build_info_icon("Select a metabolite to highlight its directly connected features in the network and update the linked rows shown below.")
         )
-      )
+      ),
+      tags$span()
+    )
+  })
+
+  # Reproducibility filters, floated over the canvas so the topbar keeps
+  # only the two node selectors.
+  output$pcsf_filter_panel <- renderUI({
+    tags$div(
+      class = "pcsf-filter-panel",
+      tags$div(
+        class = "pcsf-filter-head",
+        icon("filter"),
+        "Reproducibility",
+        build_info_icon(
+          paste0(
+            "PCSF is repeated many times; <b>frequency</b> is the share of ",
+            "repeats in which a node - or an edge - appeared, so it measures ",
+            "how reproducible that part of the subnetwork is.<br><br>",
+            "<b>Node</b> and <b>edge</b> thresholds are independent. A node ",
+            "can be perfectly stable while every connection to it is not, so ",
+            "any node left without an edge is dropped from the view.<br><br>",
+            "<code>0</code> on both shows everything."
+          )
+        )
+      ),
+      tags$div(
+        class = "pcsf-filter-row",
+        tags$span(class = "pcsf-filter-label", "Node freq"),
+        numericInput("pcsf_node_freq_cutoff", label = NULL,
+                     value = 0, min = 0, max = 1, step = 0.05)
+      ),
+      tags$div(
+        class = "pcsf-filter-row",
+        tags$span(class = "pcsf-filter-label", "Edge freq"),
+        numericInput("pcsf_edge_freq_cutoff", label = NULL,
+                     value = 0, min = 0, max = 1, step = 0.05)
+      ),
+      uiOutput("pcsf_visible_count")
+    )
+  })
+
+  output$pcsf_visible_count <- renderUI({
+    if (!(rv$pcsf_status == "finished" && isTRUE(input$pcsf_show_network))) {
+      return(NULL)
+    }
+    d <- pcsf_network_base_data()
+    if (is.null(d$total_nodes)) return(NULL)
+
+    tags$div(
+      class = "pcsf-filter-count",
+      tags$div(
+        tags$b(format(d$shown_nodes, big.mark = ",")),
+        " / ",
+        format(d$total_nodes, big.mark = ","),
+        " nodes"
+      ),
+      tags$div(
+        tags$b(format(d$shown_edges, big.mark = ",")),
+        " / ",
+        format(d$total_edges, big.mark = ","),
+        " edges"
+      ),
+      if (isTRUE(d$dropped_isolated > 0)) {
+        tags$div(
+          class = "pcsf-filter-note",
+          format(d$dropped_isolated, big.mark = ","), " unconnected hidden"
+        )
+      }
     )
   })
 
@@ -6282,11 +8271,40 @@ server <- function(input, output, session) {
     }
     node_group <- ifelse(node_type == "Terminal", "Feature", "Metabolite")
 
-    node_compound_name <- igraph::V(g)$compound_name
-    if (is.null(node_compound_name) || length(node_compound_name) != length(node_id)) {
-      node_compound_name <- rep(NA_character_, length(node_id))
+    # The PCSF subnet only carries name/prize/type - compound names live on
+    # the MRN vertices (and, failing that, in annotation table 2).
+    node_compound_name <- rep(NA_character_, length(node_id))
+
+    if (!is.null(rv$mrn) && methods::is(rv$mrn, "igraph")) {
+      mrn_nodes <- tryCatch(
+        as.data.frame(igraph::as_data_frame(rv$mrn, what = "vertices"),
+                      stringsAsFactors = FALSE),
+        error = function(e) NULL
+      )
+      if (!is.null(mrn_nodes) && nrow(mrn_nodes) > 0) {
+        key_col <- pick_first_col(mrn_nodes, c("name", "INCHI_ID", "inchi_id"))
+        name_col <- pick_first_col(
+          mrn_nodes,
+          c("Compound_name", "compound_name", "Compound.name", "name_compound")
+        )
+        if (!is.null(key_col) && !is.null(name_col)) {
+          idx <- match(node_id, as.character(mrn_nodes[[key_col]]))
+          node_compound_name <- as.character(mrn_nodes[[name_col]])[idx]
+        }
+      }
     }
-    node_compound_name <- as.character(node_compound_name)
+
+    missing_name <- is.na(node_compound_name) | !nzchar(node_compound_name)
+    if (any(missing_name) && !is.null(rv$annotation_table2)) {
+      tbl2 <- rv$annotation_table2
+      key2 <- pick_first_col(tbl2, c("INCHI_ID", "inchi_id"))
+      name2 <- pick_first_col(tbl2, c("Compound.name", "Compound_name", "compound_name"))
+      if (!is.null(key2) && !is.null(name2)) {
+        map2 <- tbl2[!duplicated(tbl2[[key2]]), c(key2, name2), drop = FALSE]
+        idx2 <- match(node_id[missing_name], as.character(map2[[key2]]))
+        node_compound_name[missing_name] <- as.character(map2[[name2]])[idx2]
+      }
+    }
 
     node_label <- ifelse(
       node_group == "Metabolite" & !is.na(node_compound_name) & nzchar(node_compound_name),
@@ -6348,6 +8366,58 @@ server <- function(input, output, session) {
     tbl[0, , drop = FALSE]
   })
 
+  # Debounced so dragging the threshold does not rebuild the widget on
+  # every tick.
+  clamp_freq <- function(v) {
+    v <- suppressWarnings(as.numeric(v))
+    if (length(v) != 1 || !is.finite(v)) 0 else max(0, min(1, v))
+  }
+
+  pcsf_node_freq_cutoff <- reactive({
+    clamp_freq(input$pcsf_node_freq_cutoff)
+  }) %>% shiny::debounce(400)
+
+  pcsf_edge_freq_cutoff <- reactive({
+    clamp_freq(input$pcsf_edge_freq_cutoff)
+  }) %>% shiny::debounce(400)
+
+  # The layout is expensive and must not move when the threshold changes,
+  # so it is computed once per subnetwork and reused.
+  pcsf_layout <- reactive({
+    req(rv$annotation_object$pcsf_subnet)
+    g <- rv$annotation_object$pcsf_subnet
+    node_id <- as.character(igraph::V(g)$name)
+
+    coords <- tryCatch({
+      set.seed(123)
+      if (igraph::vcount(g) > 2500) {
+        igraph::layout_with_drl(g)
+      } else {
+        igraph::layout_with_fr(g, niter = 900)
+      }
+    }, error = function(e) {
+      tryCatch(igraph::layout_nicely(g), error = function(e2) NULL)
+    })
+
+    if (is.null(coords) || nrow(coords) != length(node_id)) {
+      coords <- matrix(0, nrow = length(node_id), ncol = 2)
+    }
+
+    spread <- 46 * sqrt(max(length(node_id), 1))
+    norm_axis <- function(v) {
+      rng <- range(v, na.rm = TRUE)
+      if (!all(is.finite(rng)) || diff(rng) == 0) return(rep(0, length(v)))
+      (v - mean(rng)) / (diff(rng) / 2) * spread
+    }
+
+    data.frame(
+      id = node_id,
+      x = norm_axis(coords[, 1]),
+      y = norm_axis(coords[, 2]),
+      stringsAsFactors = FALSE
+    )
+  })
+
   pcsf_network_base_data <- reactive({
     req(rv$pcsf_status == "finished")
     req(isTRUE(input$pcsf_show_network))
@@ -6367,15 +8437,60 @@ server <- function(input, output, session) {
     metabolite_fill <- "#4474b3"
 
     has_name <- !is.na(lookup$compound_name) & nzchar(lookup$compound_name)
+
+    esc <- function(x) htmltools::htmlEscape(as.character(x))
+
+    # vis.js owns .vis-tooltip and forces white-space:nowrap on it, so the
+    # width has to be pinned on our own wrapper inside the tooltip.
+    # Features have no compound name by definition, so the name line is
+    # only emitted when there actually is one.
+    name_line <- ifelse(
+      has_name,
+      paste0(
+        "<div style='font-size:13px;font-weight:700;color:#1c3450;",
+        "line-height:1.35;margin-bottom:5px;'>",
+        esc(lookup$compound_name), "</div>"
+      ),
+      ""
+    )
+
+    tooltip <- paste0(
+      "<div style='width:300px;white-space:normal;word-break:break-word;",
+      "overflow-wrap:anywhere;font-family:inherit;'>",
+      "<div style='font-size:10px;font-weight:700;letter-spacing:0.08em;",
+      "text-transform:uppercase;color:#8fa3b8;margin-bottom:4px;'>",
+      esc(lookup$group), "</div>",
+      name_line,
+      "<div style='font-family:ui-monospace,Menlo,Consolas,monospace;",
+      "font-size:10.5px;color:#6d8299;line-height:1.45;'>",
+      esc(node_id), "</div>",
+      "</div>"
+    )
+
+    # Coordinates come from the cached layout so vis.js can run with physics
+    # switched off - the force simulation over ~10^3 nodes was what made
+    # dragging and zooming stutter.
+    lay <- pcsf_layout()
+    lay_idx <- match(node_id, lay$id)
+
     nodes <- data.frame(
       id = node_id,
       label = "",
-      title = ifelse(
-        has_name,
-        paste0("Name: ", lookup$compound_name, "<br>ID: ", node_id),
-        paste0("ID: ", node_id)
-      ),
-      size = scales::rescale(node_prize, to = c(10, 40)),
+      title = tooltip,
+      x = lay$x[lay_idx],
+      y = lay$y[lay_idx],
+      # area, not radius, tracks frequency, so the difference is readable
+      size = {
+        pr <- node_prize
+        rng <- range(pr[is.finite(pr)], na.rm = TRUE)
+        u <- if (!all(is.finite(rng)) || diff(rng) == 0) {
+          rep(0.5, length(pr))
+        } else {
+          (pr - rng[1]) / diff(rng)
+        }
+        u[!is.finite(u)] <- 0.5
+        round(6 + 22 * sqrt(u), 2)
+      },
       color.background = ifelse(lookup$group == "Feature", feature_fill, metabolite_fill),
       color.border = ifelse(lookup$group == "Feature", feature_fill, metabolite_fill),
       color.highlight.background = ifelse(lookup$group == "Feature", feature_fill, metabolite_fill),
@@ -6403,13 +8518,46 @@ server <- function(input, output, session) {
       id = seq_len(nrow(edges_df)),
       from = edges_df$from,
       to = edges_df$to,
-      value = scales::rescale(edge_freq, to = c(1, 6)),
+      value = scales::rescale(edge_freq, to = c(0.3, 1.8)),
       title = paste0("freq: ", round(edge_freq, 3)),
-      color = "rgba(120,120,120,0.5)",
+      color = "rgba(139,152,168,0.26)",
       stringsAsFactors = FALSE
     )
 
-    list(nodes = nodes, edges = edges)
+    total_nodes <- nrow(nodes)
+    total_edges <- nrow(edges)
+
+    # Two independent reproducibility levels. A node can be perfectly stable
+    # while every edge touching it is not, so anything left without an edge
+    # is dropped rather than drawn as a stray dot.
+    node_cut <- pcsf_node_freq_cutoff()
+    edge_cut <- pcsf_edge_freq_cutoff()
+    dropped_isolated <- 0L
+
+    if (node_cut > 0 || edge_cut > 0) {
+      keep_node <- !is.finite(node_prize) | node_prize >= node_cut
+      keep_edge <- !is.finite(edge_freq) | edge_freq >= edge_cut
+
+      if (any(keep_node)) {
+        nodes <- nodes[keep_node, , drop = FALSE]
+        edges <- edges[keep_edge, , drop = FALSE]
+        edges <- edges[edges$from %in% nodes$id & edges$to %in% nodes$id, , drop = FALSE]
+
+        connected <- unique(c(edges$from, edges$to))
+        dropped_isolated <- sum(!(nodes$id %in% connected))
+        nodes <- nodes[nodes$id %in% connected, , drop = FALSE]
+      }
+    }
+
+    list(
+      nodes = nodes,
+      edges = edges,
+      total_nodes = total_nodes,
+      total_edges = total_edges,
+      shown_nodes = nrow(nodes),
+      shown_edges = nrow(edges),
+      dropped_isolated = dropped_isolated
+    )
   })
 
   pcsf_network_styled_data <- reactive({
@@ -6463,7 +8611,7 @@ server <- function(input, output, session) {
   output$pcsf_network_plot <- renderVisNetwork({
     graph_data <- pcsf_network_base_data()
 
-    visNetwork(graph_data$nodes, graph_data$edges, width = "100%", height = "520px") %>%
+    visNetwork(graph_data$nodes, graph_data$edges, width = "100%", height = "100%") %>%
       visNodes(
         labelHighlightBold = TRUE,
         borderWidth = 0,
@@ -6474,8 +8622,8 @@ server <- function(input, output, session) {
           color = "#475467"
         ),
         scaling = list(
-          min = 10,
-          max = 40,
+          min = 6,
+          max = 28,
           label = list(
             enabled = FALSE,
             min = 14,
@@ -6483,9 +8631,16 @@ server <- function(input, output, session) {
           )
         )
       ) %>%
+      visEdges(
+        smooth = FALSE,
+        width = 1
+      ) %>%
       visInteraction(
         hoverConnectedEdges = FALSE,
-        selectConnectedEdges = FALSE
+        selectConnectedEdges = FALSE,
+        hideEdgesOnDrag = TRUE,
+        hideEdgesOnZoom = TRUE,
+        tooltipDelay = 120
       ) %>%
       visEvents(
         click = "function(params) {
@@ -6493,7 +8648,9 @@ server <- function(input, output, session) {
           Shiny.setInputValue('pcsf_network_selected_node', selected, {priority: 'event'});
         }"
       ) %>%
-      visPhysics(stabilization = FALSE)
+      # positions come from the pre-computed layout, so no force simulation
+      visPhysics(enabled = FALSE, stabilization = FALSE) %>%
+      visOptions(autoResize = TRUE)
   })
 
   observeEvent(list(rv$pcsf_selected_node, rv$pcsf_status, input$pcsf_show_network), {
@@ -6584,16 +8741,6 @@ server <- function(input, output, session) {
     rv$pcsf_selected_node <- as.character(selected_id)
   }, ignoreInit = TRUE)
 
-  output$pcsf_selected_annotation_ui <- renderUI({
-    tags$div(
-      class = "pcsf-linked-table-card",
-      tags$hr(),
-      tags$div(
-        class = "annotation-table-wrap",
-        DTOutput("pcsf_selected_annotation_table")
-      )
-    )
-  })
 
   output$pcsf_selected_annotation_table <- renderDT({
     if (rv$pcsf_status != "finished") {
@@ -6628,14 +8775,7 @@ server <- function(input, output, session) {
       return(render_table_message("No annotation table 2 results yet"))
     }
     
-    datatable(
-      rv$annotation_table2,
-      options = list(
-        pageLength = 10,
-        scrollX = TRUE
-      ),
-      rownames = FALSE
-    )
+    wb_preview_table(rv$annotation_table2)
   })
 
   observeEvent(input$next_to_modules, {
@@ -6680,19 +8820,41 @@ server <- function(input, output, session) {
       if (inherits(res, "error")) {
         rv$module_status <- "idle"
         shinyjs::enable("run_modules")
-        showNotification(res$message, type = "error", duration = NULL)
         update_process_modal("error", "Step 4 Failed", res$message)
         close_process_modal(1800)
       } else {
         rv$module_res    <- res
         rv$mrn           <- res$mrn
         rv$module_status <- "finished"
-        update_process_modal(
-          "success",
-          "Step 4 Completed",
-          "Module identification finished successfully."
+
+        score_tbl <- res$module_score
+        n_modules <- 0L
+        n_p <- NA_integer_
+        n_fdr <- NA_integer_
+        if (is.data.frame(score_tbl) && nrow(score_tbl) > 0) {
+          module_col <- pick_first_col(score_tbl, c("Module", "module", "module_id"))
+          n_modules <- if (!is.null(module_col)) {
+            length(unique(stats::na.omit(score_tbl[[module_col]])))
+          } else nrow(score_tbl)
+          count_sig <- function(cands) {
+            col <- pick_first_col(score_tbl, cands)
+            if (is.null(col)) return(NA_integer_)
+            v <- suppressWarnings(as.numeric(score_tbl[[col]]))
+            sum(is.finite(v) & v < 0.05, na.rm = TRUE)
+          }
+          n_p <- count_sig(c("p", "pvalue", "p_value", "P", "P.Value"))
+          n_fdr <- count_sig(c("fdr", "FDR", "qvalue", "q_value", "padj", "p_adj"))
+        }
+
+        finish_process_modal(
+          "Modules identified",
+          "You can continue to Function Interpretation.",
+          list(
+            proc_row("layer-group", "Modules detected", format(n_modules, big.mark = ",")),
+            proc_row("star", "p < 0.05", if (is.na(n_p)) "-" else format(n_p, big.mark = ",")),
+            proc_row("filter-circle-dollar", "FDR < 0.05", if (is.na(n_fdr)) "-" else format(n_fdr, big.mark = ","))
+          )
         )
-        close_process_modal(900)
       }
       
       
@@ -6869,6 +9031,26 @@ server <- function(input, output, session) {
       node_id
     )
 
+    # Fixed coordinates so vis.js can run with physics off: with the force
+    # simulation live the nodes never settled and kept drifting.
+    coords <- tryCatch({
+      set.seed(123)
+      igraph::layout_with_fr(g, niter = 900)
+    }, error = function(e) {
+      tryCatch(igraph::layout_nicely(g), error = function(e2) NULL)
+    })
+
+    if (is.null(coords) || nrow(coords) != length(node_id)) {
+      coords <- matrix(0, nrow = length(node_id), ncol = 2)
+    }
+
+    spread <- 62 * sqrt(max(length(node_id), 1))
+    norm_axis <- function(v) {
+      rng <- range(v, na.rm = TRUE)
+      if (!all(is.finite(rng)) || diff(rng) == 0) return(rep(0, length(v)))
+      (v - mean(rng)) / (diff(rng) / 2) * spread
+    }
+
     nodes <- data.frame(
       id = node_id,
       label = ifelse(
@@ -6877,6 +9059,10 @@ server <- function(input, output, session) {
         node_label_full
       ),
       title = node_label_full,
+      # vis.js defaults to 25, which dwarfed the 14px labels
+      size = 13,
+      x = norm_axis(coords[, 1]),
+      y = norm_axis(coords[, 2]),
       color.background = ifelse(
         type_map[node_id] == "annotated",
         "#2a9d8f",
@@ -6981,7 +9167,7 @@ server <- function(input, output, session) {
   output$module_network <- renderVisNetwork({
     graph_data <- module_network_base_data()
 
-    visNetwork(graph_data$nodes, graph_data$edges, width = "100%", height = "700px") %>%
+    visNetwork(graph_data$nodes, graph_data$edges, width = "100%", height = "100%") %>%
       visNodes(
         borderWidth = 0,
         borderWidthSelected = 0,
@@ -6990,9 +9176,13 @@ server <- function(input, output, session) {
           label = list(enabled = FALSE)
         )
       ) %>%
+      visEdges(smooth = FALSE) %>%
       visInteraction(
         hoverConnectedEdges = FALSE,
-        selectConnectedEdges = FALSE
+        selectConnectedEdges = FALSE,
+        hideEdgesOnDrag = TRUE,
+        hideEdgesOnZoom = TRUE,
+        tooltipDelay = 120
       ) %>%
       visEvents(
         click = "function(params) {
@@ -7000,8 +9190,8 @@ server <- function(input, output, session) {
           Shiny.setInputValue('module_network_selected_node', selected, {priority: 'event'});
         }"
       ) %>%
-      visPhysics(stabilization = FALSE)
-    
+      # coordinates are pre-computed, so no force simulation has to converge
+      visPhysics(enabled = FALSE, stabilization = FALSE)
   })
 
   observeEvent(input$module_network_selected_node, {
@@ -7060,14 +9250,7 @@ server <- function(input, output, session) {
       return(render_table_message("No module score results yet"))
     }
     
-    datatable(
-      rv$module_res$module_score,
-      options = list(
-        pageLength = 20,
-        scrollX = TRUE
-      ),
-      rownames = FALSE
-    )
+    wb_preview_table(rv$module_res$module_score)
   })
   
   output$module_table <- renderDT({
@@ -7077,148 +9260,10 @@ server <- function(input, output, session) {
       return(render_table_message("No module membership results yet"))
     }
     
-    datatable(
-      rv$module_res$module_table,
-      options = list(
-        pageLength = 5,
-        scrollX = TRUE
-      ),
-      rownames = FALSE
-    )
+    wb_preview_table(rv$module_res$module_table)
   })
 
-  output$module_score_status_ui <- renderUI({
-    if (rv$module_status == "running") {
-      return(
-        tags$div(
-          class = "param-card",
-          tags$h4(icon("spinner", class = "fa-spin"), "Module Score Status"),
-          tags$p(style = "margin-bottom:0;", "Module scoring is running...")
-        )
-      )
-    }
 
-    if (is.null(rv$module_res) ||
-        is.null(rv$module_res$module_score) ||
-        nrow(rv$module_res$module_score) == 0) {
-      return(
-        tags$div(
-          class = "param-card",
-          tags$h4(icon("circle-info"), "Module Score Status"),
-          tags$p(style = "margin-bottom:0;", "No module score results yet.")
-        )
-      )
-    }
-
-    score_tbl <- rv$module_res$module_score
-    module_col <- pick_first_col(score_tbl, c("Module", "module", "module_id"))
-    p_col <- pick_first_col(score_tbl, c("p", "pvalue", "p_value", "P", "P.Value"))
-    fdr_col <- pick_first_col(score_tbl, c("fdr", "FDR", "qvalue", "q_value", "padj", "p_adj"))
-
-    n_modules <- if (!is.null(module_col)) {
-      length(unique(stats::na.omit(score_tbl[[module_col]])))
-    } else {
-      nrow(score_tbl)
-    }
-
-    n_p_sig <- NA_integer_
-    if (!is.null(p_col)) {
-      p_vals <- suppressWarnings(as.numeric(score_tbl[[p_col]]))
-      n_p_sig <- sum(is.finite(p_vals) & p_vals < 0.05, na.rm = TRUE)
-    }
-
-    n_fdr_sig <- NA_integer_
-    if (!is.null(fdr_col)) {
-      fdr_vals <- suppressWarnings(as.numeric(score_tbl[[fdr_col]]))
-      n_fdr_sig <- sum(is.finite(fdr_vals) & fdr_vals < 0.05, na.rm = TRUE)
-    }
-
-    tags$div(
-      class = "param-card",
-      tags$h4(icon("circle-check"), "Module Score Status"),
-      tags$p(
-        style = "margin-bottom:6px;",
-        paste0("Modules scored: ", n_modules)
-      ),
-      tags$p(
-        style = "margin-bottom:6px;",
-        paste0("Modules with p < 0.05: ", ifelse(is.na(n_p_sig), "NA", n_p_sig))
-      ),
-      tags$p(
-        style = "margin-bottom:0;",
-        paste0("Modules with FDR < 0.05: ", ifelse(is.na(n_fdr_sig), "NA", n_fdr_sig))
-      )
-    )
-  })
-
-  output$module_table_status_ui <- renderUI({
-    if (rv$module_status == "running") {
-      return(
-        tags$div(
-          class = "param-card",
-          tags$h4(icon("spinner", class = "fa-spin"), "Module Table Status"),
-          tags$p(style = "margin-bottom:0;", "Module table is being generated...")
-        )
-      )
-    }
-
-    if (is.null(rv$module_res) ||
-        is.null(rv$module_res$module_table) ||
-        nrow(rv$module_res$module_table) == 0) {
-      return(
-        tags$div(
-          class = "param-card",
-          tags$h4(icon("circle-info"), "Module Table Status"),
-          tags$p(style = "margin-bottom:0;", "No module table results yet.")
-        )
-      )
-    }
-
-    tbl <- rv$module_res$module_table
-    module_col <- pick_first_col(tbl, c("Module", "module", "module_id"))
-    node_col <- pick_first_col(tbl, c("INCHI_ID", "node", "node_id", "id", "name"))
-    type_col <- pick_first_col(tbl, c("Type", "type"))
-
-    n_modules <- if (!is.null(module_col)) {
-      length(unique(stats::na.omit(tbl[[module_col]])))
-    } else {
-      NA_integer_
-    }
-
-    n_nodes <- if (!is.null(node_col)) {
-      length(unique(stats::na.omit(tbl[[node_col]])))
-    } else {
-      NA_integer_
-    }
-
-    annotated_hidden_txt <- "NA"
-    if (!is.null(type_col)) {
-      tp <- tolower(as.character(tbl[[type_col]]))
-      annotated_hidden_txt <- paste0(
-        sum(tp == "annotated", na.rm = TRUE),
-        " / ",
-        sum(tp %in% c("hidden", "unannotated"), na.rm = TRUE)
-      )
-    }
-
-    tags$div(
-      class = "param-card",
-      tags$h4(icon("circle-check"), "Module Table Status"),
-      tags$p(
-        style = "margin-bottom:6px;",
-        paste0("Rows: ", nrow(tbl))
-      ),
-      tags$p(
-        style = "margin-bottom:6px;",
-        paste0("Modules: ", ifelse(is.na(n_modules), "NA", n_modules),
-               "; Unique nodes: ", ifelse(is.na(n_nodes), "NA", n_nodes))
-      ),
-      tags$p(
-        style = "margin-bottom:0;",
-        paste0("Annotated / Hidden: ", annotated_hidden_txt)
-      )
-    )
-  })
   
   observeEvent(input$next_to_function, {
     req(rv$module_status == "finished")
@@ -7240,10 +9285,9 @@ server <- function(input, output, session) {
       llm_key <- trimws(Sys.getenv("FEATUREMAP_LLM_API_KEY", unset = ""))
     }
     if (!identical(input$func_provider, "local") && !nzchar(llm_key)) {
-      showNotification(
-        "LLM API key missing. Fill the input or set FEATUREMAP_LLM_API_KEY.",
-        type = "error",
-        duration = NULL
+      show_error_modal(
+        "LLM API key missing",
+        "Fill the API key input, or set FEATUREMAP_LLM_API_KEY in the environment."
       )
       return()
     }
@@ -7255,10 +9299,9 @@ server <- function(input, output, session) {
         llm_base_url <- trimws(Sys.getenv("FEATUREMAP_LLM_BASE_URL", unset = ""))
       }
       if (!nzchar(llm_base_url)) {
-        showNotification(
-          "Local LLM base URL missing. Fill the input or set FEATUREMAP_LLM_BASE_URL.",
-          type = "error",
-          duration = NULL
+        show_error_modal(
+          "Local base URL missing",
+          "Fill the base URL input, or set FEATUREMAP_LLM_BASE_URL in the environment."
         )
         return()
       }
@@ -7270,10 +9313,9 @@ server <- function(input, output, session) {
         ncbi_key <- trimws(Sys.getenv("FEATUREMAP_NCBI_API_KEY", unset = ""))
       }
       if (!nzchar(ncbi_key)) {
-        showNotification(
-          "NCBI API key missing. Fill the input or set FEATUREMAP_NCBI_API_KEY.",
-          type = "error",
-          duration = NULL
+        show_error_modal(
+          "NCBI API key missing",
+          "Fill the NCBI key input, or set FEATUREMAP_NCBI_API_KEY in the environment."
         )
         return()
       }
@@ -7290,7 +9332,8 @@ server <- function(input, output, session) {
     func_mode <- if (identical(input$func_mode, "advanced")) "advanced" else "fast"
     # Cross-module synthesis only runs in Advanced mode, and only if the
     # user checked the box for it.
-    func_synthesize  <- func_mode == "advanced" && isTRUE(input$func_synthesize)
+    # Cross-module synthesis is part of Advanced mode, not a separate opt-in.
+    func_synthesize  <- func_mode == "advanced"
     # The per-module debate transcript HTML always generates in Advanced
     # mode (needed to render the Debate History tab and to make it
     # available on the Results Download page).
@@ -7363,11 +9406,6 @@ server <- function(input, output, session) {
         rv$function_status <- "error"
         shinyjs::enable("run_function_annotation")
         
-        showNotification(
-          paste("Functional interpretation failed:", res$message),
-          type = "error",
-          duration = NULL
-        )
         update_process_modal(
           "error",
           "Step 5 Failed",
@@ -7402,24 +9440,25 @@ server <- function(input, output, session) {
           }
         }
 
-        if (is_empty) {
-          showNotification(
-            "No significant modules passed the cutoff. Try relaxing the cutoff or using p-value instead of FDR.",
-            type = "warning",
-            duration = NULL
-          )
-        }
         # (function_module_selector rebuilds itself via renderUI whenever
         # rv$function_result/rv$function_status change, so no manual
         # update*Input() call is needed here.)
 
-        update_process_modal(
-          "success",
-          "Step 5 Completed",
-          "Module function interpretation finished successfully."
+        mf <- rv$function_result$module_function
+        n_mod <- if (is.data.frame(mf) && "module_id" %in% names(mf)) {
+          length(unique(stats::na.omit(mf$module_id)))
+        } else 0L
+
+        finish_process_modal(
+          "Interpretation finished",
+          "You can continue to Results Download.",
+          list(
+            proc_row("layer-group", "Modules interpreted", format(n_mod, big.mark = ",")),
+            proc_row("wand-magic-sparkles", "Mode",
+                     if (identical(rv$function_mode_used, "advanced")) "Advanced" else "Fast")
+          )
         )
-        close_process_modal(900)
-        
+
         shinyjs::enable("run_function_annotation")
       }
     })
@@ -7461,9 +9500,16 @@ server <- function(input, output, session) {
             tabPanel(
               title = tagList(icon("circle-check"), "Accepted Interpretations"),
               tags$div(
-                class = "function-visual-filter-row",
-                uiOutput("function_module_selector"),
-                uiOutput("function_hypothesis_selector")
+                class = "fast-toolbar",
+                tags$span(
+                  class = "fast-function-eyebrow",
+                  icon("users"), "Advanced mode - accepted hypothesis"
+                ),
+                tags$div(
+                  class = "fast-toolbar-right",
+                  uiOutput("function_module_selector"),
+                  uiOutput("function_hypothesis_selector")
+                )
               ),
               uiOutput("function_module_output")
             ),
@@ -7475,15 +9521,23 @@ server <- function(input, output, session) {
               title = tagList(icon("diagram-project"), "Cross-Module Synthesis"),
               uiOutput("function_synthesis_ui")
             )
-          ),
-          uiOutput("function_result_status_ui")
+          )
         )
       } else {
         tags$div(
           class = "function-result-shell",
-          uiOutput("function_module_selector"),
-          uiOutput("function_module_output"),
-          uiOutput("function_result_status_ui")
+          tags$div(
+            class = "fast-toolbar",
+            tags$span(
+              class = "fast-function-eyebrow",
+              icon("bolt"), "Fast mode interpretation"
+            ),
+            tags$div(
+              class = "fast-toolbar-right",
+              uiOutput("function_module_selector")
+            )
+          ),
+          uiOutput("function_module_output")
         )
       }
 
@@ -7511,22 +9565,19 @@ server <- function(input, output, session) {
 
     tags$div(
       id = "function_module_selector_ui",
-      class = "pcsf-selector-item",
+      class = "fast-select",
+      tags$span(class = "fast-select-label", "Module"),
       tags$div(
-        class = "pcsf-selector-input",
-        tags$div(
-          class = "pcsf-selector-field",
-          selectizeInput(
-            "selected_function_module",
-            label = NULL,
-            choices = module_ids,
-            selected = module_ids[1],
-            multiple = FALSE,
-            width = "100%",
-            options = list(placeholder = "Module")
-          )
-        ),
-        build_info_icon("Select which annotated module to display.")
+        class = "fast-select-field",
+        selectizeInput(
+          "selected_function_module",
+          label = NULL,
+          choices = module_ids,
+          selected = module_ids[1],
+          multiple = FALSE,
+          width = "100%",
+          options = list(placeholder = "Module")
+        )
       )
     )
   })
@@ -7549,11 +9600,7 @@ server <- function(input, output, session) {
 
     if (nrow(accepted) == 0) {
       return(
-        tags$div(
-          id = "function_hypothesis_selector_ui",
-          class = "pcsf-selector-item",
-          tags$p(class = "fast-muted", style = "margin: 8px 0 0 0;", "No accepted hypothesis for this module.")
-        )
+        tags$span(class = "fast-muted", "No accepted hypothesis for this module.")
       )
     }
 
@@ -7561,22 +9608,19 @@ server <- function(input, output, session) {
 
     tags$div(
       id = "function_hypothesis_selector_ui",
-      class = "pcsf-selector-item",
+      class = "fast-select",
+      tags$span(class = "fast-select-label", "Hypothesis"),
       tags$div(
-        class = "pcsf-selector-input",
-        tags$div(
-          class = "pcsf-selector-field",
-          selectizeInput(
-            "selected_function_hypothesis",
-            label = NULL,
-            choices = choices,
-            selected = choices[1],
-            multiple = FALSE,
-            width = "100%",
-            options = list(placeholder = "Hypothesis")
-          )
-        ),
-        build_info_icon("Select which accepted hypothesis to display for this module.")
+        class = "fast-select-field is-wide",
+        selectizeInput(
+          "selected_function_hypothesis",
+          label = NULL,
+          choices = choices,
+          selected = choices[1],
+          multiple = FALSE,
+          width = "100%",
+          options = list(placeholder = "Hypothesis")
+        )
       )
     )
   })
@@ -7677,10 +9721,10 @@ server <- function(input, output, session) {
       )
     }
 
-    fast_section <- function(icon_name, title, ...) {
+    fast_section <- function(icon_name, title, accent = "blue", ...) {
       body <- list(...)
       tags$section(
-        class = "fast-info-section",
+        class = paste0("fast-info-section accent-", accent),
         tags$div(
           class = "fast-section-head",
           tags$span(class = "fast-section-icon", icon(icon_name)),
@@ -7688,6 +9732,12 @@ server <- function(input, output, session) {
         ),
         do.call(tags$div, c(list(class = "fast-section-body"), body))
       )
+    }
+
+    # The summary is the headline claim, so it gets a tinted callout rather
+    # than being one more label/value row.
+    fast_callout <- function(text) {
+      tags$div(class = "fast-callout", tags$p(text))
     }
 
     get_evidence_df <- function(path) {
@@ -7751,8 +9801,8 @@ server <- function(input, output, session) {
       )
     }
 
-    # Clickable PMID pills (used as the Literature support fallback when no
-    # structured evidence table is available).
+    # Clickable PMID pills -- the Literature support display in both
+    # Fast and Advanced mode.
     pmid_link_list <- function(pmids, empty = "No retained PubMed references.") {
       pmids <- compact_text(pmids)
       if (length(pmids) == 0) {
@@ -7848,7 +9898,6 @@ server <- function(input, output, session) {
 
       top_df <- get_evidence_df(c("top_metabolites"))
       anchor_df <- get_evidence_df(c("anchor_metabolites"))
-      pubmed_df <- get_evidence_df(c("pubmed_evidence"))
 
       kegg_df <- get_evidence_df(c("pathway_coverage", "kegg"))
       hmdb_df <- get_evidence_df(c("pathway_coverage", "hmdb"))
@@ -7875,26 +9924,10 @@ server <- function(input, output, session) {
       }
       pmids <- split_semicolon(get_field(row, "pubmed_pmids", ""))
 
-      literature_table <- NULL
-      if (!is.null(pubmed_df) && "pubmed_evidence_json" %in% names(pubmed_df)) {
-        ev_json <- compact_text(pubmed_df$pubmed_evidence_json[1])
-        if (length(ev_json) > 0) {
-          literature_table <- tryCatch(
-            jsonlite::fromJSON(ev_json[1], simplifyDataFrame = TRUE),
-            error = function(e) NULL
-          )
-        }
-      }
-
       tags$div(
         class = "fast-function-report",
         tags$div(
           class = "fast-function-hero",
-          if (!is.null(hyp_id)) {
-            tags$div(class = "fast-function-eyebrow", icon("users"), "Advanced mode · accepted hypothesis")
-          } else {
-            tags$div(class = "fast-function-eyebrow", icon("bolt"), "Fast mode interpretation")
-          },
           tags$h3(title),
           tags$div(
             class = "fast-function-meta",
@@ -7913,7 +9946,8 @@ server <- function(input, output, session) {
           fast_section(
             "wand-magic-sparkles",
             "Function Interpretation",
-            fast_field("Summary", tags$p(get_field(row, "functional_summary", "–"))),
+            accent = "blue",
+            fast_callout(get_field(row, "functional_summary", "Not available.")),
             evidence_field(
               "Core drivers",
               chip_items = anchor_items,
@@ -7928,6 +9962,7 @@ server <- function(input, output, session) {
           fast_section(
             "flask",
             "Biochemical Context",
+            accent = "teal",
             fast_field(
               "Chemical-class profile",
               chip_list(split_semicolon(get_field(row, "class_names", "")), "No class profile available.")
@@ -7960,9 +9995,10 @@ server <- function(input, output, session) {
           fast_section(
             "chart-column",
             "Module Statistics",
+            accent = "violet",
             fast_field(
-              "Top metabolites",
-              chip_list(utils::head(top_items, 12), "No top metabolite summary available.")
+              "Supporting metabolites",
+              chip_list(utils::head(top_items, 12), "No supporting metabolite summary available.")
             ),
             fast_field("Global direction", direction_chip(direction))
           ),
@@ -7970,21 +10006,12 @@ server <- function(input, output, session) {
           fast_section(
             "heart-pulse",
             "Phenotype & Literature",
+            accent = "amber",
             fast_field("Phenotype relationship", tags$p(get_field(row, "phenotype_relationship", "–"))),
             fast_field(
               "Literature support",
               if (isTRUE(rv$function_pubmed_used)) {
-                if (!is.null(literature_table) && is.data.frame(literature_table) && nrow(literature_table) > 0) {
-                  mini_table(
-                    literature_table,
-                    cols = c("pmid", "title", "evidence_scope", "source_term"),
-                    labels = c(pmid = "PMID", title = "Title", evidence_scope = "Scope", source_term = "Source term"),
-                    max_rows = 5,
-                    empty = "No PubMed evidence detail table available."
-                  )
-                } else {
-                  pmid_link_list(pmids)
-                }
+                pmid_link_list(pmids)
               } else {
                 tags$span(class = "fast-muted", "Literature-based annotation was disabled in this run.")
               }
@@ -7994,6 +10021,7 @@ server <- function(input, output, session) {
           fast_section(
             "shield-halved",
             "Evidence Strength",
+            accent = "green",
             fast_field(
               "Confidence label",
               tags$span(class = paste("fast-chip", conf_class(confidence)), confidence)
@@ -8042,10 +10070,11 @@ server <- function(input, output, session) {
     if (!isTRUE(rv$function_debate_html_used)) {
       return(
         tags$div(
-          class = "param-card function-annotation-card",
-          tags$h4(icon("messages"), "Debate Transcript"),
+          class = "fast-tab-placeholder",
+          tags$div(class = "fast-tab-placeholder-icon", icon("comments")),
+          tags$h4("Debate transcript"),
           tags$p(
-            class = "function-annotation-note",
+            class = "fast-tab-placeholder-text",
             "Debate transcript is not available for this run. Re-run Step 5 in Advanced mode to see the ",
             "Proposer / Skeptic / Arbiter exchange here."
           )
@@ -8074,9 +10103,10 @@ server <- function(input, output, session) {
     if (!file.exists(fpath)) {
       return(
         tags$div(
-          class = "param-card function-annotation-card",
-          tags$h4(icon("messages"), "Debate Transcript"),
-          tags$p(class = "function-annotation-note", "No debate transcript found for this module.")
+          class = "fast-tab-placeholder",
+          tags$div(class = "fast-tab-placeholder-icon", icon("comments")),
+          tags$h4("Debate transcript"),
+          tags$p(class = "fast-tab-placeholder-text", "No debate transcript found for this module.")
         )
       )
     }
@@ -8088,10 +10118,11 @@ server <- function(input, output, session) {
     if (inherits(debate_html, "error") || !nzchar(debate_html)) {
       return(
         tags$div(
-          class = "param-card function-annotation-card",
-          tags$h4(icon("messages"), "Debate Transcript"),
+          class = "fast-tab-placeholder",
+          tags$div(class = "fast-tab-placeholder-icon", icon("comments")),
+          tags$h4("Debate transcript"),
           tags$p(
-            class = "function-annotation-note",
+            class = "fast-tab-placeholder-text",
             paste0(
               "Could not read the debate transcript HTML",
               if (inherits(debate_html, "error")) paste0(": ", debate_html$message) else "."
@@ -8103,7 +10134,8 @@ server <- function(input, output, session) {
 
     tags$iframe(
       srcdoc = debate_html,
-      style = "width:100%; height:820px; border:1px solid #dee2e6; border-radius:8px;",
+      class = "fast-embed-frame",
+      style = "height:820px;",
       sandbox = "allow-same-origin allow-scripts"
     )
   })
@@ -8116,12 +10148,13 @@ server <- function(input, output, session) {
     if (is.null(rv$function_result) || is.null(rv$function_result$module_synthesis)) {
       return(
         tags$div(
-          class = "param-card function-annotation-card",
-          tags$h4(icon("diagram-project"), "Cross-Module Synthesis"),
+          class = "fast-tab-placeholder",
+          tags$div(class = "fast-tab-placeholder-icon", icon("diagram-project")),
+          tags$h4("Cross-module synthesis"),
           tags$p(
-            class = "function-annotation-note",
-            "Cross-module synthesis was not run for this annotation. Check ",
-            tags$em("Run cross-module synthesis"), " in Advanced mode, then re-run Step 5 to see the integrated network here."
+            class = "fast-tab-placeholder-text",
+            "Cross-module synthesis was not run for this annotation. ",
+            "Re-run Step 5 in Advanced mode to see the integrated network here."
           )
         )
       )
@@ -8131,9 +10164,10 @@ server <- function(input, output, session) {
     if (is.null(syn_path) || !file.exists(syn_path)) {
       return(
         tags$div(
-          class = "param-card function-annotation-card",
-          tags$h4(icon("diagram-project"), "Cross-Module Synthesis"),
-          tags$p(class = "function-annotation-note", "Synthesis completed, but the network HTML file could not be found.")
+          class = "fast-tab-placeholder",
+          tags$div(class = "fast-tab-placeholder-icon", icon("diagram-project")),
+          tags$h4("Cross-module synthesis"),
+          tags$p(class = "fast-tab-placeholder-text", "Synthesis completed, but the network HTML file could not be found.")
         )
       )
     }
@@ -8145,10 +10179,11 @@ server <- function(input, output, session) {
     if (inherits(syn_html, "error") || !nzchar(syn_html)) {
       return(
         tags$div(
-          class = "param-card function-annotation-card",
-          tags$h4(icon("diagram-project"), "Cross-Module Synthesis"),
+          class = "fast-tab-placeholder",
+          tags$div(class = "fast-tab-placeholder-icon", icon("diagram-project")),
+          tags$h4("Cross-module synthesis"),
           tags$p(
-            class = "function-annotation-note",
+            class = "fast-tab-placeholder-text",
             paste0(
               "Could not read the synthesis network HTML",
               if (inherits(syn_html, "error")) paste0(": ", syn_html$message) else "."
@@ -8160,88 +10195,12 @@ server <- function(input, output, session) {
 
     tags$iframe(
       srcdoc = syn_html,
-      style = "width:100%; height:900px; border:1px solid #dee2e6; border-radius:8px;",
+      class = "fast-embed-frame",
+      style = "height:900px;",
       sandbox = "allow-same-origin allow-scripts"
     )
   })
 
-  output$function_result_status_ui <- renderUI({
-    if (rv$function_status != "finished") return(NULL)
-    if (is.null(rv$function_result) || is.null(rv$function_result$module_function)) return(NULL)
-
-    mf <- rv$function_result$module_function
-    if (!is.data.frame(mf) || nrow(mf) == 0) return(NULL)
-
-    n_modules <- if ("module_id" %in% names(mf)) {
-      length(unique(stats::na.omit(mf$module_id)))
-    } else {
-      nrow(mf)
-    }
-
-    n_summary_ready <- if ("functional_summary" %in% names(mf)) {
-      sum(!is.na(mf$functional_summary) & nzchar(trimws(mf$functional_summary)))
-    } else {
-      n_modules
-    }
-
-    has_literature <- isTRUE(rv$function_pubmed_used) &&
-      "pubmed_pmids" %in% names(mf) &&
-      any(!is.na(mf$pubmed_pmids) & nzchar(trimws(mf$pubmed_pmids)))
-
-    debate_dir <- rv$function_debate_html_dir
-    debate_files <- if (!is.null(debate_dir) && dir.exists(debate_dir)) {
-      list.files(debate_dir, pattern = "\\.html?$", full.names = TRUE)
-    } else {
-      character(0)
-    }
-    debate_payload <- rv$function_result$module_evidence$debate_html_payload
-    has_debate_payload <- !is.null(debate_payload) &&
-      is.data.frame(debate_payload) &&
-      nrow(debate_payload) > 0
-    debate_count <- max(
-      length(debate_files),
-      if (has_debate_payload) nrow(debate_payload) else 0L
-    )
-
-    tags$div(
-      class = "param-card",
-      tags$h4(icon("circle-check"), "Functional Interpretation Status"),
-      tags$ul(
-        style = "margin:0; padding-left:18px; list-style:disc;",
-        tags$li(
-          style = "margin-bottom:5px;",
-          paste0("Annotated modules: ", n_modules, " (mode: ", rv$function_mode_used %||% input$func_mode, ")")
-        ),
-        tags$li(
-          style = "margin-bottom:5px;",
-          paste0(
-            "Literature-based annotation: ",
-            if (has_literature) "Enabled" else "Disabled"
-          )
-        ),
-        if (debate_count > 0) {
-          tags$li(
-            style = "margin-bottom:5px;",
-            paste0(
-              "Debate transcripts available for ",
-              debate_count,
-              " module(s). Download from Results Download."
-            )
-          )
-        },
-        if (!is.null(rv$function_result$module_synthesis)) {
-          tags$li(
-            style = "margin-bottom:5px;",
-            "Cross-module synthesis completed. Download from Results Download."
-          )
-        },
-        tags$li(
-          style = "margin-bottom:0; font-weight:600;",
-          "Congratulations! Functional interpretation is complete. You can go to Results Download to download outputs."
-        )
-      )
-    )
-  })
   
   observeEvent(input$next_to_results, {
     switch_page("results")
@@ -8284,6 +10243,14 @@ server <- function(input, output, session) {
       if (!is.null(pcsf_export_data())) "pcsf",
       if (length(results_module_choices()) > 0) "module"
     )
+  })
+
+  selected_report_export_items <- reactive({
+    if (!identical(rv$function_status, "finished") ||
+        !identical(rv$function_mode_used, "advanced")) {
+      return(character(0))
+    }
+    input$report_export_items %||% character(0)
   })
 
   observeEvent(input$export_items, ignoreInit = TRUE, {
@@ -8385,6 +10352,7 @@ server <- function(input, output, session) {
       options = list(plugins = list("remove_button"))
     )
   })
+  outputOptions(output, "results_module_export_selector", suspendWhenHidden = FALSE)
 
   pcsf_export_data <- reactive({
     if (rv$pcsf_status != "finished") return(NULL)
@@ -8545,15 +10513,33 @@ server <- function(input, output, session) {
   })
 
   build_network_widget <- function(nodes, edges) {
+    # Exported HTML has no pre-computed coordinates, so the simulation is
+    # allowed to run - but with a hard iteration cap, and physics is switched
+    # off the moment it finishes so the layout stops moving.
     visNetwork(nodes, edges, width = "100%", height = "760px") %>%
       visOptions(highlightNearest = TRUE, nodesIdSelection = TRUE) %>%
-      visPhysics(stabilization = FALSE)
+      visEdges(smooth = FALSE) %>%
+      visPhysics(
+        solver = "forceAtlas2Based",
+        stabilization = list(
+          enabled = TRUE,
+          iterations = 400,
+          updateInterval = 40,
+          fit = TRUE
+        )
+      ) %>%
+      visEvents(
+        stabilizationIterationsDone = "function() {
+          this.setOptions({ physics: false });
+        }"
+      )
   }
 
   output$results_overview <- renderUI({
     payload <- export_payload()
     module_table <- payload$module_table
     annotation_table2 <- payload$anno2
+    fmt_n <- function(x) format(x, big.mark = ",", scientific = FALSE, trim = TRUE)
 
     n_uploaded <- if (is.data.frame(rv$feature_data)) nrow(rv$feature_data) else 0
 
@@ -8585,18 +10571,62 @@ server <- function(input, output, session) {
       0
     }
 
-    n_export_ready <- sum(vapply(payload, is_export_ready, logical(1)))
-    function_status <- if (is_export_ready(payload$module_function)) {
-      "Completed"
-    } else if (rv$function_status == "running") {
-      "Running"
-    } else if (rv$function_status == "finished") {
-      "No output"
+    mf <- payload$module_function
+    score_tbl <- payload$module_score
+    score_module_col <- if (is.data.frame(score_tbl) && nrow(score_tbl) > 0) {
+      pick_first_col(score_tbl, c("Module", "module", "module_id"))
     } else {
-      "Not run"
+      NULL
+    }
+    metric <- if (identical(input$func_p_type, "p")) "p" else "fdr"
+    metric_col <- if (is.data.frame(score_tbl) && nrow(score_tbl) > 0) {
+      if (identical(metric, "p")) {
+        pick_first_col(score_tbl, c("p", "pvalue", "p_value", "P", "P.Value"))
+      } else {
+        pick_first_col(score_tbl, c("fdr", "FDR", "qvalue", "q_value", "padj", "p_adj"))
+      }
+    } else {
+      NULL
+    }
+    cutoff <- suppressWarnings(as.numeric(input$func_p_cutoff))
+    significant_modules <- if (!is.null(score_module_col) && !is.null(metric_col) &&
+                               length(cutoff) == 1 && is.finite(cutoff)) {
+      metric_values <- suppressWarnings(as.numeric(score_tbl[[metric_col]]))
+      unique(as.character(stats::na.omit(score_tbl[[score_module_col]][metric_values < cutoff])))
+    } else {
+      character(0)
+    }
+    annotated_modules <- if (is.data.frame(mf) && nrow(mf) > 0 && "module_id" %in% names(mf)) {
+      unique(as.character(stats::na.omit(mf$module_id)))
+    } else {
+      character(0)
+    }
+    annotated_significant_modules <- if (length(significant_modules) > 0) {
+      intersect(annotated_modules, significant_modules)
+    } else {
+      annotated_modules
     }
 
-    fmt_n <- function(x) format(x, big.mark = ",", scientific = FALSE, trim = TRUE)
+    n_significant <- length(significant_modules)
+    n_annotated_significant <- length(annotated_significant_modules)
+    annotated_sig_value <- if (n_significant > 0) {
+      paste0(fmt_n(n_annotated_significant), " / ", fmt_n(n_significant))
+    } else {
+      fmt_n(n_annotated_significant)
+    }
+    annotated_sig_note <- if (n_annotated_significant > 0) {
+      paste0(
+        toupper(metric), " < ", format(cutoff, trim = TRUE, scientific = FALSE),
+        if (identical(rv$function_mode_used, "advanced")) " (Advanced)" else
+          if (identical(rv$function_mode_used, "fast")) " (Fast)" else ""
+      )
+    } else if (identical(rv$function_status, "running")) {
+      "Interpretation running"
+    } else if (identical(rv$function_status, "finished")) {
+      "No module passed the cutoff"
+    } else {
+      "Functional interpretation not run"
+    }
 
     tags$div(
       class = "results-overview-grid",
@@ -8620,12 +10650,9 @@ server <- function(input, output, session) {
       ),
       tags$div(
         class = "results-overview-card",
-        tags$div(class = "results-overview-label", "Export-Ready Tables"),
-        tags$div(class = "results-overview-value", paste0(n_export_ready, " / ", length(payload))),
-        tags$div(
-          class = "results-overview-subtext",
-          paste0("Functional interpretation: ", function_status)
-        )
+        tags$div(class = "results-overview-label", "Annotated Modules"),
+        tags$div(class = "results-overview-value", annotated_sig_value),
+        tags$div(class = "results-overview-subtext", annotated_sig_note)
       )
     )
   })
@@ -8657,8 +10684,24 @@ server <- function(input, output, session) {
       ))
     }
 
-    has_any_selection <- (length(selected) + length(selected_networks)) > 0
-    ready_for_download <- has_any_selection && table_ready && network_ready
+    selected_reports <- selected_report_export_items()
+    report_ready <- if (length(selected_reports) == 0) {
+      TRUE
+    } else {
+      all(vapply(
+        selected_reports,
+        function(key) {
+          if (identical(key, "debate")) return(isTRUE(has_debate_report()))
+          if (identical(key, "synthesis")) return(length(synthesis_export_file()) > 0)
+          FALSE
+        },
+        logical(1)
+      ))
+    }
+
+    has_any_selection <-
+      (length(selected) + length(selected_networks) + length(selected_reports)) > 0
+    ready_for_download <- has_any_selection && table_ready && network_ready && report_ready
 
     shinyjs::toggleState(
       "download_results",
@@ -8666,93 +10709,89 @@ server <- function(input, output, session) {
     )
   })
   
-  output$download_debate_html <- downloadHandler(
-    filename = function() {
-      paste0("featuremap_debate_html_", Sys.Date(), ".zip")
-    },
-    content = function(file) {
-      debate_dir <- rv$function_debate_html_dir
-      req(!is.null(debate_dir), dir.exists(debate_dir))
-
-      debate_files <- list.files(debate_dir, pattern = "\\.html?$", full.names = TRUE)
-      if (length(debate_files) == 0 && !is.null(rv$function_result)) {
-        tryCatch(
-          export_debate_html(
-            res = rv$function_result,
-            html_dir = debate_dir
-          ),
-          error = function(e) NULL
-        )
-        debate_files <- list.files(debate_dir, pattern = "\\.html?$", full.names = TRUE)
-      }
-      req(length(debate_files) > 0)
-
-      zip_flat(file, debate_files)
-    }
-  )
-
-  output$download_synthesis_html <- downloadHandler(
-    filename = function() {
-      "synthesis_network.html"
-    },
-    content = function(file) {
-      syn_path <- rv$function_synthesis_html_path
-      req(!is.null(syn_path), file.exists(syn_path))
-      file.copy(syn_path, file, overwrite = TRUE)
-    }
-  )
-
-  #### ---- Advanced-mode download buttons (Results Download page) ----
-  output$results_advanced_mode_downloads <- renderUI({
+  #### ---- Advanced-mode report exports (Results Download page) ----
+  # Debate transcripts are written to disk during the Advanced run; if the
+  # folder is empty they are regenerated on demand from the saved payload.
+  debate_export_files <- reactive({
     debate_dir <- rv$function_debate_html_dir
-    debate_files <- if (!is.null(debate_dir) && dir.exists(debate_dir)) {
-      list.files(debate_dir, pattern = "\\.html?$", full.names = TRUE)
-    } else {
-      character(0)
+    if (is.null(debate_dir) || !dir.exists(debate_dir)) return(character(0))
+    files <- list.files(debate_dir, pattern = "^debate_.*\\.html?$", full.names = TRUE)
+    if (length(files) == 0 && !is.null(rv$function_result)) {
+      tryCatch(
+        export_debate_html(res = rv$function_result, html_dir = debate_dir),
+        error = function(e) NULL
+      )
+      files <- list.files(debate_dir, pattern = "^debate_.*\\.html?$", full.names = TRUE)
     }
-    debate_payload <- rv$function_result$module_evidence$debate_html_payload
-    has_debate_payload <- !is.null(debate_payload) &&
-      is.data.frame(debate_payload) &&
-      nrow(debate_payload) > 0
-    debate_count <- max(
-      length(debate_files),
-      if (has_debate_payload) nrow(debate_payload) else 0L
-    )
-    has_synthesis <- !is.null(rv$function_synthesis_html_path) && file.exists(rv$function_synthesis_html_path)
+    files
+  })
 
-    if (debate_count == 0 && !has_synthesis) return(NULL)
+  has_debate_report <- reactive({
+    if (length(debate_export_files()) > 0) return(TRUE)
+    payload <- rv$function_result$module_evidence$debate_html_payload
+    !is.null(payload) && is.data.frame(payload) && nrow(payload) > 0
+  })
+
+  synthesis_export_file <- reactive({
+    p <- rv$function_synthesis_html_path
+    if (!is.null(p) && file.exists(p)) return(p)
+
+    if (is.null(rv$function_result) || is.null(rv$function_result$module_synthesis)) {
+      return(character(0))
+    }
+
+    html_dir <- rv$function_html_dir
+    if (is.null(html_dir) || !dir.exists(html_dir)) {
+      return(character(0))
+    }
+
+    candidate <- file.path(html_dir, "synthesis_network.html")
+    if (!file.exists(candidate)) {
+      candidate <- tryCatch(
+        export_synthesis_network_html(
+          res = rv$function_result,
+          html_dir = html_dir,
+          output_file = "synthesis_network.html",
+          show_same_module = FALSE
+        ),
+        error = function(e) character(0)
+      )
+    }
+
+    if (length(candidate) > 0 && file.exists(candidate)) {
+      rv$function_synthesis_html_path <- candidate
+      return(candidate)
+    }
+
+    character(0)
+  })
+
+  output$results_reports_section <- renderUI({
+    if (!identical(rv$function_status, "finished") ||
+        !identical(rv$function_mode_used, "advanced")) {
+      return(NULL)
+    }
+
+    ready_reports <- c(
+      if (isTRUE(has_debate_report())) "debate",
+      if (length(synthesis_export_file()) > 0) "synthesis"
+    )
 
     tags$div(
-      class = "results-preview-wrap",
-      tags$div(class = "results-preview-title", icon("robot"), "Advanced Mode Outputs"),
-      tags$ul(
-        class = "results-preview-list",
-        if (debate_count > 0) {
-          tags$li(
-            class = "results-preview-item",
-            tags$span(
-              class = "results-preview-item-label",
-              paste0("Debate transcripts (", debate_count, ")")
-            ),
-            downloadButton(
-              "download_debate_html", "Download",
-              class = "results-preview-download-btn"
-            )
-          )
-        },
-        if (has_synthesis) {
-          tags$li(
-            class = "results-preview-item",
-            tags$span(class = "results-preview-item-label", "Synthesis network"),
-            downloadButton(
-              "download_synthesis_html", "Download",
-              class = "results-preview-download-btn"
-            )
-          )
-        }
+      class = "wb-section",
+      tags$div(class = "wb-section-title", icon("file-lines"), "Reports"),
+      checkboxGroupInput(
+        "report_export_items",
+        NULL,
+        choices = c(
+          "Debate transcripts" = "debate",
+          "Cross-module synthesis" = "synthesis"
+        ),
+        selected = ready_reports
       )
     )
   })
+  outputOptions(output, "results_reports_section", suspendWhenHidden = FALSE)
 
   output$download_results <- downloadHandler(
     filename = function() {
@@ -8761,8 +10800,9 @@ server <- function(input, output, session) {
     content = function(file) {
       selected <- if (is.null(input$export_items)) character(0) else input$export_items
       selected_networks <- if (is.null(input$network_export_items)) character(0) else input$network_export_items
-      if ((length(selected) + length(selected_networks)) == 0) {
-        stop("No content selected. Please select tables and/or networks to export.")
+      selected_reports <- selected_report_export_items()
+      if ((length(selected) + length(selected_networks) + length(selected_reports)) == 0) {
+        stop("No content selected. Please select tables, networks and/or reports to export.")
       }
 
       payload <- export_payload()
@@ -8883,6 +10923,22 @@ server <- function(input, output, session) {
         }
       }
 
+      if ("debate" %in% selected_reports) {
+        debate_files <- debate_export_files()
+        if (length(debate_files) == 0) {
+          stop("Debate transcripts are not available. Run Step 5 in Advanced mode first.")
+        }
+        file.copy(debate_files, file.path(tmpdir, basename(debate_files)), overwrite = TRUE)
+      }
+
+      if ("synthesis" %in% selected_reports) {
+        syn_file <- synthesis_export_file()
+        if (length(syn_file) == 0) {
+          stop("The cross-module synthesis network is not available. Run Step 5 in Advanced mode first.")
+        }
+        file.copy(syn_file, file.path(tmpdir, "synthesis_network.html"), overwrite = TRUE)
+      }
+
       files_to_zip <- list.files(tmpdir, full.names = TRUE)
       if (length(files_to_zip) == 0) {
         stop("No exportable content is available yet. Run PCSF/module steps or select ready tables.")
@@ -8895,123 +10951,152 @@ server <- function(input, output, session) {
     
   )
   
+  # ---- run-parameter spec sheet ------------------------------------------
+  rp_row <- function(label, value) {
+    if (is.null(value)) return(NULL)
+    value <- paste(as.character(value), collapse = " ")
+    if (!nzchar(trimws(value))) return(NULL)
+    tags$div(
+      class = "rp-row",
+      tags$span(class = "rp-label", label),
+      tags$span(class = "rp-value", value)
+    )
+  }
+
+  rp_card <- function(num, name, status = c("done", "pending", "skip"),
+                      rows = NULL, empty = NULL) {
+    status <- match.arg(status)
+    status_text <- switch(status,
+                          done = "Completed",
+                          pending = "Not run",
+                          skip = "Skipped")
+    rows <- Filter(Negate(is.null), rows %||% list())
+    tags$div(
+      class = "rp-card",
+      tags$div(
+        class = "rp-head",
+        tags$span(class = "rp-num", num),
+        tags$span(class = "rp-name", name),
+        tags$span(class = paste0("rp-status is-", status), status_text)
+      ),
+      if (length(rows) > 0) rows
+      else tags$div(class = "rp-empty", empty %||% "No parameters recorded.")
+    )
+  }
+
   output$analysis_parameters <- renderUI({
     if (is.null(rv$feature_data)) {
       return(
         tags$p(
-          style = "color:#6c757d;",
+          class = "rp-none",
           "No analysis has been run yet. Parameters will appear here after data upload."
         )
       )
     }
-    
+
     tags$div(
-      
-      ## -------- Step 1 --------
-      tags$h5("Step 1 – Data & Reference"),
-      tags$ul(
-        tags$li(paste("Reference database:", rv$ref_database_type)),
-        tags$li(paste("Feature table:", nrow(rv$feature_data), "features")),
-        tags$li(
-          if (is.null(rv$ms2_data)) "MS2 table: Not provided"
-          else "MS2 table: Provided"
-        )
+      class = "rp-wrap",
+      tags$div(
+        class = "rp-topbar",
+        tags$h3(class = "rp-title", "Analysis setup")
       ),
-      
-      ## -------- Step 2 --------
-      tags$h5("Step 2 – Feature Annotation"),
-      if (rv$annotation_status != "finished") {
-        tags$p("Feature annotation: Not run yet.")
-      } else {
-        tags$ul(
-          tags$li(paste("Column type:", toupper(input$column_type))),
-          tags$li(paste("MS1 tolerance:", input$ms1_ppm, "ppm")),
-          tags$li(paste("RT tolerance:", input$rt_tol, "s")),
-          tags$li(paste("Isotope number:", input$isotope_num)),
-          tags$li(paste("Threads:", input$workers))
-        )
-      },
-      
-      
-      ## -------- Step 3 --------
-      tags$h5("Step 3 – Subnetwork (PCSF)"),
-      if (rv$pcsf_status != "finished") {
-        tags$p("Subnetwork extraction: Not run yet")
-      } else {
-        tags$ul(
-          tags$li(paste("Features as terminals:", input$pcsf_feature)),
-          if (input$pcsf_feature == "sig")
-            tags$li(paste("Significance cutoff:", input$pcsf_pcutoff)),
-          tags$li(
-            if (input$pcsf_grid_tune) "PCSF mode: Grid tuning"
-            else "PCSF mode: Fixed parameters"
-          ),
-          if (!input$pcsf_grid_tune)
-            tags$li(paste("b =", input$pcsf_b, ", w =", input$pcsf_w)),
-          if (input$pcsf_grid_tune && !is.null(rv$annotation_object$tuning_best))
-            tags$li(
-              paste(
-                "Best parameters:",
-                "b =", rv$annotation_object$tuning_best$b,
-                ", w =", rv$annotation_object$tuning_best$w
-              )
+
+      tags$div(
+        class = "rp-grid",
+
+        ## -------- Step 1 --------
+        rp_card(
+          "1", "Data & Reference", "done",
+          list(
+            rp_row("Reference database", rv$ref_database_type),
+            rp_row("Feature table", paste(format(nrow(rv$feature_data), big.mark = ","), "features")),
+            rp_row("MS2 table", if (is.null(rv$ms2_data)) "Not provided" else "Provided")
+          )
+        ),
+
+        ## -------- Step 2 --------
+        if (rv$annotation_status != "finished") {
+          rp_card("2", "Feature Annotation", "pending",
+                  empty = "Feature annotation has not been run yet.")
+        } else {
+          rp_card(
+            "2", "Feature Annotation", "done",
+            list(
+              rp_row("Column type", toupper(input$column_type)),
+              rp_row("MS1 tolerance", paste(input$ms1_ppm, "ppm")),
+              rp_row("RT tolerance", paste(input$rt_tol, "s")),
+              rp_row("Isotope number", input$isotope_num),
+              rp_row("Threads", input$workers)
             )
-        )
-      },
-      
-      ## -------- Step 4 --------
-      tags$h5("Step 4 – Module Identification"),
-      
-      if (rv$module_status != "finished") {
-        
-        tags$p("Module identification: Not run yet.")
-        
-      } else {
-        
-        tags$ul(
-          tags$li(paste("Algorithm:", input$module_method)),
-          tags$li(paste("Node frequency threshold:", input$node_freq)),
-          tags$li(paste("Minimum module size:", input$min_module_size)),
-          tags$li(paste("Permutations:", input$n_perm)),
-          tags$li(paste("Random seed:", input$module_seed))
-        )
-      },
-      
-      
-      ## -------- Step 5 --------
-      tags$h5("Step 5 – Function Interpretation"),
-      if (is.null(rv$function_result)) {
-        tags$p("Functional interpretation: Skipped")
-      } else {
-        tags$ul(
-          tags$li(paste("Interpretation mode:", input$func_mode)),
-          tags$li(
-            paste(
-              "Significance cutoff:",
-              input$func_p_type, "<", input$func_p_cutoff
+          )
+        },
+
+        ## -------- Step 3 --------
+        if (rv$pcsf_status != "finished") {
+          rp_card("3", "Subnetwork (PCSF)", "pending",
+                  empty = "Subnetwork extraction has not been run yet.")
+        } else {
+          rp_card(
+            "3", "Subnetwork (PCSF)", "done",
+            list(
+              rp_row("Features as terminals", input$pcsf_feature),
+              if (identical(input$pcsf_feature, "sig"))
+                rp_row("Significance cutoff", input$pcsf_pcutoff),
+              rp_row("PCSF mode",
+                     if (isTRUE(input$pcsf_grid_tune)) "Grid tuning" else "Fixed parameters"),
+              if (!isTRUE(input$pcsf_grid_tune))
+                rp_row("b / w", paste(input$pcsf_b, "/", input$pcsf_w)),
+              if (isTRUE(input$pcsf_grid_tune) && !is.null(rv$annotation_object$tuning_best))
+                rp_row("Best b / w",
+                       paste(rv$annotation_object$tuning_best$b, "/",
+                             rv$annotation_object$tuning_best$w))
             )
-          ),
-          tags$li(paste("LLM provider:", input$func_provider)),
-          tags$li(paste("LLM model:", input$func_llm_model)),
-          if (identical(input$func_provider, "local")) {
-            tags$li(paste("Local base URL:", input$func_base_url))
-          },
-          tags$li(
-            if (input$func_use_pubmed) "PubMed literature: Enabled"
-            else "PubMed literature: Disabled"
-          ),
-          if (identical(input$func_mode, "advanced")) {
-            tags$li(
-              if (isTRUE(input$func_synthesize)) "Cross-module synthesis: Enabled"
-              else "Cross-module synthesis: Disabled"
+          )
+        },
+
+        ## -------- Step 4 --------
+        if (rv$module_status != "finished") {
+          rp_card("4", "Module Identification", "pending",
+                  empty = "Module identification has not been run yet.")
+        } else {
+          rp_card(
+            "4", "Module Identification", "done",
+            list(
+              rp_row("Algorithm", input$module_method),
+              rp_row("Node frequency threshold", input$node_freq),
+              rp_row("Minimum module size", input$min_module_size),
+              rp_row("Permutations", input$n_perm),
+              rp_row("Random seed", input$module_seed)
             )
-          }
-        )
-      }
+          )
+        },
+
+        ## -------- Step 5 --------
+        if (is.null(rv$function_result)) {
+          rp_card("5", "Function Interpretation", "skip",
+                  empty = "Functional interpretation was skipped in this run.")
+        } else {
+          rp_card(
+            "5", "Function Interpretation", "done",
+            list(
+              rp_row("Interpretation mode",
+                     if (identical(input$func_mode, "advanced")) "Advanced" else "Fast"),
+              rp_row("Significance cutoff",
+                     paste(input$func_p_type, "<", input$func_p_cutoff)),
+              rp_row("LLM provider", input$func_provider),
+              rp_row("LLM model", input$func_llm_model),
+              if (identical(input$func_provider, "local"))
+                rp_row("Local base URL", input$func_base_url),
+              rp_row("PubMed literature",
+                     if (isTRUE(input$func_use_pubmed)) "Enabled" else "Disabled"),
+              if (identical(input$func_mode, "advanced"))
+                rp_row("Cross-module synthesis", "Enabled")
+            )
+          )
+        }
+      )
     )
   })
-  
-  
 
 }
 

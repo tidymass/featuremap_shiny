@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Annotation Summary preview</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 26px; background: #eef2f6;
+    font-family: Inter, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .caption { max-width: 1240px; margin: 0 auto 14px auto; font-size: 12.5px; color: #6b7f94; }
+  .frame {
+    max-width: 1240px; margin: 0 auto; background: #fff;
+    border: 1px solid #e3eaf2; border-radius: 10px; overflow: hidden;
+  }
+  .tabs { display: flex; padding: 0 26px; border-bottom: 1px solid #e8eef5; }
+  .tab {
+    padding: 14px 2px; margin-right: 26px; font-size: 13.5px; font-weight: 600;
+    color: #71869b; border-bottom: 2px solid transparent;
+  }
+  .tab.active { color: #1d4a7a; border-bottom-color: #2b598e; }
+  .wb-plot-stack { padding: 20px 26px 24px 26px; }
+
+  /* ---- metric cards ---- */
+  .wb-metric {
+    padding: 20px 24px 22px 24px;
+    border: 1px solid #e6edf4; border-radius: 12px; background: #fff;
+  }
+  .wb-metric + .wb-metric { margin-top: 14px; }
+
+  .wb-metric-top {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 20px;
+  }
+  .wb-metric-name {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 14.5px; font-weight: 700; color: #24405e; margin-bottom: 5px;
+  }
+  .wb-metric-desc {
+    font-size: 12.5px; line-height: 1.6; color: #8296ab; margin: 0; max-width: 620px;
+  }
+
+  .wb-delta {
+    flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px;
+    padding: 5px 11px; border-radius: 999px;
+    font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  .wb-delta.is-good { background: #e8f5f1; color: #227f6f; }
+  .wb-delta.is-flat { background: #eef2f7; color: #7b8fa3; }
+  .wb-delta.is-up   { background: #fdf1e7; color: #a8672c; }
+
+  .wb-metric-bars { margin-top: 18px; }
+  .wb-bar-row { display: flex; align-items: center; gap: 14px; }
+  .wb-bar-row + .wb-bar-row { margin-top: 10px; }
+  .wb-bar-label {
+    width: 54px; flex: 0 0 auto;
+    font-size: 10px; font-weight: 700; letter-spacing: .07em;
+    text-transform: uppercase; color: #a1b1c2;
+  }
+  .wb-bar-track {
+    flex: 1 1 auto; min-width: 0; height: 15px; border-radius: 4px; background: #f3f6fa;
+  }
+  .wb-bar-fill { height: 100%; border-radius: 4px; min-width: 3px; }
+  .wb-bar-fill.is-before { background: #c6d7e8; }
+  .wb-bar-fill.is-after  { background: #2f79af; }
+  .wb-bar-value {
+    width: 78px; flex: 0 0 auto; text-align: right;
+    font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1;
+  }
+  .wb-bar-value.is-before { color: #9fb2c6; }
+  .wb-bar-value.is-after  { color: #1c3450; }
+
+  .wb-metric-note {
+    margin: 16px 0 0 0; font-size: 12.5px; color: #93a5b8;
+    display: flex; align-items: center; gap: 7px;
+  }
+
+  /* ---- info icon + popover ---- */
+  .inline-info-wrap { position: relative; display: inline-flex; align-items: center; }
+  .inline-info-icon { color: #5b6f82; cursor: pointer; display: inline-flex; }
+  .inline-info-card {
+    display: none; position: absolute; left: calc(100% + 12px); top: 50%;
+    transform: translateY(-50%); z-index: 20; width: 330px; padding: 10px 12px;
+    border-radius: 10px; border: 1px solid #d7e1ec; background: #fff;
+    box-shadow: 0 14px 30px rgba(28,49,74,.16);
+    color: #415366; font-size: 12px; line-height: 1.5;
+    text-transform: none; letter-spacing: normal; font-weight: 400; text-align: left;
+  }
+  .inline-info-wrap.is-pinned .inline-info-card { display: block; }
+  .inline-info-card code {
+    color: #1f4f82; background: #eef4fb; padding: 1px 4px; border-radius: 4px; font-size: 11px;
+  }
+
+  @media (max-width: 900px) {
+    .wb-metric-top { flex-direction: column; gap: 10px; }
+  }
+</style>
+</head>
+<body>
+
+<p class="caption">Feature Annotation &rsaquo; Summary &mdash; 导语已删除，柱子和文字并到同一行。点 <b>i</b> 看弹出说明。</p>
+
+<div class="frame">
+  <div class="tabs">
+    <div class="tab active">Summary</div>
+    <div class="tab">Annotation Table</div>
+  </div>
+
+  <div class="wb-plot-stack">
+
+    <!-- metric 1 -->
+    <div class="wb-metric">
+      <div class="wb-metric-top">
+        <div>
+          <div class="wb-metric-name">
+            Candidate metabolites per feature
+            <span class="inline-info-wrap" tabindex="0">
+              <span class="inline-info-icon">
+                <svg width="14" height="14" viewBox="0 0 512 512" fill="currentColor"><path d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM216 336l24 0 0-64-24 0c-13.3 0-24-10.7-24-24s10.7-24 24-24l48 0c13.3 0 24 10.7 24 24l0 88 8 0c13.3 0 24 10.7 24 24s-10.7 24-24 24l-80 0c-13.3 0-24-10.7-24-24s10.7-24 24-24zm40-208a32 32 0 1 1 0 64 32 32 0 1 1 0-64z"/></svg>
+              </span>
+              <span class="inline-info-card">
+                Mean number of database compounds matched to a single feature
+                (<code>variable_id</code>), averaged over all annotated features.
+              </span>
+            </span>
+          </div>
+          <p class="wb-metric-desc">
+            On average, how many different metabolites still match one LC-MS feature.
+            Lower means each feature has fewer competing explanations.
+          </p>
+        </div>
+        <span class="wb-delta is-good">
+          <svg width="10" height="10" viewBox="0 0 384 512" fill="currentColor"><path d="M169.4 470.6c12.5 12.5 32.8 12.5 45.3 0l160-160c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L224 370.8 224 64c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 306.7L54.6 265.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3l160 160z"/></svg>
+          14.2%
+        </span>
+      </div>
+      <div class="wb-metric-bars">
+        <div class="wb-bar-row">
+          <span class="wb-bar-label">Before</span>
+          <div class="wb-bar-track"><div class="wb-bar-fill is-before" style="width:100%"></div></div>
+          <span class="wb-bar-value is-before">52.47</span>
+        </div>
+        <div class="wb-bar-row">
+          <span class="wb-bar-label">After</span>
+          <div class="wb-bar-track"><div class="wb-bar-fill is-after" style="width:85.8%"></div></div>
+          <span class="wb-bar-value is-after">45.00</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- metric 2 -->
+    <div class="wb-metric">
+      <div class="wb-metric-top">
+        <div>
+          <div class="wb-metric-name">
+            Feature groups per metabolite
+            <span class="inline-info-wrap" tabindex="0">
+              <span class="inline-info-icon">
+                <svg width="14" height="14" viewBox="0 0 512 512" fill="currentColor"><path d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM216 336l24 0 0-64-24 0c-13.3 0-24-10.7-24-24s10.7-24 24-24l48 0c13.3 0 24 10.7 24 24l0 88 8 0c13.3 0 24 10.7 24 24s-10.7 24-24 24l-80 0c-13.3 0-24-10.7-24-24s10.7-24 24-24zm40-208a32 32 0 1 1 0 64 32 32 0 1 1 0-64z"/></svg>
+              </span>
+              <span class="inline-info-card">
+                A <b>metabolite feature cluster (MFC)</b> is a set of features that co-elute and
+                share a mass relationship &mdash; isotopes, adducts and in-source fragments of one
+                compound. This is the mean number of distinct clusters mapped to the same compound
+                (<code>Lab.ID</code>); more than one means the same metabolite was matched from
+                unrelated places in the chromatogram.
+              </span>
+            </span>
+          </div>
+          <p class="wb-metric-desc">
+            On average, how many separate groups of co-eluting features are assigned to the same
+            metabolite. Lower means its signal is consolidated, not scattered.
+          </p>
+        </div>
+        <span class="wb-delta is-good">
+          <svg width="10" height="10" viewBox="0 0 384 512" fill="currentColor"><path d="M169.4 470.6c12.5 12.5 32.8 12.5 45.3 0l160-160c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L224 370.8 224 64c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 306.7L54.6 265.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3l160 160z"/></svg>
+          5.5%
+        </span>
+      </div>
+      <div class="wb-metric-bars">
+        <div class="wb-bar-row">
+          <span class="wb-bar-label">Before</span>
+          <div class="wb-bar-track"><div class="wb-bar-fill is-before" style="width:100%"></div></div>
+          <span class="wb-bar-value is-before">1.368</span>
+        </div>
+        <div class="wb-bar-row">
+          <span class="wb-bar-label">After</span>
+          <div class="wb-bar-track"><div class="wb-bar-fill is-after" style="width:94.5%"></div></div>
+          <span class="wb-bar-value is-after">1.293</span>
+        </div>
+      </div>
+    </div>
+
+    <p class="wb-metric-note">
+      <svg width="13" height="13" viewBox="0 0 512 512" fill="currentColor"><path d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM216 336l24 0 0-64-24 0c-13.3 0-24-10.7-24-24s10.7-24 24-24l48 0c13.3 0 24 10.7 24 24l0 88 8 0c13.3 0 24 10.7 24 24s-10.7 24-24 24l-80 0c-13.3 0-24-10.7-24-24s10.7-24 24-24zm40-208a32 32 0 1 1 0 64 32 32 0 1 1 0-64z"/></svg>
+      Bar length is relative to the larger of the two values. Full matches are in the Annotation Table tab.
+    </p>
+
+  </div>
+</div>
+
+<script>
+  document.addEventListener('click', function (e) {
+    var wrap = e.target.closest && e.target.closest('.inline-info-wrap');
+    document.querySelectorAll('.inline-info-wrap.is-pinned').forEach(function (el) {
+      if (el !== wrap) el.classList.remove('is-pinned');
+    });
+    if (wrap) { e.preventDefault(); wrap.classList.toggle('is-pinned'); }
+  });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Module Debate &mdash; module_7</title>
+<style>/* ============================================================
+   FeatureMAP -- module debate transcript (conversation view)
+   ============================================================ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --ink:#16233a; --ink-2:#3d4c61; --muted:#7b8b9f; --faint:#9fadbe;
+  --line:#e4eaf2; --line-2:#eef2f8;
+  --blue:#2f6fb0;  --blue-soft:#eaf1f9;
+  --teal:#28857e;  --teal-soft:#e5f3f1;
+  --amber:#b56c2b; --amber-soft:#fdf3e7;
+  --red:#b4443f;   --red-soft:#fceeed;
+  --green:#2e8055; --green-soft:#e8f5ed;
+  --slate:#5c6d84; --slate-soft:#edf1f7;
+
+  /* speaker skins: background / border */
+  --sk-query-bg:#ffffff;  --sk-query-bd:#e0e7f0;
+  --sk-prop-bg:#f4f9fd;   --sk-prop-bd:#d9e6f4;
+  --sk-skep-bg:#fffaf4;   --sk-skep-bd:#f1e3d2;
+  --sk-pub-bg:#f7fcf9;    --sk-pub-bd:#d8e9df;
+  --sk-arb-bg:#ffffff;    --sk-arb-bd:#cde4e1;
+
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  --lift:0 1px 2px rgba(18,38,66,.05), 0 8px 24px rgba(18,38,66,.06);
+}
+
+html{-webkit-text-size-adjust:100%}
+body{
+  font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue",Arial,sans-serif;
+  background:radial-gradient(900px 380px at 50% -140px,#e8eff8 0%,rgba(232,239,248,0) 70%),#f4f6fa;
+  color:var(--ink);font-size:14px;line-height:1.65;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+}
+
+/* optional page header (unused by the generator, kept for standalone use) */
+.page-header{background:#fff;border-bottom:1px solid var(--line);padding:18px 32px 16px}
+.page-header h1{font-size:1.05rem;font-weight:700;letter-spacing:-.01em;color:var(--ink)}
+.page-header .sub{font-size:.76rem;color:var(--muted);margin-top:4px;display:flex;gap:14px;flex-wrap:wrap}
+.page-header .sub span{display:flex;align-items:center;gap:5px}
+
+/* ── conversation column ───────────────────────────────────── */
+.chat-body{
+  max-width:920px;margin:0 auto;padding:34px 24px 60px 24px;
+  display:flex;flex-direction:column;gap:20px;
+}
+
+/* ── message rows: left / right / centre ───────────────────── */
+.msg{display:flex;gap:14px;align-items:flex-start}
+.msg-left  {flex-direction:row;        justify-content:flex-start}
+.msg-right {flex-direction:row-reverse;justify-content:flex-start}
+.msg-center{flex-direction:column;     align-items:stretch}
+
+/* avatars */
+.av{
+  flex:0 0 40px;width:40px;height:40px;border-radius:50%;margin-top:5px;
+  display:flex;align-items:center;justify-content:center;font-size:17px;line-height:1;
+  background:#fff;border:1px solid var(--line);
+  box-shadow:0 0 0 4px var(--slate-soft),0 4px 12px rgba(18,38,66,.07);
+}
+.av-center{
+  flex:0 0 44px;width:44px;height:44px;border-radius:50%;margin:0 auto 14px auto;
+  display:flex;align-items:center;justify-content:center;font-size:19px;line-height:1;
+  background:#fff;border:1px solid var(--line);
+  box-shadow:0 0 0 5px var(--teal-soft),0 4px 14px rgba(18,38,66,.08);
+}
+.proposer-r .av{box-shadow:0 0 0 4px var(--blue-soft),0 4px 12px rgba(18,38,66,.07)}
+.skeptic    .av{box-shadow:0 0 0 4px var(--amber-soft),0 4px 12px rgba(18,38,66,.07)}
+.pubmed     .av{box-shadow:0 0 0 4px var(--green-soft),0 4px 12px rgba(18,38,66,.07)}
+
+/* ── speech bubbles ────────────────────────────────────────── */
+.bub{
+  position:relative;max-width:80%;min-width:0;
+  background:var(--sk-query-bg);border:1px solid var(--sk-query-bd);
+  border-radius:18px;padding:16px 18px 17px 18px;box-shadow:var(--lift);
+}
+.bub-left {border-top-left-radius:6px}
+.bub-right{border-top-right-radius:6px}
+.bub-center{max-width:100%;border-radius:18px;
+            background:var(--sk-arb-bg);border-color:var(--sk-arb-bd);
+            box-shadow:0 2px 4px rgba(18,38,66,.05),0 14px 36px rgba(18,38,66,.08)}
+.msg-center .bub{max-width:100%}
+
+/* bubble tails -- the thing that makes it read as a conversation */
+.bub-left::before,.bub-right::before{
+  content:"";position:absolute;top:14px;width:12px;height:12px;
+  transform:rotate(45deg);background:inherit;
+}
+.bub-left::before {left:-7px;
+  border-left:1px solid var(--sk-query-bd);border-bottom:1px solid var(--sk-query-bd);
+  border-radius:0 0 0 4px}
+.bub-right::before{right:-7px;
+  border-right:1px solid var(--sk-query-bd);border-top:1px solid var(--sk-query-bd);
+  border-radius:0 4px 0 0}
+
+/* speaker skins */
+.proposer-r .bub{background:var(--sk-prop-bg);border-color:var(--sk-prop-bd)}
+.proposer-r .bub-right::before{border-color:var(--sk-prop-bd)}
+.skeptic .bub{background:var(--sk-skep-bg);border-color:var(--sk-skep-bd)}
+.skeptic .bub-left::before{border-color:var(--sk-skep-bd)}
+.pubmed  .bub{background:var(--sk-pub-bg);border-color:var(--sk-pub-bd)}
+.pubmed  .bub-left::before{border-color:var(--sk-pub-bd)}
+
+/* ── speaker name line ─────────────────────────────────────── */
+.role-label{
+  display:flex;align-items:center;gap:8px;margin-bottom:11px;
+  font-size:.685rem;font-weight:700;letter-spacing:.11em;text-transform:uppercase;
+  color:var(--slate);
+}
+.msg-right .role-label{justify-content:flex-end}
+.msg-center .role-label{justify-content:center;padding-bottom:12px;
+                        margin-bottom:14px;border-bottom:1px solid var(--line-2)}
+.proposer-r .role-label{color:var(--blue)}
+.skeptic    .role-label{color:var(--amber)}
+.arbiter    .role-label{color:var(--teal)}
+.pubmed     .role-label{color:var(--green)}
+
+/* what the speaker says */
+.summary-line{font-size:.895rem;color:var(--ink-2);margin-bottom:13px}
+.summary-line strong{font-weight:700;color:var(--ink)}
+.no-challenge-note{
+  font-size:.86rem;color:#256b45;font-style:normal;background:var(--green-soft);
+  border:1px solid #d1e7db;border-radius:11px;padding:11px 14px;
+}
+
+/* ── query card ────────────────────────────────────────────── */
+.query-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
+.query-section{background:#f7f9fc;border:1px solid var(--line-2);
+               border-radius:12px;padding:12px 14px}
+.section-label{font-size:.625rem;font-weight:700;letter-spacing:.13em;
+               text-transform:uppercase;color:var(--faint);margin-bottom:9px}
+.met-chips{display:flex;flex-wrap:wrap;gap:6px}
+.met-chip{display:inline-block;font-size:.765rem;line-height:1.55;padding:3px 11px;
+          background:#fff;color:#2b4a6b;border:1px solid #dce6f2;border-radius:999px;
+          white-space:normal;transition:border-color .15s,color .15s}
+.met-chip:hover{border-color:#b9d1e9;color:#1d3d5c}
+.muted{color:var(--faint);font-size:.82rem}
+
+.cls-block{display:flex;flex-direction:column;gap:8px}
+.cls-row{display:grid;grid-template-columns:1fr 92px 40px;align-items:center;
+         gap:12px;font-size:.78rem}
+.cls-name{color:var(--ink-2);line-height:1.4}
+.cls-track{height:7px;background:#e7ecf4;border-radius:999px;overflow:hidden}
+.cls-fill{height:100%;border-radius:999px;
+          background:linear-gradient(90deg,#84aeda 0%,#3d78b4 100%)}
+.cls-pct{color:var(--muted);text-align:right;white-space:nowrap;
+         font-variant-numeric:tabular-nums}
+
+.context-pills{display:flex;flex-wrap:wrap;gap:6px}
+.ctx-pill{font-size:.755rem;padding:3px 11px;background:#fff;color:var(--slate);
+          border:1px solid #dfe6ef;border-radius:999px}
+
+/* ── hypothesis cards ──────────────────────────────────────── */
+.hyp-card{background:#fff;border:1px solid var(--line);border-radius:13px;
+          padding:14px 16px;margin-top:11px;transition:box-shadow .18s ease}
+.hyp-card:hover{box-shadow:0 6px 18px rgba(18,38,66,.075)}
+.hyp-header{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:7px}
+.hyp-id{font-family:var(--mono);font-size:.655rem;font-weight:700;letter-spacing:.06em;
+        color:var(--blue);background:var(--blue-soft);border:1px solid #d8e6f4;
+        padding:3px 8px;border-radius:6px;flex-shrink:0}
+.hyp-title{font-weight:700;font-size:.915rem;color:var(--ink);
+           flex:1 1 auto;min-width:0;line-height:1.45}
+.type-pill{font-size:.655rem;font-weight:600;letter-spacing:.04em;color:var(--teal);
+           background:var(--teal-soft);border:1px solid #cde5e2;
+           padding:3px 9px;border-radius:999px;white-space:nowrap}
+.hyp-summary{font-size:.845rem;color:var(--ink-2);line-height:1.7}
+
+.mtag-row{margin-top:10px;display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.mtag-label{font-size:.615rem;font-weight:700;letter-spacing:.11em;text-transform:uppercase;
+            color:var(--faint);margin-right:4px;flex-shrink:0}
+.mtag{font-size:.735rem;padding:2px 9px;border-radius:999px;border:1px solid transparent}
+.mtag-anc{background:var(--blue-soft);color:#255d95;border-color:#d8e6f4}
+.mtag-ten{background:var(--amber-soft);color:#8d5520;border-color:#f0dcc4}
+
+/* ── challenges ────────────────────────────────────────────── */
+.ch-item{border-radius:12px;padding:13px 15px;margin-top:10px;border:1px solid transparent}
+.ch-major{background:#fdeeed;border-color:#f2d6d3}
+.ch-minor{background:#fdf3e6;border-color:#f0dfc6}
+.ch-meta{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:8px}
+.sev-pill{font-size:.6rem;font-weight:800;letter-spacing:.11em;
+          padding:3px 10px;border-radius:999px;text-transform:uppercase}
+.sev-major{background:var(--red);color:#fff}
+.sev-minor{background:var(--amber);color:#fff}
+.ch-type{font-size:.725rem;color:var(--muted);letter-spacing:.02em}
+.ch-target{font-family:var(--mono);font-size:.71rem;font-weight:600;color:var(--ink-2);
+           background:rgba(255,255,255,.85);border:1px solid rgba(22,35,58,.09);
+           padding:2px 8px;border-radius:6px}
+.ch-text{font-size:.845rem;color:var(--ink-2);line-height:1.7}
+
+/* ── revisions ─────────────────────────────────────────────── */
+.rev-item{padding:13px 15px;margin-top:10px;border-radius:12px;
+          background:rgba(255,255,255,.72);border:1px solid rgba(22,35,58,.07)}
+.rev-header{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:7px}
+.rev-hid{font-family:var(--mono);font-size:.75rem;font-weight:700;color:var(--ink)}
+.act-pill{font-size:.6rem;font-weight:800;letter-spacing:.11em;
+          padding:3px 10px;border-radius:999px}
+.act-pill.act-modify{background:var(--blue);color:#fff}
+.act-pill.act-drop  {background:var(--red);color:#fff}
+.act-pill.act-keep  {background:var(--green);color:#fff}
+.rev-just{font-size:.845rem;color:var(--ink-2);line-height:1.7}
+.rev-detail{margin-top:11px;padding:13px 15px;background:#fff;
+            border:1px solid var(--line);border-radius:11px}
+.rev-new-type{display:inline-block;font-size:.655rem;font-weight:600;color:var(--teal);
+              background:var(--teal-soft);border:1px solid #cde5e2;
+              padding:3px 9px;border-radius:999px;margin-bottom:7px}
+.rev-new-title{font-size:.875rem;font-weight:700;color:var(--ink);margin-bottom:5px}
+.rev-new-summary{font-size:.82rem;color:var(--ink-2);line-height:1.65}
+
+/* ── verdict cards ─────────────────────────────────────────── */
+.verdict-card{border-radius:14px;padding:17px 19px;margin-top:12px;
+              border:1px solid var(--line);background:#fff}
+.st-accepted{background:linear-gradient(180deg,#f4fbf7 0%,#ffffff 60%);border-color:#cde6d8}
+.st-rejected{background:linear-gradient(180deg,#fdf6f5 0%,#ffffff 60%);border-color:#eed7d4}
+.verdict-hdr{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:11px}
+.verdict-hid{font-family:var(--mono);font-size:.75rem;font-weight:700;color:var(--ink);
+             background:rgba(22,35,58,.05);border:1px solid rgba(22,35,58,.08);
+             padding:3px 9px;border-radius:6px}
+.status-pill{font-size:.6rem;font-weight:800;letter-spacing:.11em;
+             padding:3px 11px;border-radius:999px}
+.st-accepted .status-pill{background:var(--green);color:#fff}
+.st-rejected .status-pill{background:var(--red);color:#fff}
+.verdict-type{display:inline-block;font-size:.655rem;font-weight:600;color:var(--teal);
+              background:var(--teal-soft);border:1px solid #cde5e2;
+              padding:3px 9px;border-radius:999px;margin-bottom:7px}
+.verdict-title{font-size:.945rem;font-weight:700;color:var(--ink);
+               margin-bottom:6px;line-height:1.45}
+.verdict-fin-summary{font-size:.845rem;color:var(--ink-2);line-height:1.7;
+                     margin-bottom:13px;padding-bottom:13px;
+                     border-bottom:1px solid var(--line-2)}
+
+.rat-block{margin-top:12px}
+.rat-label{font-size:.625rem;font-weight:700;letter-spacing:.13em;text-transform:uppercase;
+           color:var(--faint);margin-bottom:6px;display:flex;align-items:center;gap:9px}
+.rat-text{font-size:.845rem;color:var(--ink-2);line-height:1.72}
+.rat-divider{height:1px;background:var(--line-2);margin:14px 0}
+.conf-pill{font-size:.6rem;font-weight:700;letter-spacing:.06em;
+           padding:2px 9px;border-radius:999px;text-transform:uppercase}
+.conf-high  {background:var(--green-soft);color:#256b45}
+.conf-medium{background:var(--amber-soft);color:#8d5520}
+.conf-low   {background:var(--red-soft);color:#963a36}
+
+.ambiguity-note{margin-top:16px;padding:13px 15px;background:var(--amber-soft);
+                border:1px solid #f0dfc6;border-radius:12px;
+                font-size:.845rem;line-height:1.7;color:#7d5423}
+.ambiguity-note strong{color:#5f3d17;font-weight:700}
+
+/* ── PubMed evidence ───────────────────────────────────────── */
+.pubmed-card{background:#fff;border:1px solid var(--line);border-radius:13px;
+             padding:14px 16px;margin-top:11px}
+.pubmed-hdr{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:8px}
+.pubmed-hid{font-family:var(--mono);font-size:.73rem;font-weight:700;color:#256b45;
+            background:var(--green-soft);border:1px solid #d1e7db;
+            padding:3px 9px;border-radius:6px}
+.lit-pill{font-size:.6rem;font-weight:800;letter-spacing:.1em;
+          padding:3px 10px;border-radius:999px;text-transform:uppercase}
+.lit-direct      {background:var(--green);color:#fff}
+.lit-indirect    {background:var(--green-soft);color:#1f6642;border:1px solid #cbe2d4}
+.lit-insufficient{background:#eef1f5;color:var(--muted);border:1px solid #e2e8f0}
+.pm-relationship,.pm-note{font-size:.845rem;color:var(--ink-2);line-height:1.7;margin-top:6px}
+.pm-relationship strong,.pm-note strong{color:var(--ink);font-weight:700}
+.pmid-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:11px}
+.pmid-chip{font-family:var(--mono);font-size:.715rem;font-weight:600;padding:3px 10px;
+           background:#f4f9f6;color:#2b6b4a;border:1px solid #d9e9e0;border-radius:999px}
+.pm-empty{font-size:.8rem;color:var(--faint)}
+
+/* ── round divider ─────────────────────────────────────────── */
+.round-divider{display:flex;align-items:center;gap:16px;margin:6px 0;
+               font-size:.615rem;font-weight:800;letter-spacing:.18em;
+               text-transform:uppercase;color:var(--faint)}
+.round-divider::before,.round-divider::after{
+  content:"";flex:1;height:1px;
+  background:linear-gradient(90deg,rgba(219,227,236,0),#dce4ee,rgba(219,227,236,0))}
+
+/* ── responsive ────────────────────────────────────────────── */
+@media (max-width:760px){
+  .chat-body{padding:22px 14px 44px 14px;gap:16px}
+  .msg{gap:10px}
+  .av{flex-basis:32px;width:32px;height:32px;font-size:14px;margin-top:4px}
+  .av-center{width:38px;height:38px;font-size:16px}
+  .bub{max-width:88%;padding:14px 15px 15px 15px;border-radius:16px}
+  .query-grid{grid-template-columns:1fr}
+  .cls-row{grid-template-columns:1fr 62px 36px;gap:9px}
+}
+
+/* ── print / PDF export ────────────────────────────────────── */
+@media print{
+  body{background:#fff}
+  .chat-body{max-width:none;padding:0 8px}
+  .bub{max-width:100%;box-shadow:none;break-inside:avoid}
+  .bub-left::before,.bub-right::before{display:none}
+  .msg-right{flex-direction:row}
+  .hyp-card,.verdict-card,.ch-item,.rev-item,.pubmed-card{break-inside:avoid}
+}</style></head>
+<body><div class="chat-body">
+<div class="msg msg-left "><div class="av av-left">🔍</div><div class="bub bub-left"><div class="role-label">🔍 Query</div>
+<div class="summary-line"><strong>module_7</strong> is a detected dysregulated functional module.
+Please interpret its biological significance.</div>
+<div class="query-section"><div class="section-label">Core metabolites</div>
+<div class="met-chips"><span class="met-chip">L-Glutamine</span><span class="met-chip">Taurine</span><span class="met-chip">Hypoxanthine</span><span class="met-chip">Palmitoylcarnitine</span><span class="met-chip">Sphingosine 1-phosphate</span><span class="met-chip">Kynurenine</span><span class="met-chip">Indole-3-lactic acid</span><span class="met-chip">Citrulline</span><span class="met-chip">Uric acid</span><span class="met-chip">Deoxycholic acid</span></div></div>
+<div class="query-section" style="margin-top:8px"><div class="section-label">Dominant chemical classes</div>
+<div class="cls-block"><div class="cls-row"><div class="cls-name">Amino acids, peptides and analogues</div>
+  <div class="cls-track"><div class="cls-fill" style="width:34%"></div></div>
+  <div class="cls-pct">34%</div></div><div class="cls-row"><div class="cls-name">Fatty acyls</div>
+  <div class="cls-track"><div class="cls-fill" style="width:22%"></div></div>
+  <div class="cls-pct">22%</div></div><div class="cls-row"><div class="cls-name">Purine nucleosides and analogues</div>
+  <div class="cls-track"><div class="cls-fill" style="width:15%"></div></div>
+  <div class="cls-pct">15%</div></div></div></div>
+<div class="query-section" style="margin-top:8px"><div class="section-label">Study context</div>
+<div class="context-pills"><span class="ctx-pill">Homo sapiens</span><span class="ctx-pill">Plasma</span><span class="ctx-pill">Type 2 diabetes</span></div></div></div></div>
+<div class="msg msg-right proposer-r"><div class="av av-right">🔬</div><div class="bub bub-right"><div class="role-label proposer-r">🔬 Proposer &mdash; Initial</div>
+<div class="summary-line">I propose <strong>3</strong> candidate hypotheses based on the module data:</div>
+<div class="hyp-card"><div class="hyp-header">
+    <span class="hyp-id">H1</span><span class="hyp-title">Impaired mitochondrial fatty-acid beta-oxidation</span>
+    <span class="type-pill">metabolic pathway</span></div>
+    <div class="hyp-summary">Accumulation of long-chain acylcarnitines alongside depleted free carnitine is consistent with a partial block at the CPT2 step, limiting flux of activated fatty acids into the mitochondrial matrix in insulin-resistant tissue.</div>
+    <div class="mtag-row"><span class="mtag-label">Core anchors</span><span class="mtag mtag-anc">Palmitoylcarnitine</span><span class="mtag mtag-anc">Taurine</span></div>
+    <div class="mtag-row"><span class="mtag-label">Tension metabolites</span><span class="mtag mtag-ten">Hypoxanthine</span></div></div>
+<div class="hyp-card"><div class="hyp-header">
+    <span class="hyp-id">H2</span><span class="hyp-title">Activation of the kynurenine branch of tryptophan catabolism</span>
+    <span class="type-pill">immune signalling</span></div>
+    <div class="hyp-summary">Elevated kynurenine with reduced indole derivatives suggests IDO1 induction by low-grade inflammation, diverting tryptophan away from the microbial indole route.</div>
+    <div class="mtag-row"><span class="mtag-label">Core anchors</span><span class="mtag mtag-anc">Kynurenine</span><span class="mtag mtag-anc">Indole-3-lactic acid</span></div>
+    <div class="mtag-row"><span class="mtag-label">Tension metabolites</span><span class="mtag mtag-ten">Citrulline</span></div></div>
+<div class="hyp-card"><div class="hyp-header">
+    <span class="hyp-id">H3</span><span class="hyp-title">Purine nucleotide turnover driven by adenine-nucleotide stress</span>
+    <span class="type-pill">energy homeostasis</span></div>
+    <div class="hyp-summary">Concurrent rises in hypoxanthine and uric acid point to net ATP degradation, a hallmark of cellular energy stress.</div>
+    <div class="mtag-row"><span class="mtag-label">Core anchors</span><span class="mtag mtag-anc">Hypoxanthine</span><span class="mtag mtag-anc">Uric acid</span></div>
+    <div class="mtag-row"><span class="mtag-label">Tension metabolites</span></div></div></div></div>
+<div class="msg msg-left skeptic"><div class="av av-left">🧐</div><div class="bub bub-left"><div class="role-label">🧐 Skeptic &mdash; Round 1</div>
+<div class="summary-line">I raise <strong>2</strong> challenges:</div>
+<div class="ch-item ch-major"><div class="ch-meta">
+    <span class="sev-pill sev-major">MAJOR</span>
+    <span class="ch-type">alternative explanation</span><span class="ch-target">H1</span></div>
+    <div class="ch-text">A single acylcarnitine species cannot distinguish a CPT2 block from increased lipolytic supply. Without free carnitine and medium-chain species in the module, the directionality of the proposed block is not identifiable from these data alone.</div></div>
+<div class="ch-item ch-minor"><div class="ch-meta">
+    <span class="sev-pill sev-minor">MINOR</span>
+    <span class="ch-type">annotation confidence</span><span class="ch-target">H2</span></div>
+    <div class="ch-text">Indole-3-lactic acid is isobaric with several tryptophan derivatives; if the MS2 match is level 3, the depletion arm of this hypothesis rests on a weak identification.</div></div></div></div>
+<div class="msg msg-right proposer-r"><div class="av av-right">✏️</div><div class="bub bub-right"><div class="role-label proposer-r">✏️ Proposer &mdash; Revision 1</div>
+<div class="summary-line">Addressing Round 1: <strong>1 modified</strong>, <strong>1 dropped</strong>, 1 kept.</div>
+<div class="rev-item"><div class="rev-header"><span class="rev-hid">H1</span>
+    <span class="act-pill act-modify">MODIFY</span></div>
+    <div class="rev-just">The Skeptic is right that the enzymatic step is not identifiable. I broaden the claim to disturbed mitochondrial lipid handling without asserting a specific block.</div><div class="rev-detail"><div class="rev-new-type">metabolic pathway</div>
+        <div class="rev-new-title">Disturbed mitochondrial handling of long-chain fatty acids</div><div class="rev-new-summary">Long-chain acylcarnitine accumulation with taurine depletion indicates that fatty-acid delivery exceeds oxidative capacity, without specifying which transport or oxidation step is rate-limiting.</div>
+        <div class="mtag-row"><span class="mtag-label">Core anchors</span><span class="mtag mtag-anc">Palmitoylcarnitine</span></div>
+        <div class="mtag-row"><span class="mtag-label">Tension metabolites</span><span class="mtag mtag-ten">Hypoxanthine</span></div></div></div>
+<div class="rev-item"><div class="rev-header"><span class="rev-hid">H2</span>
+    <span class="act-pill act-drop">DROP</span></div>
+    <div class="rev-just">Identification confidence for the indole arm is insufficient; the remaining kynurenine signal alone is better captured within H3.</div></div>
+<div class="rev-item"><div class="rev-header"><span class="rev-hid">H3</span>
+    <span class="act-pill act-keep">KEEP</span></div>
+    <div class="rev-just">No challenge was raised and the two anchors are both level-1 identifications.</div></div></div></div>
+<div class="round-divider">Round 2</div>
+<div class="msg msg-left skeptic"><div class="av av-left">🧐</div><div class="bub bub-left"><div class="role-label">🧐 Skeptic &mdash; Round 2</div>
+<div class="no-challenge-note">No substantive challenges after reviewing the revision.</div></div></div>
+<div class="msg msg-left pubmed"><div class="av av-left">📚</div><div class="bub bub-left"><div class="role-label">📚 PubMed phenotype evidence</div>
+<div class="summary-line">Retrieved literature and phenotype relationship summaries used by the Arbiter:</div>
+<div class="pubmed-card"><div class="pubmed-hdr"><span class="pubmed-hid">H1</span>
+    <span class="lit-pill lit-direct">direct literature support</span></div>
+    <div class="pm-relationship"><strong>Phenotype relationship:</strong> Plasma long-chain acylcarnitines are repeatedly reported as elevated in insulin-resistant and type 2 diabetic cohorts.</div>
+    <div class="pm-note"><strong>Evidence note:</strong> Three cohort studies report the same direction of effect in fasting plasma.</div>
+    <div class="pmid-chips"><span class="pmid-chip">PMID:21873557</span><span class="pmid-chip">PMID:23193084</span><span class="pmid-chip">PMID:28114233</span></div></div>
+<div class="pubmed-card"><div class="pubmed-hdr"><span class="pubmed-hid">H3</span>
+    <span class="lit-pill lit-indirect">indirect literature support</span></div>
+    <div class="pm-relationship"><strong>Phenotype relationship:</strong> Purine turnover markers associate with type 2 diabetes mainly through hyperuricaemia rather than a direct mechanistic link.</div>
+    <div class="pm-note"><strong>Evidence note:</strong> Association is consistent but confounded by renal handling of urate.</div>
+    <div class="pmid-chips"><span class="pmid-chip">PMID:19875614</span><span class="pmid-chip">PMID:26340111</span></div></div></div></div>
+<div class="msg msg-center arbiter"><div class="av av-center">⚖</div><div class="bub bub-center"><div class="role-label">⚖ Arbiter &mdash; Final Verdict</div>
+<div class="summary-line">Reviewing the full debate: <strong>1 accepted</strong> &middot; <strong>1 rejected</strong>.</div>
+<div class="verdict-card st-accepted"><div class="verdict-hdr">
+    <span class="verdict-hid">H1</span><span class="status-pill st-accepted">ACCEPTED</span></div>
+    <div class="verdict-type">metabolic pathway</div><div class="verdict-title">Disturbed mitochondrial handling of long-chain fatty acids</div>
+    <div class="verdict-fin-summary">Long-chain acylcarnitine accumulation with taurine depletion indicates fatty-acid delivery in excess of oxidative capacity.</div>
+    <div class="rat-block"><div class="rat-label">Verdict rationale</div><div class="rat-text">The revised claim survives the Skeptic&rsquo;s identifiability objection because it no longer names a specific enzymatic step, and both anchors are level-1 identifications supported by the module frequency data.</div></div>
+    <div class="rat-divider"></div>
+    <div class="rat-block"><div class="rat-label">Confidence rationale <span class="conf-pill conf-high">high confidence</span></div>
+    <div class="rat-text">Direct literature support in matched cohorts, consistent effect direction, and two independent anchors within the module.</div></div></div>
+<div class="verdict-card st-rejected"><div class="verdict-hdr">
+    <span class="verdict-hid">H3</span><span class="status-pill st-rejected">REJECTED</span></div>
+    <div class="verdict-type">energy homeostasis</div><div class="verdict-title">Purine nucleotide turnover driven by adenine-nucleotide stress</div>
+    <div class="verdict-fin-summary">Concurrent rises in hypoxanthine and uric acid point to net ATP degradation.</div>
+    <div class="rat-block"><div class="rat-label">Verdict rationale</div><div class="rat-text">Urate is strongly influenced by renal clearance in this phenotype, so the module signal cannot be attributed to intracellular energy stress without orthogonal evidence.</div></div>
+    <div class="rat-divider"></div>
+    <div class="rat-block"><div class="rat-label">Confidence rationale <span class="conf-pill conf-low">low confidence</span></div>
+    <div class="rat-text">Literature support is indirect and the two anchors are not independent of one another.</div></div></div>
+<div class="ambiguity-note"><strong>Residual ambiguity:</strong> The module contains both a lipid and a purine signal that the current data cannot separate mechanistically; a targeted acylcarnitine panel with free carnitine would resolve H1 further.</div></div></div>
+</div></body></html>
