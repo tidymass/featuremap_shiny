@@ -39,6 +39,12 @@ Imports:
     glue,
     jsonlite,
     data.table,
+    DBI,
+    RSQLite,
+    sodium,
+    digest,
+    curl,
+    openssl,
     plyr,
     MASS,
     httr,
@@ -55,8 +61,6 @@ Imports:
     masstools,
     rlang,
     cli
-Suggests:
-    digest
 Remotes:
     tidymass/massdataset,
     tidymass/metid,

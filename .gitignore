@@ -5,3 +5,6 @@
 .DS_Store
 .Rapp.history
 *.tar.gz
+.featuremap_auth.sqlite
+.featuremap_auth.sqlite-wal
+.featuremap_auth.sqlite-shm

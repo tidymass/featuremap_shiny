@@ -79,6 +79,530 @@ build_info_icon <- function(content) {
   )
 }
 
+`%||%` <- function(x, y) {
+  if (is.null(x) || length(x) == 0) y else x
+}
+
+featuremap_auth_enabled <- function() {
+  value <- tolower(trimws(Sys.getenv("FEATUREMAP_AUTH_ENABLED", unset = "false")))
+  value %in% c("true", "1", "yes", "y", "on")
+}
+
+featuremap_truthy <- function(value, default = "false") {
+  value <- tolower(trimws(Sys.getenv(value, unset = default)))
+  value %in% c("true", "1", "yes", "y", "on")
+}
+
+featuremap_auth_now <- function() {
+  as.numeric(Sys.time())
+}
+
+featuremap_auth_timestamp <- function() {
+  format(Sys.time(), "%Y-%m-%d %H:%M:%S %z")
+}
+
+featuremap_auth_generate_token <- function() {
+  token <- openssl::base64_encode(openssl::rand_bytes(32), linebreaks = FALSE)
+  token <- chartr("+/", "-_", token)
+  gsub("=+$", "", token)
+}
+
+featuremap_auth_token_hash <- function(token) {
+  digest::digest(as.character(token %||% ""), algo = "sha256", serialize = FALSE)
+}
+
+featuremap_auth_email_config <- function() {
+  username <- Sys.getenv("FEATUREMAP_SMTP_USERNAME", unset = "")
+  if (!nzchar(username)) username <- Sys.getenv("SMTP_USERNAME", unset = "featuremapofficial@gmail.com")
+  password <- Sys.getenv("FEATUREMAP_SMTP_PASSWORD", unset = "")
+  if (!nzchar(password)) password <- Sys.getenv("SMTP_PASSWORD", unset = "")
+  if (grepl("gmail", Sys.getenv("FEATUREMAP_SMTP_HOST", unset = Sys.getenv("SMTP_HOST", unset = "smtp.gmail.com")), ignore.case = TRUE)) {
+    password <- gsub("\\s+", "", password)
+  }
+  from <- Sys.getenv("FEATUREMAP_SMTP_FROM", unset = "")
+  if (!nzchar(from)) from <- username
+
+  list(
+    host = Sys.getenv("FEATUREMAP_SMTP_HOST", unset = Sys.getenv("SMTP_HOST", unset = "smtp.gmail.com")),
+    port = Sys.getenv("FEATUREMAP_SMTP_PORT", unset = Sys.getenv("SMTP_PORT", unset = "587")),
+    username = username,
+    password = password,
+    from = from,
+    dry_run = featuremap_truthy("FEATUREMAP_EMAIL_DRY_RUN")
+  )
+}
+
+featuremap_auth_header_value <- function(value) {
+  gsub("[\r\n]+", " ", as.character(value %||% ""))
+}
+
+featuremap_auth_send_mail <- function(to, subject, body) {
+  cfg <- featuremap_auth_email_config()
+  to <- featuremap_auth_normalize_email(to)
+  if (!featuremap_auth_validate_email(to)) {
+    stop("Email address is invalid.", call. = FALSE)
+  }
+  smtp_url <- sprintf("smtp://%s:%s", cfg$host, cfg$port)
+  if (identical(cfg$port, "465")) smtp_url <- sprintf("smtps://%s:%s", cfg$host, cfg$port)
+  message <- paste0(
+    "From: FeatureMAP <", featuremap_auth_header_value(cfg$from), ">\r\n",
+    "To: ", featuremap_auth_header_value(to), "\r\n",
+    "Subject: ", featuremap_auth_header_value(subject), "\r\n",
+    "MIME-Version: 1.0\r\n",
+    "Content-Type: text/plain; charset=\"UTF-8\"\r\n",
+    "\r\n",
+    body
+  )
+
+  if (isTRUE(cfg$dry_run)) {
+    return(invisible(list(sent = FALSE, dry_run = TRUE, message = message)))
+  }
+
+  if (!nzchar(cfg$username) || !nzchar(cfg$password)) {
+    stop("SMTP is not configured. Set FEATUREMAP_SMTP_PASSWORD before sending account emails.", call. = FALSE)
+  }
+
+  result <- tryCatch(
+    curl::send_mail(
+      mail_from = cfg$from,
+      mail_rcpt = to,
+      message = message,
+      smtp_server = smtp_url,
+      use_ssl = "force",
+      username = cfg$username,
+      password = cfg$password,
+      verbose = FALSE
+    ),
+    error = function(e) e
+  )
+  if (inherits(result, "error")) {
+    message <- conditionMessage(result)
+    if (grepl("login denied|authentication|invalid username|invalid password", message, ignore.case = TRUE)) {
+      stop(
+        "Gmail SMTP login failed. Check FEATUREMAP_SMTP_USERNAME and FEATUREMAP_SMTP_PASSWORD; use the Gmail app password, not the normal Gmail password.",
+        call. = FALSE
+      )
+    }
+    stop(message, call. = FALSE)
+  }
+  invisible(list(sent = TRUE, dry_run = FALSE))
+}
+
+featuremap_auth_send_verification_email <- function(to, token, base_url) {
+  link <- paste0(sub("/+$", "", base_url), "/?verify_token=", utils::URLencode(token, reserved = TRUE))
+  body <- paste0(
+    "Welcome to FeatureMAP!\r\n\r\n",
+    "Click the link below to verify your email address:\r\n",
+    link, "\r\n\r\n",
+    "This link expires in 24 hours. If you didn't sign up, you can ignore this email.\r\n"
+  )
+  featuremap_auth_send_mail(to, "Verify your FeatureMAP account", body)
+}
+
+featuremap_auth_send_password_reset_email <- function(to, token, base_url) {
+  link <- paste0(sub("/+$", "", base_url), "/?reset_token=", utils::URLencode(token, reserved = TRUE))
+  body <- paste0(
+    "We received a request to reset your FeatureMAP password.\r\n\r\n",
+    "Click the link below to choose a new password:\r\n",
+    link, "\r\n\r\n",
+    "This link expires in 1 hour. If you didn't request this, you can ignore this email.\r\n"
+  )
+  featuremap_auth_send_mail(to, "Reset your FeatureMAP password", body)
+}
+
+featuremap_auth_db_path <- function() {
+  env_path <- Sys.getenv("FEATUREMAP_AUTH_DB", unset = "")
+  if (nzchar(trimws(env_path))) {
+    return(path.expand(env_path))
+  }
+  file.path(getwd(), ".featuremap_auth.sqlite")
+}
+
+featuremap_auth_connect <- function() {
+  db_path <- featuremap_auth_db_path()
+  db_dir <- dirname(db_path)
+  if (!dir.exists(db_dir)) {
+    dir.create(db_dir, recursive = TRUE, showWarnings = FALSE)
+  }
+  con <- DBI::dbConnect(RSQLite::SQLite(), db_path)
+  DBI::dbExecute(con, "PRAGMA busy_timeout = 5000")
+  featuremap_auth_init(con)
+  con
+}
+
+featuremap_auth_init <- function(con) {
+  DBI::dbExecute(
+    con,
+    "CREATE TABLE IF NOT EXISTS users (
+       id TEXT PRIMARY KEY,
+       email TEXT UNIQUE NOT NULL,
+       display_name TEXT NOT NULL,
+       institution TEXT NOT NULL DEFAULT '',
+       country_region TEXT NOT NULL DEFAULT '',
+       password_hash TEXT NOT NULL,
+       role TEXT NOT NULL DEFAULT 'user',
+       email_verified INTEGER NOT NULL DEFAULT 1,
+       created_at TEXT NOT NULL,
+       updated_at TEXT NOT NULL,
+       last_login_at TEXT
+     )"
+  )
+  featuremap_auth_add_column_if_missing(con, "users", "email_verified", "INTEGER NOT NULL DEFAULT 1")
+  featuremap_auth_add_column_if_missing(con, "users", "updated_at", "TEXT")
+  featuremap_auth_add_column_if_missing(con, "users", "last_login_at", "TEXT")
+  DBI::dbExecute(
+    con,
+    "CREATE TABLE IF NOT EXISTS email_verifications (
+       token_hash TEXT PRIMARY KEY,
+       user_id TEXT NOT NULL,
+       created_at REAL NOT NULL,
+       expires_at REAL NOT NULL,
+       used_at REAL
+     )"
+  )
+  DBI::dbExecute(
+    con,
+    "CREATE TABLE IF NOT EXISTS password_resets (
+       token_hash TEXT PRIMARY KEY,
+       user_id TEXT NOT NULL,
+       created_at REAL NOT NULL,
+       expires_at REAL NOT NULL,
+       used_at REAL
+     )"
+  )
+  invisible(TRUE)
+}
+
+featuremap_auth_add_column_if_missing <- function(con, table, column, definition) {
+  info <- DBI::dbGetQuery(con, paste0("PRAGMA table_info(", table, ")"))
+  if (column %in% info$name) return(invisible(FALSE))
+  DBI::dbExecute(con, sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, column, definition))
+  invisible(TRUE)
+}
+
+featuremap_auth_random_id <- function(prefix = "usr") {
+  chars <- c(0:9, letters[1:6])
+  paste0(prefix, "_", paste(sample(chars, 32, replace = TRUE), collapse = ""))
+}
+
+featuremap_auth_normalize_email <- function(email) {
+  tolower(trimws(as.character(email %||% "")))
+}
+
+featuremap_auth_validate_email <- function(email) {
+  grepl("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", email, perl = TRUE)
+}
+
+featuremap_auth_validate_password <- function(password) {
+  is.character(password) && length(password) == 1 && nchar(password) >= 8
+}
+
+featuremap_auth_user_from_row <- function(row) {
+  if (is.null(row) || nrow(row) < 1) return(NULL)
+  row <- row[1, , drop = FALSE]
+  list(
+    id = row$id[[1]],
+    email = row$email[[1]],
+    display_name = row$display_name[[1]],
+    institution = row$institution[[1]],
+    country_region = row$country_region[[1]],
+    role = row$role[[1]],
+    email_verified = isTRUE(as.integer(row$email_verified[[1]]) == 1L)
+  )
+}
+
+featuremap_auth_find_user <- function(con, email) {
+  DBI::dbGetQuery(
+    con,
+    "SELECT id, email, display_name, institution, country_region, password_hash, role, email_verified
+       FROM users
+      WHERE email = ?
+      LIMIT 1",
+    params = list(email)
+  )
+}
+
+featuremap_auth_find_user_by_id <- function(con, user_id) {
+  DBI::dbGetQuery(
+    con,
+    "SELECT id, email, display_name, institution, country_region, password_hash, role, email_verified
+       FROM users
+      WHERE id = ?
+      LIMIT 1",
+    params = list(user_id)
+  )
+}
+
+featuremap_auth_create_token <- function(con, table, user_id, ttl_seconds) {
+  now <- featuremap_auth_now()
+  token <- featuremap_auth_generate_token()
+  DBI::dbExecute(
+    con,
+    sprintf("DELETE FROM %s WHERE user_id = ? OR expires_at < ? OR used_at IS NOT NULL", table),
+    params = list(user_id, now)
+  )
+  DBI::dbExecute(
+    con,
+    sprintf(
+      "INSERT INTO %s (token_hash, user_id, created_at, expires_at, used_at)
+       VALUES (?, ?, ?, ?, NULL)",
+      table
+    ),
+    params = list(featuremap_auth_token_hash(token), user_id, now, now + ttl_seconds)
+  )
+  token
+}
+
+featuremap_auth_lookup_token <- function(con, table, token) {
+  DBI::dbGetQuery(
+    con,
+    sprintf(
+      "SELECT token_hash, user_id, created_at, expires_at, used_at
+         FROM %s
+        WHERE token_hash = ?
+          AND used_at IS NULL
+          AND expires_at >= ?
+        LIMIT 1",
+      table
+    ),
+    params = list(featuremap_auth_token_hash(token), featuremap_auth_now())
+  )
+}
+
+featuremap_auth_signup <- function(display_name, email, password,
+                                   institution = "", country_region = "") {
+  display_name <- trimws(as.character(display_name %||% ""))
+  email <- featuremap_auth_normalize_email(email)
+  password <- as.character(password %||% "")
+  institution <- trimws(as.character(institution %||% ""))
+  country_region <- trimws(as.character(country_region %||% ""))
+
+  if (!nzchar(display_name)) {
+    stop("Please enter your name.", call. = FALSE)
+  }
+  if (!featuremap_auth_validate_email(email)) {
+    stop("Please enter a valid email address.", call. = FALSE)
+  }
+  if (!featuremap_auth_validate_password(password)) {
+    stop("Password must be at least 8 characters.", call. = FALSE)
+  }
+
+  con <- featuremap_auth_connect()
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
+
+  existing <- featuremap_auth_find_user(con, email)
+  if (nrow(existing) > 0) {
+    stop("This email is already registered. Please sign in instead.", call. = FALSE)
+  }
+
+  now <- featuremap_auth_timestamp()
+  user_id <- featuremap_auth_random_id()
+  DBI::dbExecute(
+    con,
+    "INSERT INTO users
+       (id, email, display_name, institution, country_region, password_hash, role, email_verified, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, 'user', 0, ?, ?)",
+    params = list(
+      user_id,
+      email,
+      display_name,
+      institution,
+      country_region,
+      sodium::password_store(password),
+      now,
+      now
+    )
+  )
+
+  row <- featuremap_auth_find_user(con, email)
+  user <- featuremap_auth_user_from_row(row)
+  user$verification_token <- featuremap_auth_create_token(con, "email_verifications", user_id, 24 * 60 * 60)
+  user
+}
+
+featuremap_auth_login <- function(email, password) {
+  email <- featuremap_auth_normalize_email(email)
+  password <- as.character(password %||% "")
+
+  if (!featuremap_auth_validate_email(email) || !nzchar(password)) {
+    stop("Please enter your email and password.", call. = FALSE)
+  }
+
+  con <- featuremap_auth_connect()
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
+
+  row <- featuremap_auth_find_user(con, email)
+  if (nrow(row) < 1 || !sodium::password_verify(row$password_hash[[1]], password)) {
+    stop("Email or password is incorrect.", call. = FALSE)
+  }
+  if (!isTRUE(as.integer(row$email_verified[[1]]) == 1L)) {
+    stop("Please verify your email before signing in.", call. = FALSE)
+  }
+
+  now <- featuremap_auth_timestamp()
+  DBI::dbExecute(
+    con,
+    "UPDATE users SET last_login_at = ?, updated_at = ? WHERE email = ?",
+    params = list(now, now, email)
+  )
+
+  featuremap_auth_user_from_row(row)
+}
+
+featuremap_auth_verify_email <- function(token) {
+  token <- trimws(as.character(token %||% ""))
+  if (!nzchar(token)) stop("Verification link is invalid or expired.", call. = FALSE)
+
+  con <- featuremap_auth_connect()
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
+
+  row <- featuremap_auth_lookup_token(con, "email_verifications", token)
+  if (nrow(row) < 1) {
+    stop("Verification link is invalid or expired.", call. = FALSE)
+  }
+
+  user_id <- row$user_id[[1]]
+  DBI::dbWithTransaction(con, {
+    now <- featuremap_auth_now()
+    DBI::dbExecute(
+      con,
+      "UPDATE users SET email_verified = 1, updated_at = ? WHERE id = ?",
+      params = list(featuremap_auth_timestamp(), user_id)
+    )
+    DBI::dbExecute(
+      con,
+      "UPDATE email_verifications SET used_at = ? WHERE token_hash = ?",
+      params = list(now, row$token_hash[[1]])
+    )
+    DBI::dbExecute(
+      con,
+      "DELETE FROM email_verifications WHERE user_id = ? AND token_hash <> ?",
+      params = list(user_id, row$token_hash[[1]])
+    )
+  })
+
+  featuremap_auth_user_from_row(featuremap_auth_find_user_by_id(con, user_id))
+}
+
+featuremap_auth_resend_verification <- function(email) {
+  email <- featuremap_auth_normalize_email(email)
+  if (!featuremap_auth_validate_email(email)) return(NULL)
+
+  con <- featuremap_auth_connect()
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
+
+  row <- featuremap_auth_find_user(con, email)
+  if (nrow(row) < 1 || isTRUE(as.integer(row$email_verified[[1]]) == 1L)) {
+    return(NULL)
+  }
+
+  user <- featuremap_auth_user_from_row(row)
+  user$verification_token <- featuremap_auth_create_token(con, "email_verifications", user$id, 24 * 60 * 60)
+  user
+}
+
+featuremap_auth_request_password_reset <- function(email) {
+  email <- featuremap_auth_normalize_email(email)
+  if (!featuremap_auth_validate_email(email)) return(NULL)
+
+  con <- featuremap_auth_connect()
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
+
+  row <- featuremap_auth_find_user(con, email)
+  if (nrow(row) < 1) return(NULL)
+
+  user <- featuremap_auth_user_from_row(row)
+  user$reset_token <- featuremap_auth_create_token(con, "password_resets", user$id, 60 * 60)
+  user
+}
+
+featuremap_auth_reset_password <- function(token, password) {
+  token <- trimws(as.character(token %||% ""))
+  password <- as.character(password %||% "")
+  if (!nzchar(token)) stop("Reset link is invalid or expired.", call. = FALSE)
+  if (!featuremap_auth_validate_password(password)) {
+    stop("Password must be at least 8 characters.", call. = FALSE)
+  }
+
+  con <- featuremap_auth_connect()
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
+
+  row <- featuremap_auth_lookup_token(con, "password_resets", token)
+  if (nrow(row) < 1) {
+    stop("Reset link is invalid or expired.", call. = FALSE)
+  }
+
+  user_id <- row$user_id[[1]]
+  DBI::dbWithTransaction(con, {
+    now <- featuremap_auth_now()
+    DBI::dbExecute(
+      con,
+      "UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?",
+      params = list(sodium::password_store(password), featuremap_auth_timestamp(), user_id)
+    )
+    DBI::dbExecute(
+      con,
+      "UPDATE password_resets SET used_at = ? WHERE token_hash = ?",
+      params = list(now, row$token_hash[[1]])
+    )
+    DBI::dbExecute(
+      con,
+      "DELETE FROM password_resets WHERE user_id = ? AND token_hash <> ?",
+      params = list(user_id, row$token_hash[[1]])
+    )
+  })
+
+  featuremap_auth_user_from_row(featuremap_auth_find_user_by_id(con, user_id))
+}
+
+auth_text_field <- function(input_id, label, icon_name, type = "text", autocomplete = NULL) {
+  label_node <- if (inherits(label, "shiny.tag") || inherits(label, "shiny.tag.list")) label else tags$span(label)
+  tags$label(
+    class = "auth-field",
+    label_node,
+    tags$div(
+      class = "auth-input-wrap",
+      icon(icon_name),
+      tags$input(
+        id = input_id,
+        type = type,
+        class = "form-control",
+        autocomplete = autocomplete %||% NULL
+      )
+    )
+  )
+}
+
+auth_password_field <- function(input_id, label, autocomplete = NULL) {
+  label_node <- if (inherits(label, "shiny.tag") || inherits(label, "shiny.tag.list")) label else tags$span(label)
+  tags$label(
+    class = "auth-field",
+    label_node,
+    tags$div(
+      class = "auth-input-wrap",
+      icon("lock"),
+      tags$input(
+        id = input_id,
+        type = "password",
+        class = "form-control has-trailing-btn",
+        autocomplete = autocomplete %||% NULL
+      ),
+      tags$button(
+        type = "button",
+        class = "auth-password-toggle",
+        `data-target` = input_id,
+        `aria-label` = "Show or hide password",
+        onclick = "(function(btn) {
+          var input = document.getElementById(btn.getAttribute('data-target'));
+          if (!input) return;
+          input.type = input.type === 'password' ? 'text' : 'password';
+        })(this);",
+        icon("eye")
+      )
+    )
+  )
+}
+
 
 # UI Definition=================================================================
 ui <- fluidPage(
@@ -2560,6 +3084,42 @@ ui <- fluidPage(
         background-color: rgba(255,255,255,0.18);
         border-color: rgba(255,255,255,0.7);
       }
+
+      .nav-auth-item {
+        display: flex;
+        align-items: center;
+      }
+
+      .nav-auth-item .shiny-html-output {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .nav-auth-user {
+        max-width: 150px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .nav-auth-logout {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        color: rgba(255, 255, 255, 0.88) !important;
+        text-decoration: none !important;
+        transition: background-color 0.16s ease, color 0.16s ease;
+      }
+
+      .nav-auth-logout:hover,
+      .nav-auth-logout:focus {
+        background-color: rgba(255, 255, 255, 0.16);
+        color: #ffffff !important;
+      }
       
       /* Home page redesign */
       #home_page {
@@ -3147,7 +3707,350 @@ ui <- fluidPage(
         }
       }
 
-      
+      /* Authors page */
+      #authors_page {
+        background: #f4f7fb;
+      }
+
+      #authors_page .authors-page {
+        min-height: calc(100vh - var(--fm-nav-h, 70px));
+        overflow-x: hidden;
+        color: #20364d;
+      }
+
+      #authors_page .authors-hero-section {
+        position: relative;
+        overflow: hidden;
+        padding: 30px 40px 28px 40px;
+        background:
+          linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+          linear-gradient(0deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+          linear-gradient(126deg, #1e4a72 0%, #2d6e91 58%, #3e908e 100%);
+        background-size: 52px 52px, 52px 52px, auto;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.28);
+      }
+
+      #authors_page .authors-hero-inner {
+        width: min(1180px, 100%);
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 260px;
+        gap: 38px;
+        align-items: center;
+      }
+
+      #authors_page .authors-kicker,
+      #authors_page .authors-section-kicker {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0;
+        color: #2f7894;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+
+      #authors_page .authors-kicker {
+        color: #d8eef7;
+      }
+
+      #authors_page .authors-hero-title {
+        margin: 12px 0 0 0;
+        color: #ffffff;
+        font-size: 34px;
+        line-height: 1.08;
+        font-weight: 800;
+        letter-spacing: 0;
+      }
+
+      #authors_page .authors-hero-subtitle {
+        margin: 9px 0 0 0;
+        max-width: 620px;
+        color: rgba(238, 248, 252, 0.82);
+        font-size: 14px;
+        line-height: 1.45;
+        font-weight: 700;
+        letter-spacing: 0;
+      }
+
+      #authors_page .authors-logo-block {
+        justify-self: end;
+        width: 260px;
+        max-width: 100%;
+        padding: 12px 0 0 0;
+        border-top: 1px solid rgba(255, 255, 255, 0.36);
+      }
+
+      #authors_page .authors-logo-block img {
+        display: block;
+        width: 100%;
+        height: auto;
+        filter: drop-shadow(0 12px 20px rgba(5, 23, 40, 0.18));
+      }
+
+      #authors_page .authors-body {
+        width: min(1180px, calc(100% - 80px));
+        margin: 0 auto;
+        padding: 42px 0 72px 0;
+      }
+
+      #authors_page .authors-section + .authors-section {
+        margin-top: 54px;
+      }
+
+      #authors_page .authors-section-head {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 24px;
+        margin-bottom: 20px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid #d4e1ed;
+      }
+
+      #authors_page .authors-section-title {
+        margin: 6px 0 0 0;
+        color: #213d58;
+        font-size: 30px;
+        line-height: 1.15;
+        font-weight: 800;
+        letter-spacing: 0;
+      }
+
+      #authors_page .faculty-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 22px;
+      }
+
+      #authors_page .student-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 18px;
+      }
+
+      #authors_page .author-card {
+        min-width: 0;
+        border: 1px solid #d7e2ec;
+        border-top: 3px solid #3e908e;
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: 0 8px 20px rgba(41, 67, 95, 0.08);
+        transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+      }
+
+      #authors_page .author-card:hover {
+        transform: translateY(-2px);
+        border-color: #bad0e2;
+        box-shadow: 0 14px 26px rgba(41, 67, 95, 0.13);
+      }
+
+      #authors_page .faculty-author {
+        display: grid;
+        grid-template-columns: 168px minmax(0, 1fr);
+        gap: 22px;
+        align-items: center;
+        padding: 22px;
+      }
+
+      #authors_page .student-author {
+        padding: 18px;
+      }
+
+      #authors_page .author-photo {
+        position: relative;
+        overflow: hidden;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #eaf4f8 0%, #dbe9f0 100%);
+        border: 1px solid #dce8f1;
+      }
+
+      #authors_page .faculty-photo {
+        width: 168px;
+        aspect-ratio: 1;
+      }
+
+      #authors_page .student-photo {
+        width: 100%;
+        aspect-ratio: 1;
+        margin-bottom: 16px;
+      }
+
+      #authors_page .author-photo img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      #authors_page .author-initials {
+        width: 100%;
+        height: 100%;
+        display: none;
+        place-items: center;
+        color: #ffffff;
+        background: linear-gradient(135deg, #2d6e91 0%, #3e908e 100%);
+        font-size: 36px;
+        line-height: 1;
+        font-weight: 800;
+        letter-spacing: 0;
+      }
+
+      #authors_page .student-photo .author-initials {
+        font-size: 28px;
+      }
+
+      #authors_page .author-role-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        margin-bottom: 8px;
+        color: #3e7895;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+
+      #authors_page .author-name {
+        margin: 0 0 8px 0;
+        color: #172f47;
+        font-size: 21px;
+        line-height: 1.16;
+        font-weight: 800;
+        letter-spacing: 0;
+      }
+
+      #authors_page .student-author .author-name {
+        font-size: 17px;
+      }
+
+      #authors_page .author-role {
+        margin: 0 0 14px 0;
+        color: #5b7188;
+        font-size: 14px;
+        line-height: 1.5;
+        font-weight: 600;
+      }
+
+      #authors_page .student-author .author-role {
+        font-size: 13px;
+      }
+
+      #authors_page .author-email {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        max-width: 100%;
+        color: #2f7894;
+        font-size: 13px;
+        line-height: 1.35;
+        font-weight: 800;
+        text-decoration: none;
+        overflow-wrap: anywhere;
+      }
+
+      #authors_page .author-email:hover,
+      #authors_page .author-email:focus {
+        color: #224d7b;
+        text-decoration: none;
+      }
+
+      #authors_page .author-email span {
+        min-width: 0;
+        overflow-wrap: anywhere;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        #authors_page .author-card {
+          transition: none !important;
+        }
+
+        #authors_page .author-card:hover {
+          transform: none !important;
+        }
+      }
+
+      @media (max-width: 1080px) {
+        #authors_page .authors-hero-inner {
+          grid-template-columns: 1fr;
+          gap: 28px;
+        }
+
+        #authors_page .authors-logo-block {
+          justify-self: start;
+          width: 260px;
+        }
+
+        #authors_page .student-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 760px) {
+        #authors_page .authors-hero-section {
+          padding: 24px 20px 22px 20px;
+        }
+
+        #authors_page .authors-hero-title {
+          font-size: 28px;
+        }
+
+        #authors_page .authors-hero-subtitle {
+          font-size: 13px;
+        }
+
+        #authors_page .authors-body {
+          width: calc(100% - 32px);
+          padding: 30px 0 54px 0;
+        }
+
+        #authors_page .authors-section-head {
+          display: block;
+        }
+
+        #authors_page .authors-section-title {
+          font-size: 25px;
+        }
+
+        #authors_page .faculty-grid,
+        #authors_page .student-grid {
+          grid-template-columns: 1fr;
+        }
+
+        #authors_page .faculty-author,
+        #authors_page .student-author {
+          display: grid;
+          grid-template-columns: 96px minmax(0, 1fr);
+          gap: 16px;
+          align-items: center;
+          padding: 16px;
+        }
+
+        #authors_page .faculty-photo,
+        #authors_page .student-photo {
+          width: 96px;
+          margin-bottom: 0;
+        }
+
+        #authors_page .author-name,
+        #authors_page .student-author .author-name {
+          font-size: 16px;
+        }
+
+        #authors_page .author-role,
+        #authors_page .student-author .author-role {
+          font-size: 12px;
+        }
+
+        #authors_page .author-email {
+          font-size: 12px;
+        }
+      }
+
+
       /* Step indicators for other pages */
       .step-box {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -3157,25 +4060,25 @@ ui <- fluidPage(
         margin-bottom: 20px;
         box-shadow: 0 4px 6px rgba(0,0,0,0.1);
       }
-      
+
       .step-number {
         font-size: 36px;
         font-weight: bold;
         opacity: 0.9;
       }
-      
+
       .step-title {
         font-size: 24px;
         font-weight: 600;
         margin-top: 10px;
       }
-      
+
       .step-description {
         font-size: 14px;
         opacity: 0.9;
         margin-top: 5px;
       }
-      
+
       /* Parameter cards */
       .param-card {
         background-color: #f8f9fa;
@@ -3184,7 +4087,7 @@ ui <- fluidPage(
         padding: 15px;
         margin-bottom: 15px;
       }
-      
+
       .param-card h4 {
         color: #2c3e50;
         font-size: 16px;
@@ -3879,21 +4782,21 @@ ui <- fluidPage(
           font-size: 19px;
         }
       }
-      
+
       /* Card styles */
       .card {
         border-radius: 12px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         margin-bottom: 20px;
       }
-      
+
       .card-header {
         background-color: #3966a2;
         color: white;
         font-weight: 600;
         border-radius: 12px 12px 0 0 !important;
       }
-      
+
       /* Result / Output card header */
       .card-header-result {
         background-color: #519d9e;
@@ -3906,30 +4809,30 @@ ui <- fluidPage(
         border-color: #6191d3;
         border-radius: 6px;
       }
-      
+
       .btn-primary:hover {
         background-color: #5568d3;
         border-color: #5568d3;
       }
-      
+
       .btn-success {
         background-color: #d75725;
         border-color: #d75725;
         border-radius: 6px;
       }
-      
+
       .btn-success:hover {
         background-color: #e86349;
         border-color: #e86349;
       }
-      
+
       .next-button-container {
         display: flex;
         justify-content: center;
         margin-top: 30px;
         margin-bottom: 30px;
       }
-      
+
       .btn-next {
         padding: 10px 24px;
         font-size: 16px;
@@ -3945,11 +4848,6 @@ ui <- fluidPage(
         flex: 1 1 0;
       }
 
-      
-      body.fm-workbench .app-footer {
-        display: none;
-      }
-
       /* fluidPage wraps everything in .container-fluid; its gutters would
          stop the navbar and the analysis workbench from reaching the edges. */
       .container-fluid {
@@ -3963,6 +4861,331 @@ ui <- fluidPage(
         width: 100%;
         margin: 0 auto;
         padding: 0 28px;
+      }
+
+      /* Account page */
+      #signin_page {
+        background: #f7f8fa;
+      }
+
+      #signin_page .auth-page {
+        min-height: calc(100vh - var(--fm-nav-h, 70px));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 48px 24px;
+      }
+
+      #signin_page .auth-panel {
+        width: 100%;
+        max-width: 400px;
+        border: 1px solid #e2e5ea;
+        border-radius: 18px;
+        background: #ffffff;
+        box-shadow: 0 24px 48px -24px rgba(17, 24, 60, 0.25);
+        padding: 36px 32px;
+      }
+
+      #signin_page .auth-title {
+        margin: 0 0 22px 0;
+        color: #1b1f24;
+        font-size: 24px;
+        font-weight: 800;
+        line-height: 1.2;
+        letter-spacing: 0;
+      }
+
+      #signin_page .auth-form {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      #signin_page .auth-field {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        margin: 0;
+        color: #55607a;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      #signin_page .auth-label-row {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      #signin_page .auth-inline-link,
+      #signin_page .auth-inline-link:visited {
+        color: #0f7c96;
+        font-size: 12.5px;
+        font-weight: 700;
+        text-decoration: none;
+      }
+
+      #signin_page .auth-inline-link:hover,
+      #signin_page .auth-inline-link:focus {
+        color: #0b647a;
+        text-decoration: underline;
+      }
+
+      #signin_page .auth-input-wrap {
+        position: relative;
+        display: flex;
+        align-items: center;
+      }
+
+      #signin_page .auth-input-wrap > .fa,
+      #signin_page .auth-input-wrap > .fas,
+      #signin_page .auth-input-wrap > .far {
+        position: absolute;
+        left: 13px;
+        width: 18px;
+        color: #9aa1c2;
+        text-align: center;
+        pointer-events: none;
+      }
+
+      #signin_page .auth-input-wrap .form-control {
+        width: 100%;
+        min-height: 44px;
+        padding: 11px 14px 11px 40px;
+        border: 1.5px solid #e2e5ea;
+        border-radius: 10px;
+        background: #fbfbfd;
+        color: #1b1f24;
+        font-size: 15px;
+        box-shadow: none;
+        transition: border-color 0.15s ease, background-color 0.15s ease;
+      }
+
+      #signin_page .auth-input-wrap .form-control.has-trailing-btn {
+        padding-right: 42px;
+      }
+
+      #signin_page .auth-input-wrap .form-control:focus {
+        background: #ffffff;
+        border-color: #519d9e;
+        box-shadow: none;
+        outline: none;
+      }
+
+      #signin_page .auth-password-toggle {
+        position: absolute;
+        right: 6px;
+        width: 30px;
+        height: 30px;
+        border: none;
+        border-radius: 8px;
+        background: transparent;
+        color: #9aa1c2;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        padding: 0;
+      }
+
+      #signin_page .auth-password-toggle:hover,
+      #signin_page .auth-password-toggle:focus {
+        background: #eef7fa;
+        color: #0f7c96;
+      }
+
+      #signin_page .btn-auth-primary {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        width: 100%;
+        min-height: 45px;
+        margin-top: 4px;
+        border: none;
+        border-radius: 10px;
+        background: #0f7c96;
+        color: #ffffff;
+        font-size: 15px;
+        font-weight: 800;
+        box-shadow: none;
+        transition: background-color 0.15s ease;
+      }
+
+      #signin_page .btn-auth-primary:hover,
+      #signin_page .btn-auth-primary:focus {
+        background: #0b647a;
+        color: #ffffff;
+      }
+
+      #signin_page .auth-switch {
+        margin: 22px 0 0 0;
+        text-align: center;
+        color: #6b7280;
+        font-size: 14px;
+      }
+
+      #signin_page .auth-switch a {
+        color: #0f7c96;
+        font-weight: 800;
+        text-decoration: none;
+      }
+
+      #signin_page .auth-switch a:hover,
+      #signin_page .auth-switch a:focus {
+        text-decoration: underline;
+      }
+
+      #signin_page .auth-alert {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        margin: 0 0 16px 0;
+        padding: 0;
+        border-radius: 0;
+        border: none;
+        background: transparent;
+        font-size: 13.5px;
+        line-height: 1.5;
+      }
+
+      #signin_page .auth-alert-error {
+        color: #c0392b;
+      }
+
+      #signin_page .auth-alert-success {
+        color: #1a7f37;
+      }
+
+      #signin_page .auth-alert-info {
+        color: #0f7c96;
+      }
+
+      #signin_page .auth-alert .fa,
+      #signin_page .auth-alert .fas,
+      #signin_page .auth-alert .far {
+        flex: 0 0 auto;
+        width: 17px;
+        margin-top: 2px;
+      }
+
+      #signin_page .auth-success {
+        display: grid;
+        gap: 16px;
+        text-align: center;
+      }
+
+      #signin_page .auth-success-mark {
+        width: 58px;
+        height: 58px;
+        margin: 0 auto;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: #edf8f5;
+        color: #1a7f37;
+        font-size: 24px;
+      }
+
+      #signin_page .auth-success-title {
+        margin: 0;
+        color: #1b1f24;
+        font-size: 24px;
+        font-weight: 800;
+      }
+
+      #signin_page .auth-success-text {
+        margin: 0;
+        color: #5f6f86;
+        font-size: 15px;
+        line-height: 1.55;
+      }
+
+      #signin_page .auth-success-email {
+        color: #20364d;
+        font-weight: 800;
+        overflow-wrap: anywhere;
+      }
+
+      #signin_page .auth-success-actions {
+        display: grid;
+        gap: 10px;
+      }
+
+      #signin_page .auth-account {
+        display: grid;
+        gap: 16px;
+        text-align: center;
+      }
+
+      #signin_page .auth-account-mark {
+        width: 58px;
+        height: 58px;
+        margin: 0 auto;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: #e6f2f4;
+        color: #2b7180;
+        font-size: 24px;
+      }
+
+      #signin_page .auth-account-title {
+        margin: 0;
+        color: #1b1f24;
+        font-size: 24px;
+        font-weight: 800;
+      }
+
+      #signin_page .auth-account-meta {
+        margin: 4px 0 0 0;
+        color: #687b93;
+        font-size: 14px;
+      }
+
+      #signin_page .auth-account-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      #signin_page .btn-auth-secondary {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        min-height: 44px;
+        border: 1.5px solid #e2e5ea;
+        border-radius: 10px;
+        background: #ffffff;
+        color: #0f7c96;
+        font-weight: 800;
+      }
+
+      #signin_page .btn-auth-secondary:hover,
+      #signin_page .btn-auth-secondary:focus {
+        background: #f1f9fb;
+        color: #0b647a;
+      }
+
+      @media (max-width: 640px) {
+        #signin_page .auth-page {
+          align-items: flex-start;
+          padding: 24px 14px;
+        }
+
+        #signin_page .auth-panel {
+          padding: 24px 18px;
+        }
+
+        #signin_page .auth-account-actions {
+          width: 100%;
+        }
+
+        #signin_page .auth-account-actions {
+          grid-template-columns: 1fr;
+        }
       }
 
       /* Results page redesign */
@@ -4975,7 +6198,7 @@ ui <- fluidPage(
             "Contacts"
           )
         ),
-        tags$li(class = "nav-item", actionLink("nav_signin", "Sign In", class = "nav-link nav-link-signin"))
+        tags$li(class = "nav-item nav-auth-item", uiOutput("auth_nav", inline = TRUE))
       )
     )
   ),
@@ -5491,13 +6714,13 @@ ui <- fluidPage(
                     )
                   )
                 ),
-                sliderInput(
+                numericInput(
                   "ms1_ppm", "MS1 match (ppm)",
-                  min = 5, max = 30, value = 15, step = 1
+                  value = 15, min = 0, step = 1
                 ),
-                sliderInput(
+                numericInput(
                   "rt_tol", "RT tolerance (second)",
-                  min = 1, max = 10, value = 5, step = 1
+                  value = 5, min = 0, step = 1
                 )
               ),
 
@@ -6383,17 +7606,204 @@ ui <- fluidPage(
     tags$div(
       id = "authors_page",
       style = "display: none;",
-      tags$div(
-        class = "content-wrapper",
-        tags$div(
-          class = "step-box results-step-box",
+      tags$main(
+        class = "authors-page",
+        tags$section(
+          class = "authors-hero-section",
           tags$div(
-            class = "results-step-top",
-            tags$div(class = "results-kicker", icon("users"), "About"),
-            tags$div(class = "results-step-number", "Team")
+            class = "authors-hero-inner",
+            tags$div(
+              tags$p(class = "authors-kicker", icon("users"), "Authors"),
+              tags$h1(class = "authors-hero-title", "Project Team"),
+              tags$p(
+                class = "authors-hero-subtitle",
+                "The Shen Lab team at Lee Kong Chian School of Medicine, NTU"
+              )
+            ),
+            tags$div(
+              class = "authors-logo-block",
+              tags$img(
+                src = "shen_lab_footer_logo.png",
+                alt = "Shen Lab",
+                onerror = "this.onerror=null; this.src='shen_lab_logo6.png';"
+              )
+            )
+          )
+        ),
+
+        tags$div(
+          class = "authors-body",
+          tags$section(
+            class = "authors-section",
+            tags$div(
+              class = "authors-section-head",
+              tags$div(
+                tags$p(class = "authors-section-kicker", icon("chalkboard-user"), "Faculty"),
+                tags$h2(class = "authors-section-title", "Principal Investigators")
+              )
+            ),
+            tags$div(
+              class = "faculty-grid",
+              tags$article(
+                class = "author-card faculty-author",
+                tags$div(
+                  class = "author-photo faculty-photo",
+                  tags$img(
+                    src = "authors/xiaotao-shen.jpg",
+                    alt = "Xiaotao Shen",
+                    onerror = "this.style.display='none'; var fallback=this.nextElementSibling; if (fallback) fallback.style.display='grid';"
+                  ),
+                  tags$span(class = "author-initials", "XS")
+                ),
+                tags$div(
+                  class = "author-copy",
+                  tags$div(class = "author-role-label", icon("user-tie"), "Faculty"),
+                  tags$h3(class = "author-name", "Xiaotao Shen"),
+                  tags$p(class = "author-role", "Assistant Professor, Lee Kong Chian School of Medicine, NTU"),
+                  tags$a(
+                    class = "author-email",
+                    href = "mailto:xiaotao.shen@ntu.edu.sg",
+                    icon("envelope"),
+                    tags$span("xiaotao.shen@ntu.edu.sg")
+                  )
+                )
+              ),
+              tags$article(
+                class = "author-card faculty-author",
+                tags$div(
+                  class = "author-photo faculty-photo",
+                  tags$img(
+                    src = "authors/chuchu-wang.jpg",
+                    alt = "Chuchu Wang",
+                    onerror = "this.style.display='none'; var fallback=this.nextElementSibling; if (fallback) fallback.style.display='grid';"
+                  ),
+                  tags$span(class = "author-initials", "CW")
+                ),
+                tags$div(
+                  class = "author-copy",
+                  tags$div(class = "author-role-label", icon("user-tie"), "Faculty"),
+                  tags$h3(class = "author-name", "Chuchu Wang"),
+                  tags$p(class = "author-role", "Assistant Professor, Lee Kong Chian School of Medicine, NTU"),
+                  tags$a(
+                    class = "author-email",
+                    href = "mailto:chuchu.wang@ntu.edu.sg",
+                    icon("envelope"),
+                    tags$span("chuchu.wang@ntu.edu.sg")
+                  )
+                )
+              )
+            )
           ),
-          tags$div(class = "step-title", "Authors"),
-          tags$div(class = "step-description", "Coming soon.")
+
+          tags$section(
+            class = "authors-section",
+            tags$div(
+              class = "authors-section-head",
+              tags$div(
+                tags$p(class = "authors-section-kicker", icon("graduation-cap"), "Students"),
+                tags$h2(class = "authors-section-title", "Research Contributors")
+              )
+            ),
+            tags$div(
+              class = "student-grid",
+              tags$article(
+                class = "author-card student-author",
+                tags$div(
+                  class = "author-photo student-photo",
+                  tags$img(
+                    src = "authors/yuting-wang.jpg",
+                    alt = "Yuting Wang",
+                    onerror = "this.style.display='none'; var fallback=this.nextElementSibling; if (fallback) fallback.style.display='grid';"
+                  ),
+                  tags$span(class = "author-initials", "YW")
+                ),
+                tags$div(
+                  class = "author-copy",
+                  tags$div(class = "author-role-label", icon("microscope"), "Contributor"),
+                  tags$h3(class = "author-name", "Yuting Wang"),
+                  tags$p(class = "author-role", "PhD Candidate, Lee Kong Chian School of Medicine, NTU"),
+                  tags$a(
+                    class = "author-email",
+                    href = "mailto:yuting012@e.ntu.edu.sg",
+                    icon("envelope"),
+                    tags$span("yuting012@e.ntu.edu.sg")
+                  )
+                )
+              ),
+              tags$article(
+                class = "author-card student-author",
+                tags$div(
+                  class = "author-photo student-photo",
+                  tags$img(
+                    src = "authors/feifan-zhang.jpg",
+                    alt = "Feifan Zhang",
+                    onerror = "this.style.display='none'; var fallback=this.nextElementSibling; if (fallback) fallback.style.display='grid';"
+                  ),
+                  tags$span(class = "author-initials", "FZ")
+                ),
+                tags$div(
+                  class = "author-copy",
+                  tags$div(class = "author-role-label", icon("microscope"), "Contributor"),
+                  tags$h3(class = "author-name", "Feifan Zhang"),
+                  tags$p(class = "author-role", "PhD Candidate, Lee Kong Chian School of Medicine, NTU"),
+                  tags$a(
+                    class = "author-email",
+                    href = "mailto:feifan004@e.ntu.edu.sg",
+                    icon("envelope"),
+                    tags$span("feifan004@e.ntu.edu.sg")
+                  )
+                )
+              ),
+              tags$article(
+                class = "author-card student-author",
+                tags$div(
+                  class = "author-photo student-photo",
+                  tags$img(
+                    src = "authors/yijiang-liu.jpg",
+                    alt = "Yijiang Liu",
+                    onerror = "this.style.display='none'; var fallback=this.nextElementSibling; if (fallback) fallback.style.display='grid';"
+                  ),
+                  tags$span(class = "author-initials", "YL")
+                ),
+                tags$div(
+                  class = "author-copy",
+                  tags$div(class = "author-role-label", icon("microscope"), "Contributor"),
+                  tags$h3(class = "author-name", "Yijiang Liu"),
+                  tags$p(class = "author-role", "PhD Candidate, Lee Kong Chian School of Medicine, NTU"),
+                  tags$a(
+                    class = "author-email",
+                    href = "mailto:liuy0292@e.ntu.edu.sg",
+                    icon("envelope"),
+                    tags$span("liuy0292@e.ntu.edu.sg")
+                  )
+                )
+              ),
+              tags$article(
+                class = "author-card student-author",
+                tags$div(
+                  class = "author-photo student-photo",
+                  tags$img(
+                    src = "authors/jiramet-kinchagawat.jpg",
+                    alt = "Jiramet Kinchagawat",
+                    onerror = "this.style.display='none'; var fallback=this.nextElementSibling; if (fallback) fallback.style.display='grid';"
+                  ),
+                  tags$span(class = "author-initials", "JK")
+                ),
+                tags$div(
+                  class = "author-copy",
+                  tags$div(class = "author-role-label", icon("microscope"), "Contributor"),
+                  tags$h3(class = "author-name", "Jiramet Kinchagawat"),
+                  tags$p(class = "author-role", "PhD Candidate, Lee Kong Chian School of Medicine, NTU"),
+                  tags$a(
+                    class = "author-email",
+                    href = "mailto:jiramet001@e.ntu.edu.sg",
+                    icon("envelope"),
+                    tags$span("jiramet001@e.ntu.edu.sg")
+                  )
+                )
+              )
+            )
+          )
         )
       )
     ),
@@ -6403,16 +7813,12 @@ ui <- fluidPage(
       id = "signin_page",
       style = "display: none;",
       tags$div(
-        class = "content-wrapper",
+        class = "auth-page",
         tags$div(
-          class = "step-box results-step-box",
-          tags$div(
-            class = "results-step-top",
-            tags$div(class = "results-kicker", icon("right-to-bracket"), "Account"),
-            tags$div(class = "results-step-number", "Sign In")
-          ),
-          tags$div(class = "step-title", "Sign In"),
-          tags$div(class = "step-description", "Coming soon.")
+          class = "auth-panel",
+          uiOutput("auth_notice"),
+          uiOutput("auth_account_panel"),
+          uiOutput("auth_form_panel")
         )
       )
     ),
@@ -6588,6 +7994,17 @@ server <- function(input, output, session) {
     results_export_networks_touched = FALSE,
     results_export_tables_updating = FALSE,
     results_export_networks_updating = FALSE,
+    ### Account
+    auth_user = NULL,
+    auth_notice = NULL,
+    auth_redirect_after_login = NULL,
+    auth_mode = "signin",
+    auth_reset_token = NULL,
+    auth_signup_email = NULL,
+    auth_email_delivery_failed = FALSE,
+    auth_email_dry_run = FALSE,
+    auth_resend_available = FALSE,
+    auth_query_seen = NULL,
     ### Quickstart
     quickstart_active = FALSE,
     quickstart_prompt_shown = FALSE,
@@ -6636,12 +8053,290 @@ server <- function(input, output, session) {
 
   # Pages already converted to the full-bleed workbench layout
   workbench_pages <- c("upload", "annotation", "network", "modules", "function", "results")
+
+  # Analysis pages are protected in the first-stage account system. Public
+  # pages stay open so visitors can still read about the tool and team.
+  protected_pages <- analysis_pages
+  auth_enabled <- featuremap_auth_enabled()
+
+  auth_user_label <- function(user = rv$auth_user) {
+    if (is.null(user)) return("Sign In")
+    label <- trimws(as.character(user$display_name %||% ""))
+    if (!nzchar(label)) label <- trimws(as.character(user$email %||% ""))
+    if (!nzchar(label)) label <- "Account"
+    label
+  }
+
+  auth_user_initials <- function(user = rv$auth_user) {
+    label <- auth_user_label(user)
+    if (identical(label, "Sign In") || identical(label, "Account")) return(label)
+    parts <- unlist(strsplit(label, "[^A-Za-z0-9]+", perl = TRUE))
+    parts <- parts[nzchar(parts)]
+    if (length(parts) == 0 && nzchar(user$email %||% "")) {
+      parts <- unlist(strsplit(sub("@.*$", "", user$email), "[^A-Za-z0-9]+", perl = TRUE))
+      parts <- parts[nzchar(parts)]
+    }
+    initials <- paste0(toupper(substr(parts, 1, 1)), collapse = "")
+    if (nchar(initials) > 3) initials <- substr(initials, 1, 3)
+    if (!nzchar(initials)) initials <- "AC"
+    initials
+  }
+
+  set_auth_notice <- function(type = c("info", "success", "error"), text) {
+    type <- match.arg(type)
+    rv$auth_notice <- list(type = type, text = text)
+  }
+
+  auth_public_base_url <- function() {
+    env_url <- Sys.getenv("FEATUREMAP_PUBLIC_URL", unset = "")
+    if (nzchar(trimws(env_url))) return(sub("/+$", "", trimws(env_url)))
+
+    protocol <- session$clientData$url_protocol %||% "http:"
+    host <- session$clientData$url_hostname %||% "127.0.0.1"
+    port <- session$clientData$url_port %||% ""
+    port_part <- if (nzchar(port)) paste0(":", port) else ""
+    paste0(protocol, "//", host, port_part)
+  }
+
+  output$authenticated <- reactive({
+    !auth_enabled || !is.null(rv$auth_user)
+  })
+  outputOptions(output, "authenticated", suspendWhenHidden = FALSE)
+
+  output$auth_nav <- renderUI({
+    if (!auth_enabled) return(NULL)
+
+    if (is.null(rv$auth_user)) {
+      return(actionLink(
+        "nav_signin",
+        tagList(icon("right-to-bracket"), tags$span("Sign In")),
+        class = "nav-link nav-link-signin"
+      ))
+    }
+
+    tagList(
+      actionLink(
+        "nav_signin",
+        tags$span(class = "nav-auth-user", auth_user_initials()),
+        class = "nav-link nav-link-signin",
+        title = auth_user_label()
+      ),
+      actionLink(
+        "auth_logout_nav",
+        icon("arrow-right-from-bracket"),
+        class = "nav-auth-logout",
+        title = "Log out",
+        `aria-label` = "Log out"
+      )
+    )
+  })
+  outputOptions(output, "auth_nav", suspendWhenHidden = FALSE)
+
+  output$auth_notice <- renderUI({
+    if (!auth_enabled) return(NULL)
+
+    notice <- rv$auth_notice
+    if (is.null(notice) || !nzchar(notice$text %||% "")) return(NULL)
+    icon_name <- switch(
+      notice$type,
+      success = "circle-check",
+      error = "circle-exclamation",
+      "circle-info"
+    )
+    tags$div(
+      class = paste("auth-alert", paste0("auth-alert-", notice$type)),
+      icon(icon_name),
+      tags$span(notice$text)
+    )
+  })
+
+  output$auth_account_panel <- renderUI({
+    if (!auth_enabled) return(NULL)
+
+    user <- rv$auth_user
+    if (is.null(user)) return(NULL)
+
+    tags$div(
+      class = "auth-account",
+      tags$div(class = "auth-account-mark", icon("user-check")),
+      tags$div(
+        tags$h2(class = "auth-account-title", paste("Signed in as", auth_user_label(user))),
+        tags$p(class = "auth-account-meta", user$email %||% "")
+      ),
+      tags$div(
+        class = "auth-account-actions",
+        actionButton(
+          "auth_continue",
+          tagList(icon("play"), "Continue"),
+          class = "btn btn-auth-primary"
+        ),
+        actionButton(
+          "auth_logout",
+          tagList(icon("arrow-right-from-bracket"), "Log Out"),
+          class = "btn btn-auth-secondary"
+        )
+      )
+    )
+  })
+
+  output$auth_form_panel <- renderUI({
+    if (!auth_enabled) {
+      return(tagList(
+        tags$h1(class = "auth-title", "Sign in"),
+        tags$p(class = "auth-switch", "Sign in is disabled for this local session.")
+      ))
+    }
+
+    if (!is.null(rv$auth_user)) return(NULL)
+
+    mode <- rv$auth_mode %||% "signin"
+    if (identical(mode, "signup_success")) {
+      delivery_failed <- isTRUE(rv$auth_email_delivery_failed)
+      dry_run <- isTRUE(rv$auth_email_dry_run)
+      return(tags$div(
+        class = "auth-success",
+        tags$div(class = "auth-success-mark", icon("envelope")),
+        tags$h1(
+          class = "auth-success-title",
+          if (dry_run) "Dry run enabled" else if (delivery_failed) "Account created" else "Check your email"
+        ),
+        tags$p(
+          class = "auth-success-text",
+          if (dry_run) "No email was sent to " else if (delivery_failed) "Verification email could not be sent to " else "Verification link sent to ",
+          tags$span(class = "auth-success-email", rv$auth_signup_email %||% "your email"),
+          "."
+        ),
+        if (dry_run) {
+          tags$p(class = "auth-success-text", "Restart without FEATUREMAP_EMAIL_DRY_RUN=true to send real email.")
+        },
+        tags$div(
+          class = "auth-success-actions",
+          actionButton(
+            "resend_signup_verification",
+            "Resend email",
+            class = "btn btn-auth-secondary"
+          ),
+          actionButton(
+            "auth_success_signin",
+            "Back to sign in",
+            class = "btn btn-auth-primary"
+          )
+        )
+      ))
+    }
+
+    if (identical(mode, "forgot")) {
+      return(tagList(
+        tags$h1(class = "auth-title", "Reset password"),
+        tags$div(
+          class = "auth-form",
+          auth_text_field("forgot_email", "Email", "envelope", type = "email", autocomplete = "email"),
+          actionButton(
+            "forgot_submit",
+            "Send reset link",
+            class = "btn btn-auth-primary"
+          )
+        ),
+        tags$p(
+          class = "auth-switch",
+          actionLink("auth_show_signin", "Back to sign in", class = "auth-switch-link")
+        )
+      ))
+    }
+
+    if (identical(mode, "reset")) {
+      return(tagList(
+        tags$h1(class = "auth-title", "Reset password"),
+        tags$div(
+          class = "auth-form",
+          auth_password_field("reset_password", "New password", autocomplete = "new-password"),
+          auth_password_field("reset_password_confirm", "Confirm password", autocomplete = "new-password"),
+          actionButton(
+            "reset_submit",
+            "Update password",
+            class = "btn btn-auth-primary"
+          )
+        ),
+        tags$p(
+          class = "auth-switch",
+          actionLink("auth_show_signin", "Back to sign in", class = "auth-switch-link")
+        )
+      ))
+    }
+
+    if (identical(mode, "signup")) {
+      return(tagList(
+        tags$h1(class = "auth-title", "Sign up"),
+        tags$div(
+          class = "auth-form",
+          auth_text_field("signup_name", "Display name", "user", autocomplete = "name"),
+          auth_text_field("signup_email", "Email", "envelope", type = "email", autocomplete = "email"),
+          auth_text_field("signup_institution", "Institution", "university", autocomplete = "organization"),
+          auth_text_field("signup_country", "Country/Region", "globe"),
+          auth_password_field("signup_password", "Password", autocomplete = "new-password"),
+          auth_password_field("signup_password_confirm", "Confirm password", autocomplete = "new-password"),
+          actionButton(
+            "signup_submit",
+            "Create account",
+            class = "btn btn-auth-primary"
+          )
+        ),
+        tags$p(
+          class = "auth-switch",
+          "Already have an account? ",
+          actionLink("auth_show_signin", "Sign in", class = "auth-switch-link")
+        )
+      ))
+    }
+
+    tagList(
+      tags$h1(class = "auth-title", "Sign in"),
+      tags$div(
+        class = "auth-form",
+        auth_text_field("signin_email", "Email", "envelope", type = "email", autocomplete = "email"),
+        auth_password_field(
+          "signin_password",
+          tags$span(
+            class = "auth-label-row",
+            tags$span("Password"),
+            actionLink("auth_show_forgot", "Forgot password?", class = "auth-inline-link")
+          ),
+          autocomplete = "current-password"
+        ),
+        actionButton(
+          "signin_submit",
+          "Sign in",
+          class = "btn btn-auth-primary"
+        ),
+        if (isTRUE(rv$auth_resend_available)) {
+          actionButton(
+            "resend_verification",
+            "Resend verification email",
+            class = "btn btn-auth-secondary"
+          )
+        }
+      ),
+      tags$p(
+        class = "auth-switch",
+        "No account yet? ",
+        actionLink("auth_show_signup", "Sign up", class = "auth-switch-link")
+      )
+    )
+  })
+  outputOptions(output, "auth_form_panel", suspendWhenHidden = FALSE)
   
   # Function to switch pages.
   # Everything is done in a single browser call: the old version sent one
   # websocket message per page and per nav link (~22 round trips), which is
   # what made switching feel sluggish.
   switch_page <- function(page) {
+    if (!(page %in% pages)) page <- "home"
+    if (auth_enabled && page %in% protected_pages && is.null(rv$auth_user)) {
+      rv$auth_redirect_after_login <- page
+      set_auth_notice("info", "Sign in or create an account to continue to the analysis workflow.")
+      page <- "signin"
+    }
+
     rv$current_page <- page
 
     js_pages <- paste0("['", paste(pages, collapse = "','"), "']")
@@ -6898,6 +8593,292 @@ server <- function(input, output, session) {
     open_process_modal("error", title, text)
     close_process_modal(2600)
   }
+
+  post_auth_target <- function() {
+    rv$auth_redirect_after_login <- NULL
+    "home"
+  }
+
+  require_auth <- function(target_page = "upload") {
+    if (!auth_enabled) return(TRUE)
+    if (!is.null(rv$auth_user)) return(TRUE)
+    rv$auth_redirect_after_login <- target_page
+    set_auth_notice("info", "Sign in or create an account to continue to the analysis workflow.")
+    switch_page("signin")
+    FALSE
+  }
+
+  observe({
+    if (!auth_enabled) return(invisible(NULL))
+    search <- session$clientData$url_search %||% ""
+    if (identical(search, rv$auth_query_seen)) return(invisible(NULL))
+    rv$auth_query_seen <- search
+
+    params <- parseQueryString(search)
+    if (nzchar(params$verify_token %||% "")) {
+      result <- tryCatch(
+        featuremap_auth_verify_email(params$verify_token),
+        error = function(e) e
+      )
+      rv$auth_mode <- "signin"
+      rv$auth_resend_available <- FALSE
+      if (inherits(result, "error")) {
+        set_auth_notice("error", conditionMessage(result))
+      } else {
+        set_auth_notice("success", "Email verified. You can sign in now.")
+      }
+      shinyjs::runjs("if (window.history && window.history.replaceState) window.history.replaceState({}, document.title, window.location.pathname);")
+      switch_page("signin")
+    } else if (nzchar(params$reset_token %||% "")) {
+      rv$auth_reset_token <- params$reset_token
+      rv$auth_mode <- "reset"
+      rv$auth_resend_available <- FALSE
+      rv$auth_notice <- NULL
+      shinyjs::runjs("if (window.history && window.history.replaceState) window.history.replaceState({}, document.title, window.location.pathname);")
+      switch_page("signin")
+    }
+  })
+
+  logout_user <- function() {
+    rv$auth_user <- NULL
+    rv$auth_redirect_after_login <- NULL
+    set_auth_notice("success", "You have signed out.")
+    switch_page("home")
+  }
+
+  observeEvent(input$auth_show_signup, {
+    rv$auth_mode <- "signup"
+    rv$auth_notice <- NULL
+    rv$auth_resend_available <- FALSE
+    rv$auth_signup_email <- NULL
+    rv$auth_email_delivery_failed <- FALSE
+    rv$auth_email_dry_run <- FALSE
+  }, ignoreInit = TRUE)
+
+  observeEvent(input$auth_show_signin, {
+    rv$auth_mode <- "signin"
+    rv$auth_notice <- NULL
+    rv$auth_reset_token <- NULL
+    rv$auth_resend_available <- FALSE
+  }, ignoreInit = TRUE)
+
+  observeEvent(input$auth_success_signin, {
+    rv$auth_mode <- "signin"
+    rv$auth_notice <- NULL
+    rv$auth_signup_email <- NULL
+    rv$auth_email_delivery_failed <- FALSE
+    rv$auth_email_dry_run <- FALSE
+    rv$auth_resend_available <- FALSE
+  }, ignoreInit = TRUE)
+
+  observeEvent(input$auth_show_forgot, {
+    rv$auth_mode <- "forgot"
+    rv$auth_notice <- NULL
+    rv$auth_resend_available <- FALSE
+    rv$auth_email_delivery_failed <- FALSE
+    rv$auth_email_dry_run <- FALSE
+  }, ignoreInit = TRUE)
+
+  observeEvent(input$signin_submit, {
+    if (!auth_enabled) return(invisible(NULL))
+    rv$auth_resend_available <- FALSE
+
+    result <- tryCatch(
+      featuremap_auth_login(input$signin_email, input$signin_password),
+      error = function(e) e
+    )
+
+    if (inherits(result, "error")) {
+      if (grepl("verify your email", conditionMessage(result), ignore.case = TRUE)) {
+        rv$auth_resend_available <- TRUE
+      }
+      set_auth_notice("error", conditionMessage(result))
+      return(invisible(NULL))
+    }
+
+    rv$auth_user <- result
+    set_auth_notice("success", "Signed in.")
+    switch_page(post_auth_target())
+  })
+
+  observeEvent(input$signup_submit, {
+    if (!auth_enabled) return(invisible(NULL))
+
+    password <- as.character(input$signup_password %||% "")
+    password_confirm <- as.character(input$signup_password_confirm %||% "")
+
+    if (!identical(password, password_confirm)) {
+      set_auth_notice("error", "Passwords do not match.")
+      return(invisible(NULL))
+    }
+
+    result <- tryCatch(
+      featuremap_auth_signup(
+        display_name = input$signup_name,
+        email = input$signup_email,
+        password = password,
+        institution = input$signup_institution,
+        country_region = input$signup_country
+      ),
+      error = function(e) e
+    )
+
+    if (inherits(result, "error")) {
+      set_auth_notice("error", conditionMessage(result))
+      return(invisible(NULL))
+    }
+
+    mail_result <- tryCatch(
+      featuremap_auth_send_verification_email(result$email, result$verification_token, auth_public_base_url()),
+      error = function(e) e
+    )
+
+    rv$auth_signup_email <- result$email
+    rv$auth_mode <- "signup_success"
+    rv$auth_resend_available <- FALSE
+    if (inherits(mail_result, "error")) {
+      rv$auth_email_delivery_failed <- TRUE
+      rv$auth_email_dry_run <- FALSE
+      set_auth_notice("error", conditionMessage(mail_result))
+    } else {
+      rv$auth_email_delivery_failed <- FALSE
+      rv$auth_email_dry_run <- isTRUE(mail_result$dry_run)
+      if (isTRUE(mail_result$dry_run)) {
+        set_auth_notice("info", "Email dry-run is enabled. No real email was sent.")
+      } else {
+        rv$auth_notice <- NULL
+      }
+    }
+    switch_page("signin")
+  })
+
+  observeEvent(input$resend_signup_verification, {
+    if (!auth_enabled) return(invisible(NULL))
+
+    email <- featuremap_auth_normalize_email(rv$auth_signup_email)
+    if (!featuremap_auth_validate_email(email)) {
+      set_auth_notice("error", "Enter your email first.")
+      return(invisible(NULL))
+    }
+
+    result <- featuremap_auth_resend_verification(email)
+    if (is.null(result)) {
+      rv$auth_email_delivery_failed <- FALSE
+      rv$auth_email_dry_run <- FALSE
+      set_auth_notice("success", "If that email still needs verification, a new email has been sent.")
+      return(invisible(NULL))
+    }
+
+    mail_result <- tryCatch(
+      featuremap_auth_send_verification_email(result$email, result$verification_token, auth_public_base_url()),
+      error = function(e) e
+    )
+    if (inherits(mail_result, "error")) {
+      set_auth_notice("error", conditionMessage(mail_result))
+      return(invisible(NULL))
+    }
+    rv$auth_email_delivery_failed <- FALSE
+    rv$auth_email_dry_run <- isTRUE(mail_result$dry_run)
+    if (isTRUE(mail_result$dry_run)) {
+      set_auth_notice("info", "Email dry-run is enabled. No real email was sent.")
+    } else {
+      set_auth_notice("success", "Verification email sent.")
+    }
+  })
+
+  observeEvent(input$resend_verification, {
+    if (!auth_enabled) return(invisible(NULL))
+
+    email <- featuremap_auth_normalize_email(input$signin_email)
+    if (!featuremap_auth_validate_email(email)) {
+      set_auth_notice("error", "Enter your email first.")
+      return(invisible(NULL))
+    }
+
+    result <- featuremap_auth_resend_verification(email)
+    if (is.null(result)) {
+      set_auth_notice("success", "If that email exists and is not verified yet, a new verification email has been sent.")
+      rv$auth_resend_available <- FALSE
+      return(invisible(NULL))
+    }
+
+    mail_result <- tryCatch(
+      featuremap_auth_send_verification_email(result$email, result$verification_token, auth_public_base_url()),
+      error = function(e) e
+    )
+    if (inherits(mail_result, "error")) {
+      set_auth_notice("error", conditionMessage(mail_result))
+      return(invisible(NULL))
+    }
+
+    if (isTRUE(mail_result$dry_run)) {
+      set_auth_notice("info", "Email dry-run is enabled. No real email was sent.")
+    } else {
+      set_auth_notice("success", "If that email exists and is not verified yet, a new verification email has been sent.")
+    }
+    rv$auth_resend_available <- FALSE
+  })
+
+  observeEvent(input$forgot_submit, {
+    if (!auth_enabled) return(invisible(NULL))
+
+    email <- featuremap_auth_normalize_email(input$forgot_email)
+    if (!featuremap_auth_validate_email(email)) {
+      set_auth_notice("error", "Enter your email first.")
+      return(invisible(NULL))
+    }
+
+    result <- featuremap_auth_request_password_reset(email)
+    if (!is.null(result)) {
+      mail_result <- tryCatch(
+        featuremap_auth_send_password_reset_email(result$email, result$reset_token, auth_public_base_url()),
+        error = function(e) e
+      )
+      if (inherits(mail_result, "error")) {
+        set_auth_notice("error", conditionMessage(mail_result))
+        return(invisible(NULL))
+      }
+    }
+    rv$auth_mode <- "signin"
+    set_auth_notice("success", "If that email has an account, a password reset link has been sent.")
+  })
+
+  observeEvent(input$reset_submit, {
+    if (!auth_enabled) return(invisible(NULL))
+
+    password <- as.character(input$reset_password %||% "")
+    password_confirm <- as.character(input$reset_password_confirm %||% "")
+    if (!identical(password, password_confirm)) {
+      set_auth_notice("error", "Passwords do not match.")
+      return(invisible(NULL))
+    }
+
+    result <- tryCatch(
+      featuremap_auth_reset_password(rv$auth_reset_token, password),
+      error = function(e) e
+    )
+
+    if (inherits(result, "error")) {
+      set_auth_notice("error", conditionMessage(result))
+      return(invisible(NULL))
+    }
+
+    rv$auth_reset_token <- NULL
+    rv$auth_mode <- "signin"
+    set_auth_notice("success", "Password updated. You can sign in now.")
+  })
+
+  observeEvent(input$auth_continue, {
+    switch_page("upload")
+  })
+
+  observeEvent(input$auth_logout, {
+    logout_user()
+  })
+
+  observeEvent(input$auth_logout_nav, {
+    logout_user()
+  })
   
   # Navigation observers
   observeEvent(input$nav_home, { switch_page("home") })
@@ -6909,7 +8890,14 @@ server <- function(input, output, session) {
   observeEvent(input$nav_results, { switch_page("results") })
   observeEvent(input$nav_docs, { switch_page("docs") })
   observeEvent(input$nav_authors, { switch_page("authors") })
-  observeEvent(input$nav_signin, { switch_page("signin") })
+  observeEvent(input$nav_signin, {
+    if (!auth_enabled) {
+      switch_page("home")
+      return(invisible(NULL))
+    }
+    if (is.null(rv$auth_user)) rv$auth_mode <- "signin"
+    switch_page("signin")
+  })
 
   observeEvent(input$back_home_reset, {
     showModal(
@@ -7111,6 +9099,8 @@ server <- function(input, output, session) {
   }
 
   observeEvent(input$load_upload_data, {
+    if (!require_auth("upload")) return(invisible(NULL))
+
     missing <- character(0)
     use_staged_demo <- is.null(input$feature_file) && !is.null(rv$staged_feature_data)
 
@@ -7507,12 +9497,15 @@ server <- function(input, output, session) {
   }
   
   observeEvent(input$next_to_annotation, {
+    if (!require_auth("annotation")) return(invisible(NULL))
+
     req(!is.null(rv$feature_data), !is.null(rv$ref_database), !is.null(rv$mrn))
     switch_page("annotation")
   })
   
   ## Step 2 Feature annotation====================================
   observeEvent(input$run_annotation, {
+    if (!require_auth("annotation")) return(invisible(NULL))
     
     req(rv$feature_data, rv$ref_database)
     
@@ -7582,6 +9575,8 @@ server <- function(input, output, session) {
   })
 
   observeEvent(input$next_to_network, {
+    if (!require_auth("network")) return(invisible(NULL))
+
     req(rv$annotation_status == "finished")
     switch_page("network")
   })
@@ -7934,6 +9929,7 @@ server <- function(input, output, session) {
   
   ## Step 3: Extract Subnetwork ======================================
   observeEvent(input$run_pcsf, {
+    if (!require_auth("network")) return(invisible(NULL))
     
     req(rv$annotation_object, rv$mrn)
     
@@ -8779,6 +10775,8 @@ server <- function(input, output, session) {
   })
 
   observeEvent(input$next_to_modules, {
+    if (!require_auth("modules")) return(invisible(NULL))
+
     req(rv$pcsf_status == "finished")
     switch_page("modules")
   })
@@ -8786,6 +10784,8 @@ server <- function(input, output, session) {
  
   ## Step 4: Module Identification =====================================
   observeEvent(input$run_modules, {
+    if (!require_auth("modules")) return(invisible(NULL))
+
     req(rv$annotation_object)
     req(rv$pcsf_status == "finished")
     show_process_modal(
@@ -9266,6 +11266,8 @@ server <- function(input, output, session) {
 
   
   observeEvent(input$next_to_function, {
+    if (!require_auth("function")) return(invisible(NULL))
+
     req(rv$module_status == "finished")
     switch_page("function")
   })
@@ -9273,6 +11275,7 @@ server <- function(input, output, session) {
   
   ## Step 5: Function Interpretation =====================================
   observeEvent(input$run_function_annotation, {
+    if (!require_auth("function")) return(invisible(NULL))
     
     req(rv$module_res)
     req(rv$module_status == "finished")
@@ -10203,6 +12206,8 @@ server <- function(input, output, session) {
 
   
   observeEvent(input$next_to_results, {
+    if (!require_auth("results")) return(invisible(NULL))
+
     switch_page("results")
   })
   
@@ -10798,6 +12803,10 @@ server <- function(input, output, session) {
       paste0("featuremap_results_", Sys.Date(), ".zip")
     },
     content = function(file) {
+      if (!require_auth("results")) {
+        stop("Please sign in before downloading FeatureMAP results.", call. = FALSE)
+      }
+
       selected <- if (is.null(input$export_items)) character(0) else input$export_items
       selected_networks <- if (is.null(input$network_export_items)) character(0) else input$network_export_items
       selected_reports <- selected_report_export_items()

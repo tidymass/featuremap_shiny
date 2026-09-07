@@ -17,11 +17,27 @@ FM_SRC="$FM_ROOT/src"
 FM_LIB="$FM_ROOT/rlib"
 FM_LOCAL="$FM_ROOT/local"
 FM_BIN="$FM_ROOT/bin"
+FM_ENV="$FM_ROOT/env.sh"
+
+# Private deployment secrets/configuration live outside git.
+# Example: FEATUREMAP_SMTP_PASSWORD for Gmail app-password SMTP.
+if [ -f "$FM_ENV" ]; then
+  # shellcheck disable=SC1090
+  . "$FM_ENV"
+fi
 
 # ---- deployment settings -------------------------------------------------
 export FM_HOST="${FM_HOST:-0.0.0.0}"
 export FM_PORT="${FM_PORT:-3838}"
 export FEATUREMAP_MAX_UPLOAD_MB="${FEATUREMAP_MAX_UPLOAD_MB:-500}"
+export FEATUREMAP_AUTH_ENABLED="${FEATUREMAP_AUTH_ENABLED:-false}"
+export FEATUREMAP_AUTH_DB="${FEATUREMAP_AUTH_DB:-$FM_ROOT/auth/featuremap_auth.sqlite}"
+export FEATUREMAP_PUBLIC_URL="${FEATUREMAP_PUBLIC_URL:-}"
+export FEATUREMAP_SMTP_HOST="${FEATUREMAP_SMTP_HOST:-smtp.gmail.com}"
+export FEATUREMAP_SMTP_PORT="${FEATUREMAP_SMTP_PORT:-587}"
+export FEATUREMAP_SMTP_USERNAME="${FEATUREMAP_SMTP_USERNAME:-featuremapofficial@gmail.com}"
+export FEATUREMAP_SMTP_FROM="${FEATUREMAP_SMTP_FROM:-featuremapofficial@gmail.com}"
+# export FEATUREMAP_SMTP_PASSWORD=your-gmail-app-password
 # export SILICONFLOW_BASE_URL=https://api.siliconflow.cn   # pin one endpoint
 # --------------------------------------------------------------------------
 

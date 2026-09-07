@@ -184,13 +184,64 @@ cd ~/featuremap-deploy/src && git checkout -- . && git pull
 export FM_HOST="${FM_HOST:-0.0.0.0}"
 export FM_PORT="${FM_PORT:-3838}"
 export FEATUREMAP_MAX_UPLOAD_MB="${FEATUREMAP_MAX_UPLOAD_MB:-500}"
+export FEATUREMAP_AUTH_ENABLED="${FEATUREMAP_AUTH_ENABLED:-false}"
+export FEATUREMAP_AUTH_DB="${FEATUREMAP_AUTH_DB:-$FM_ROOT/auth/featuremap_auth.sqlite}"
+export FEATUREMAP_PUBLIC_URL="${FEATUREMAP_PUBLIC_URL:-}"
+export FEATUREMAP_SMTP_HOST="${FEATUREMAP_SMTP_HOST:-smtp.gmail.com}"
+export FEATUREMAP_SMTP_PORT="${FEATUREMAP_SMTP_PORT:-587}"
+export FEATUREMAP_SMTP_USERNAME="${FEATUREMAP_SMTP_USERNAME:-featuremapofficial@gmail.com}"
+export FEATUREMAP_SMTP_FROM="${FEATUREMAP_SMTP_FROM:-featuremapofficial@gmail.com}"
+# export FEATUREMAP_SMTP_PASSWORD=your-gmail-app-password
 # export SILICONFLOW_BASE_URL=https://api.siliconflow.cn
 ```
 
 - **`FM_HOST`** —— 必须是 `0.0.0.0`，别人才连得上。Shiny 默认的 `127.0.0.1` 只接受服务器本机连接。
 - **`FM_PORT`** —— 换端口后组员的地址也要跟着变。
 - **`FEATUREMAP_MAX_UPLOAD_MB`** —— Shiny 自带默认值是 5 MB，基本挡住所有真实的 feature table。
+- **`FEATUREMAP_AUTH_ENABLED`** —— 登录开关。本地/内部使用建议保持 `false`；公开公网版本设成 `true` 后，分析页面需要登录。
+- **`FEATUREMAP_AUTH_DB`** —— 账号 SQLite 数据库位置。公开部署时放在 `~/featuremap-deploy/` 这类持久目录，不要提交到 git。
+- **`FEATUREMAP_PUBLIC_URL`** —— 公开访问地址，用来生成邮箱验证和重置密码链接。公网部署时一定要设成最终 URL。
+- **`FEATUREMAP_SMTP_USERNAME` / `FEATUREMAP_SMTP_FROM`** —— 发件邮箱，默认 `featuremapofficial@gmail.com`。
+- **`FEATUREMAP_SMTP_PASSWORD`** —— Gmail app password。不要提交到 git；在服务器环境变量或私有配置里设置。
 - **`SILICONFLOW_BASE_URL`** —— 全组统一用某一个站点的 key 时取消注释，可以完全绕过端点自动探测。
+
+### 配置 Gmail 发信
+
+FeatureMAP 账号邮件默认使用 `featuremapofficial@gmail.com` 发送。第一次启用前：
+
+1. 登录 `featuremapofficial@gmail.com` 的 Google Account。
+2. 在 Security 里开启 2-Step Verification。
+3. 打开 App passwords，创建一个用于 FeatureMAP SMTP 的 app password。
+4. 在服务器私有环境里设置。推荐放到 `~/featuremap-deploy/env.sh`，这个文件在仓库外，不会提交到 git：
+
+```bash
+ssh yuting@10.96.129.143
+nano ~/featuremap-deploy/env.sh
+```
+
+写入下面几行，把最后一行换成 Google 生成的 16 位 app password：
+
+```bash
+export FEATUREMAP_AUTH_ENABLED=true
+export FEATUREMAP_PUBLIC_URL=https://你的公网地址
+export FEATUREMAP_SMTP_USERNAME=featuremapofficial@gmail.com
+export FEATUREMAP_SMTP_FROM=featuremapofficial@gmail.com
+export FEATUREMAP_SMTP_PASSWORD='Google 生成的 app password'
+```
+
+`FEATUREMAP_PUBLIC_URL` 必须是用户能打开的公网地址，否则验证邮件和重置密码邮件里的链接会指错地方。
+
+保存后重启应用，让新的环境变量进入 R 进程：
+
+```bash
+~/featuremap-deploy/src/deploy/run_app.sh restart
+```
+
+检查当前 R 进程能不能读到配置，但不要打印密码本身：
+
+```bash
+Rscript -e 'cat("user=", Sys.getenv("FEATUREMAP_SMTP_USERNAME"), "\npassword_chars=", nchar(Sys.getenv("FEATUREMAP_SMTP_PASSWORD")), "\ndry_run=", Sys.getenv("FEATUREMAP_EMAIL_DRY_RUN"), "\n")'
+```
 
 改法（改仓库文件，走正常发布流程）：
 
