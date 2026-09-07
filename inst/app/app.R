@@ -802,16 +802,23 @@ ui <- fluidPage(
       .fm-process-modal .fm-modal-icon.error,
       .fm-process-modal .wb-check,
       .fm-process-modal .wb-done-rows,
-      .fm-process-modal .fm-modal-actions { display: none; }
-      .fm-process-modal.is-running .fm-modal-icon.running { display: flex; }
-      .fm-process-modal.is-error   .fm-modal-icon.error   { display: flex; }
-      .fm-process-modal.is-error   .fm-modal-actions      { display: flex; }
-      .fm-process-modal.is-success .wb-check              { display: block; }
+      .fm-process-modal .fm-modal-actions { display: none !important; }
+      .fm-process-modal.is-running > .fm-modal-icon.running { display: flex !important; }
+      .fm-process-modal.is-error   > .fm-modal-icon.error   { display: flex !important; }
+      .fm-process-modal.is-error   > .fm-modal-actions      { display: flex !important; }
+      .fm-process-modal.is-success > .wb-check              { display: block !important; }
       /* keep the icon block the same height in both states so the card
          does not jump when it switches from running to success */
       .fm-process-modal .wb-check { margin: 6px auto 24px auto; }
-      .fm-process-modal.is-success .fm-modal-actions      { display: flex; }
-      .fm-process-modal.is-success .wb-done-rows:not(:empty) { display: flex; }
+      .fm-process-modal.is-success > .fm-modal-actions      { display: flex !important; }
+      .fm-process-modal.is-success > .wb-done-rows:not(:empty) { display: flex !important; }
+      .fm-process-modal.is-running > .wb-check,
+      .fm-process-modal.is-running > .wb-done-rows,
+      .fm-process-modal.is-running > .fm-modal-actions,
+      .fm-process-modal.is-success > .fm-modal-icon.running,
+      .fm-process-modal.is-success > .fm-modal-icon.error {
+        display: none !important;
+      }
       
       .modal.fm-process-modal-wrap {
         display: flex !important;
@@ -2208,11 +2215,14 @@ ui <- fluidPage(
            both touch; `gap` applies between every pair of children whatever
            they are, and a hidden panel contributes no gap at all. */
         .wb-side .wb-section,
-        .wb-side .wb-subfield,
-        .wb-side [data-display-if] {
+        .wb-side .wb-subfield {
           display: flex;
           flex-direction: column;
           gap: 18px;
+        }
+
+        .wb-side [data-display-if][style*='display: none'] {
+          display: none !important;
         }
 
         .wb-side .form-group,
@@ -8744,6 +8754,7 @@ server <- function(input, output, session) {
   }
 
   open_process_modal <- function(state, title, text, rows = NULL) {
+    removeModal()
     showModal(
       modalDialog(
         easyClose = FALSE,
@@ -8774,17 +8785,24 @@ server <- function(input, output, session) {
 
   # Switch the already-open card to another state, in place.
   set_process_state <- function(state, title, text, rows = NULL) {
-    shinyjs::html("fm_proc_title", htmltools::htmlEscape(title %||% ""))
-    shinyjs::html("fm_proc_text",  htmltools::htmlEscape(text  %||% ""))
-    shinyjs::html(
-      "fm_proc_rows",
-      if (!is.null(rows) && length(rows) > 0) as.character(tagList(rows)) else ""
-    )
+    rows_html <- if (!is.null(rows) && length(rows) > 0) as.character(tagList(rows)) else ""
     shinyjs::runjs(sprintf(
       "(function() {
          var c = document.getElementById('fm_proc_card');
-         if (c) { c.className = 'fm-process-modal is-%s'; }
-       })();", state))
+         if (!c) return;
+         var title = document.getElementById('fm_proc_title');
+         var text = document.getElementById('fm_proc_text');
+         var rows = document.getElementById('fm_proc_rows');
+         if (title) title.textContent = %s;
+         if (text) text.textContent = %s;
+         if (rows) rows.innerHTML = %s;
+         c.className = 'fm-process-modal is-%s';
+       })();",
+      jsonlite::toJSON(title %||% "", auto_unbox = TRUE),
+      jsonlite::toJSON(text %||% "", auto_unbox = TRUE),
+      jsonlite::toJSON(rows_html, auto_unbox = TRUE),
+      state
+    ))
   }
 
   show_process_modal <- function(title, text) {
