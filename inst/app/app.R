@@ -293,8 +293,45 @@ featuremap_auth_validate_email <- function(email) {
   grepl("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", email, perl = TRUE)
 }
 
+featuremap_auth_password_message <- function() {
+  "Password must be at least 8 characters and include at least 3 of: uppercase letters, lowercase letters, numbers, and symbols."
+}
+
+featuremap_auth_password_score <- function(password) {
+  password <- as.character(password %||% "")
+  checks <- c(
+    grepl("[A-Z]", password, perl = TRUE),
+    grepl("[a-z]", password, perl = TRUE),
+    grepl("[0-9]", password, perl = TRUE),
+    grepl("[^A-Za-z0-9]", password, perl = TRUE)
+  )
+  sum(checks)
+}
+
 featuremap_auth_validate_password <- function(password) {
-  is.character(password) && length(password) == 1 && nchar(password) >= 8
+  is.character(password) &&
+    length(password) == 1 &&
+    nchar(password) >= 8 &&
+    featuremap_auth_password_score(password) >= 3
+}
+
+featuremap_auth_token_cooldown_remaining <- function(con, table, user_id, cooldown_seconds = 60) {
+  if (is.null(cooldown_seconds) || cooldown_seconds <= 0) return(0L)
+  row <- DBI::dbGetQuery(
+    con,
+    sprintf(
+      "SELECT MAX(created_at) AS created_at
+         FROM %s
+        WHERE user_id = ?
+          AND used_at IS NULL",
+      table
+    ),
+    params = list(user_id)
+  )
+  if (nrow(row) < 1 || is.na(row$created_at[[1]])) return(0L)
+  last_created <- suppressWarnings(as.numeric(row$created_at[[1]]))
+  if (is.na(last_created)) return(0L)
+  max(0L, ceiling(cooldown_seconds - (featuremap_auth_now() - last_created)))
 }
 
 featuremap_auth_user_from_row <- function(row) {
@@ -383,8 +420,14 @@ featuremap_auth_signup <- function(display_name, email, password,
   if (!featuremap_auth_validate_email(email)) {
     stop("Please enter a valid email address.", call. = FALSE)
   }
+  if (!nzchar(institution)) {
+    stop("Please enter your institution.", call. = FALSE)
+  }
+  if (!nzchar(country_region)) {
+    stop("Please enter your country/region.", call. = FALSE)
+  }
   if (!featuremap_auth_validate_password(password)) {
-    stop("Password must be at least 8 characters.", call. = FALSE)
+    stop(featuremap_auth_password_message(), call. = FALSE)
   }
 
   con <- featuremap_auth_connect()
@@ -497,6 +540,10 @@ featuremap_auth_resend_verification <- function(email) {
   }
 
   user <- featuremap_auth_user_from_row(row)
+  remaining <- featuremap_auth_token_cooldown_remaining(con, "email_verifications", user$id, 60)
+  if (remaining > 0) {
+    stop(sprintf("Please wait %s seconds before requesting another verification email.", remaining), call. = FALSE)
+  }
   user$verification_token <- featuremap_auth_create_token(con, "email_verifications", user$id, 24 * 60 * 60)
   user
 }
@@ -512,6 +559,10 @@ featuremap_auth_request_password_reset <- function(email) {
   if (nrow(row) < 1) return(NULL)
 
   user <- featuremap_auth_user_from_row(row)
+  remaining <- featuremap_auth_token_cooldown_remaining(con, "password_resets", user$id, 60)
+  if (remaining > 0) {
+    stop(sprintf("Please wait %s seconds before requesting another password reset email.", remaining), call. = FALSE)
+  }
   user$reset_token <- featuremap_auth_create_token(con, "password_resets", user$id, 60 * 60)
   user
 }
@@ -521,7 +572,7 @@ featuremap_auth_reset_password <- function(token, password) {
   password <- as.character(password %||% "")
   if (!nzchar(token)) stop("Reset link is invalid or expired.", call. = FALSE)
   if (!featuremap_auth_validate_password(password)) {
-    stop("Password must be at least 8 characters.", call. = FALSE)
+    stop(featuremap_auth_password_message(), call. = FALSE)
   }
 
   con <- featuremap_auth_connect()
@@ -555,11 +606,18 @@ featuremap_auth_reset_password <- function(token, password) {
   featuremap_auth_user_from_row(featuremap_auth_find_user_by_id(con, user_id))
 }
 
-auth_text_field <- function(input_id, label, icon_name, type = "text", autocomplete = NULL) {
+auth_required_label <- function(label, required = FALSE) {
+  label_node <- if (inherits(label, "shiny.tag") || inherits(label, "shiny.tag.list")) label else tags$span(label)
+  if (!isTRUE(required)) return(label_node)
+  tags$span(class = "auth-required-label", label_node, tags$span(class = "auth-required-mark", "*"))
+}
+
+auth_text_field <- function(input_id, label, icon_name, type = "text", autocomplete = NULL,
+                            required = FALSE, label_required = required) {
   label_node <- if (inherits(label, "shiny.tag") || inherits(label, "shiny.tag.list")) label else tags$span(label)
   tags$label(
     class = "auth-field",
-    label_node,
+    auth_required_label(label_node, label_required),
     tags$div(
       class = "auth-input-wrap",
       icon(icon_name),
@@ -567,17 +625,20 @@ auth_text_field <- function(input_id, label, icon_name, type = "text", autocompl
         id = input_id,
         type = type,
         class = "form-control",
-        autocomplete = autocomplete %||% NULL
+        autocomplete = autocomplete %||% NULL,
+        required = if (isTRUE(required)) "required" else NULL,
+        `aria-required` = if (isTRUE(required)) "true" else NULL
       )
     )
   )
 }
 
-auth_password_field <- function(input_id, label, autocomplete = NULL) {
+auth_password_field <- function(input_id, label, autocomplete = NULL, required = FALSE,
+                                label_required = required, hint = NULL) {
   label_node <- if (inherits(label, "shiny.tag") || inherits(label, "shiny.tag.list")) label else tags$span(label)
   tags$label(
     class = "auth-field",
-    label_node,
+    auth_required_label(label_node, label_required),
     tags$div(
       class = "auth-input-wrap",
       icon("lock"),
@@ -585,7 +646,9 @@ auth_password_field <- function(input_id, label, autocomplete = NULL) {
         id = input_id,
         type = "password",
         class = "form-control has-trailing-btn",
-        autocomplete = autocomplete %||% NULL
+        autocomplete = autocomplete %||% NULL,
+        required = if (isTRUE(required)) "required" else NULL,
+        `aria-required` = if (isTRUE(required)) "true" else NULL
       ),
       tags$button(
         type = "button",
@@ -599,9 +662,12 @@ auth_password_field <- function(input_id, label, autocomplete = NULL) {
         })(this);",
         icon("eye")
       )
-    )
+    ),
+    if (!is.null(hint) && nzchar(hint)) tags$span(class = "auth-field-hint", hint)
   )
 }
+
+auth_button_press_js <- "this.classList.add('is-auth-pressing'); setTimeout(function(btn) { btn.classList.remove('is-auth-pressing'); }, 260, this);"
 
 
 # UI Definition=================================================================
@@ -616,6 +682,34 @@ ui <- fluidPage(
   
   # Custom CSS
   tags$head(
+    tags$script(HTML("
+      window.FeatureMAPAuthCooldown = function(id, label, seconds) {
+        var button = document.getElementById(id);
+        if (!button) return;
+        if (button.__featuremapCooldownTimer) {
+          clearInterval(button.__featuremapCooldownTimer);
+        }
+        var remaining = Math.max(0, parseInt(seconds, 10) || 0);
+        var setState = function() {
+          if (remaining > 0) {
+            button.disabled = true;
+            button.classList.add('disabled');
+            button.textContent = label + ' (' + remaining + 's)';
+          } else {
+            button.disabled = false;
+            button.classList.remove('disabled');
+            button.textContent = label;
+            clearInterval(button.__featuremapCooldownTimer);
+            button.__featuremapCooldownTimer = null;
+          }
+        };
+        setState();
+        button.__featuremapCooldownTimer = setInterval(function() {
+          remaining -= 1;
+          setState();
+        }, 1000);
+      };
+    ")),
     
     tags$style(HTML("
     
@@ -4911,11 +5005,29 @@ ui <- fluidPage(
         font-weight: 700;
       }
 
+      #signin_page .auth-required-label {
+        display: inline-flex;
+        align-items: baseline;
+        gap: 4px;
+      }
+
+      #signin_page .auth-required-mark {
+        color: #c0392b;
+      }
+
+      #signin_page .auth-field-hint {
+        color: #7b8498;
+        font-size: 11.5px;
+        font-weight: 600;
+        line-height: 1.4;
+      }
+
       #signin_page .auth-label-row {
         display: flex;
         align-items: baseline;
         justify-content: space-between;
         gap: 16px;
+        width: 100%;
       }
 
       #signin_page .auth-inline-link,
@@ -5009,14 +5121,34 @@ ui <- fluidPage(
         color: #ffffff;
         font-size: 15px;
         font-weight: 800;
-        box-shadow: none;
-        transition: background-color 0.15s ease;
+        box-shadow: 0 10px 20px rgba(15, 124, 150, 0.22);
+        transform: translateY(0);
+        transition: background-color 0.15s ease, box-shadow 0.15s ease, transform 0.12s ease;
       }
 
       #signin_page .btn-auth-primary:hover,
       #signin_page .btn-auth-primary:focus {
         background: #0b647a;
         color: #ffffff;
+        box-shadow: 0 12px 24px rgba(15, 124, 150, 0.28);
+        transform: translateY(-1px);
+      }
+
+      #signin_page .btn-auth-primary:active,
+      #signin_page .btn-auth-primary.is-auth-pressing {
+        background: #09596d;
+        box-shadow: 0 5px 12px rgba(15, 124, 150, 0.22);
+        transform: translateY(1px);
+      }
+
+      #signin_page .btn-auth-primary:disabled,
+      #signin_page .btn-auth-secondary:disabled,
+      #signin_page .btn-auth-primary.disabled,
+      #signin_page .btn-auth-secondary.disabled {
+        cursor: not-allowed;
+        opacity: 0.58;
+        box-shadow: none;
+        transform: none;
       }
 
       #signin_page .auth-switch {
@@ -5161,12 +5293,34 @@ ui <- fluidPage(
         background: #ffffff;
         color: #0f7c96;
         font-weight: 800;
+        box-shadow: 0 1px 3px rgba(31, 54, 82, 0.08);
+        transform: translateY(0);
+        transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.12s ease;
       }
 
       #signin_page .btn-auth-secondary:hover,
       #signin_page .btn-auth-secondary:focus {
         background: #f1f9fb;
+        border-color: #b6d5de;
         color: #0b647a;
+        box-shadow: 0 8px 18px rgba(31, 54, 82, 0.12);
+        transform: translateY(-1px);
+      }
+
+      #signin_page .btn-auth-secondary:active,
+      #signin_page .btn-auth-secondary.is-auth-pressing {
+        background: #e6f4f7;
+        border-color: #9bc6d1;
+        box-shadow: 0 2px 7px rgba(31, 54, 82, 0.10);
+        transform: translateY(1px);
+      }
+
+      #signin_page .btn-auth-primary:disabled:hover,
+      #signin_page .btn-auth-primary.disabled:hover,
+      #signin_page .btn-auth-secondary:disabled:hover,
+      #signin_page .btn-auth-secondary.disabled:hover {
+        box-shadow: none;
+        transform: none;
       }
 
       @media (max-width: 640px) {
@@ -7998,12 +8152,16 @@ server <- function(input, output, session) {
     auth_user = NULL,
     auth_notice = NULL,
     auth_redirect_after_login = NULL,
+    auth_account_return_page = "home",
     auth_mode = "signin",
     auth_reset_token = NULL,
     auth_signup_email = NULL,
     auth_email_delivery_failed = FALSE,
     auth_email_dry_run = FALSE,
     auth_resend_available = FALSE,
+    auth_signup_resend_ready_at = 0,
+    auth_signin_resend_ready_at = 0,
+    auth_reset_request_ready_at = 0,
     auth_query_seen = NULL,
     ### Quickstart
     quickstart_active = FALSE,
@@ -8098,6 +8256,53 @@ server <- function(input, output, session) {
     paste0(protocol, "//", host, port_part)
   }
 
+  auth_cooldown_remaining <- function(key) {
+    ready_at <- suppressWarnings(as.numeric(rv[[key]] %||% 0))
+    if (is.na(ready_at)) ready_at <- 0
+    max(0L, ceiling(ready_at - as.numeric(Sys.time())))
+  }
+
+  auth_set_cooldown <- function(key, seconds = 60) {
+    rv[[key]] <- as.numeric(Sys.time()) + seconds
+  }
+
+  auth_cooldown_blocked <- function(key, label = "another email") {
+    remaining <- auth_cooldown_remaining(key)
+    if (remaining <= 0) return(FALSE)
+    set_auth_notice("info", sprintf("Please wait %s seconds before requesting %s.", remaining, label))
+    TRUE
+  }
+
+  auth_cooldown_button <- function(input_id, label, cooldown_key, class = "btn btn-auth-secondary") {
+    remaining <- auth_cooldown_remaining(cooldown_key)
+    is_waiting <- remaining > 0
+    actionButton(
+      input_id,
+      if (is_waiting) sprintf("%s (%ss)", label, remaining) else label,
+      class = class,
+      onclick = auth_button_press_js,
+      disabled = if (is_waiting) "disabled" else NULL
+    )
+  }
+
+  auth_start_button_cooldown <- function(input_id, label, seconds = 60) {
+    shinyjs::delay(
+      40,
+      shinyjs::runjs(sprintf(
+        "window.FeatureMAPAuthCooldown && window.FeatureMAPAuthCooldown(%s, %s, %d);",
+        jsonlite::toJSON(input_id, auto_unbox = TRUE),
+        jsonlite::toJSON(label, auto_unbox = TRUE),
+        as.integer(seconds)
+      ))
+    )
+  }
+
+  auth_return_page <- function() {
+    page <- rv$auth_account_return_page %||% "home"
+    if (!(page %in% pages) || identical(page, "signin")) page <- "home"
+    page
+  }
+
   output$authenticated <- reactive({
     !auth_enabled || !is.null(rv$auth_user)
   })
@@ -8168,12 +8373,14 @@ server <- function(input, output, session) {
         actionButton(
           "auth_continue",
           tagList(icon("play"), "Continue"),
-          class = "btn btn-auth-primary"
+          class = "btn btn-auth-primary",
+          onclick = auth_button_press_js
         ),
         actionButton(
           "auth_logout",
           tagList(icon("arrow-right-from-bracket"), "Log Out"),
-          class = "btn btn-auth-secondary"
+          class = "btn btn-auth-secondary",
+          onclick = auth_button_press_js
         )
       )
     )
@@ -8211,15 +8418,17 @@ server <- function(input, output, session) {
         },
         tags$div(
           class = "auth-success-actions",
-          actionButton(
+          auth_cooldown_button(
             "resend_signup_verification",
             "Resend email",
+            "auth_signup_resend_ready_at",
             class = "btn btn-auth-secondary"
           ),
           actionButton(
             "auth_success_signin",
             "Back to sign in",
-            class = "btn btn-auth-primary"
+            class = "btn btn-auth-primary",
+            onclick = auth_button_press_js
           )
         )
       ))
@@ -8230,10 +8439,11 @@ server <- function(input, output, session) {
         tags$h1(class = "auth-title", "Reset password"),
         tags$div(
           class = "auth-form",
-          auth_text_field("forgot_email", "Email", "envelope", type = "email", autocomplete = "email"),
-          actionButton(
+          auth_text_field("forgot_email", "Email", "envelope", type = "email", autocomplete = "email", required = TRUE),
+          auth_cooldown_button(
             "forgot_submit",
             "Send reset link",
+            "auth_reset_request_ready_at",
             class = "btn btn-auth-primary"
           )
         ),
@@ -8249,12 +8459,19 @@ server <- function(input, output, session) {
         tags$h1(class = "auth-title", "Reset password"),
         tags$div(
           class = "auth-form",
-          auth_password_field("reset_password", "New password", autocomplete = "new-password"),
-          auth_password_field("reset_password_confirm", "Confirm password", autocomplete = "new-password"),
+          auth_password_field(
+            "reset_password",
+            "New password",
+            autocomplete = "new-password",
+            required = TRUE,
+            hint = "8+ chars, covering at least 3 of uppercase, lowercase, number, symbol."
+          ),
+          auth_password_field("reset_password_confirm", "Confirm password", autocomplete = "new-password", required = TRUE),
           actionButton(
             "reset_submit",
             "Update password",
-            class = "btn btn-auth-primary"
+            class = "btn btn-auth-primary",
+            onclick = auth_button_press_js
           )
         ),
         tags$p(
@@ -8269,16 +8486,23 @@ server <- function(input, output, session) {
         tags$h1(class = "auth-title", "Sign up"),
         tags$div(
           class = "auth-form",
-          auth_text_field("signup_name", "Display name", "user", autocomplete = "name"),
-          auth_text_field("signup_email", "Email", "envelope", type = "email", autocomplete = "email"),
-          auth_text_field("signup_institution", "Institution", "university", autocomplete = "organization"),
-          auth_text_field("signup_country", "Country/Region", "globe"),
-          auth_password_field("signup_password", "Password", autocomplete = "new-password"),
-          auth_password_field("signup_password_confirm", "Confirm password", autocomplete = "new-password"),
+          auth_text_field("signup_name", "Display name", "user", autocomplete = "name", required = TRUE),
+          auth_text_field("signup_email", "Email", "envelope", type = "email", autocomplete = "email", required = TRUE),
+          auth_text_field("signup_institution", "Institution", "university", autocomplete = "organization", required = TRUE),
+          auth_text_field("signup_country", "Country/Region", "globe", required = TRUE),
+          auth_password_field(
+            "signup_password",
+            "Password",
+            autocomplete = "new-password",
+            required = TRUE,
+            hint = "8+ chars, covering at least 3 of uppercase, lowercase, number, symbol."
+          ),
+          auth_password_field("signup_password_confirm", "Confirm password", autocomplete = "new-password", required = TRUE),
           actionButton(
             "signup_submit",
             "Create account",
-            class = "btn btn-auth-primary"
+            class = "btn btn-auth-primary",
+            onclick = auth_button_press_js
           )
         ),
         tags$p(
@@ -8293,25 +8517,29 @@ server <- function(input, output, session) {
       tags$h1(class = "auth-title", "Sign in"),
       tags$div(
         class = "auth-form",
-        auth_text_field("signin_email", "Email", "envelope", type = "email", autocomplete = "email"),
+        auth_text_field("signin_email", "Email", "envelope", type = "email", autocomplete = "email", required = TRUE),
         auth_password_field(
           "signin_password",
           tags$span(
             class = "auth-label-row",
-            tags$span("Password"),
+            auth_required_label("Password", TRUE),
             actionLink("auth_show_forgot", "Forgot password?", class = "auth-inline-link")
           ),
-          autocomplete = "current-password"
+          autocomplete = "current-password",
+          required = TRUE,
+          label_required = FALSE
         ),
         actionButton(
           "signin_submit",
           "Sign in",
-          class = "btn btn-auth-primary"
+          class = "btn btn-auth-primary",
+          onclick = auth_button_press_js
         ),
         if (isTRUE(rv$auth_resend_available)) {
-          actionButton(
+          auth_cooldown_button(
             "resend_verification",
             "Resend verification email",
+            "auth_signin_resend_ready_at",
             class = "btn btn-auth-secondary"
           )
         }
@@ -8736,6 +8964,7 @@ server <- function(input, output, session) {
     rv$auth_signup_email <- result$email
     rv$auth_mode <- "signup_success"
     rv$auth_resend_available <- FALSE
+    auth_set_cooldown("auth_signup_resend_ready_at", 60)
     if (inherits(mail_result, "error")) {
       rv$auth_email_delivery_failed <- TRUE
       rv$auth_email_dry_run <- FALSE
@@ -8750,6 +8979,7 @@ server <- function(input, output, session) {
       }
     }
     switch_page("signin")
+    auth_start_button_cooldown("resend_signup_verification", "Resend email", 60)
   })
 
   observeEvent(input$resend_signup_verification, {
@@ -8760,12 +8990,24 @@ server <- function(input, output, session) {
       set_auth_notice("error", "Enter your email first.")
       return(invisible(NULL))
     }
+    if (auth_cooldown_blocked("auth_signup_resend_ready_at", "another verification email")) {
+      return(invisible(NULL))
+    }
 
-    result <- featuremap_auth_resend_verification(email)
+    result <- tryCatch(
+      featuremap_auth_resend_verification(email),
+      error = function(e) e
+    )
+    if (inherits(result, "error")) {
+      set_auth_notice("error", conditionMessage(result))
+      return(invisible(NULL))
+    }
     if (is.null(result)) {
       rv$auth_email_delivery_failed <- FALSE
       rv$auth_email_dry_run <- FALSE
+      auth_set_cooldown("auth_signup_resend_ready_at", 60)
       set_auth_notice("success", "If that email still needs verification, a new email has been sent.")
+      auth_start_button_cooldown("resend_signup_verification", "Resend email", 60)
       return(invisible(NULL))
     }
 
@@ -8779,6 +9021,8 @@ server <- function(input, output, session) {
     }
     rv$auth_email_delivery_failed <- FALSE
     rv$auth_email_dry_run <- isTRUE(mail_result$dry_run)
+    auth_set_cooldown("auth_signup_resend_ready_at", 60)
+    auth_start_button_cooldown("resend_signup_verification", "Resend email", 60)
     if (isTRUE(mail_result$dry_run)) {
       set_auth_notice("info", "Email dry-run is enabled. No real email was sent.")
     } else {
@@ -8794,11 +9038,23 @@ server <- function(input, output, session) {
       set_auth_notice("error", "Enter your email first.")
       return(invisible(NULL))
     }
+    if (auth_cooldown_blocked("auth_signin_resend_ready_at", "another verification email")) {
+      return(invisible(NULL))
+    }
 
-    result <- featuremap_auth_resend_verification(email)
+    result <- tryCatch(
+      featuremap_auth_resend_verification(email),
+      error = function(e) e
+    )
+    if (inherits(result, "error")) {
+      set_auth_notice("error", conditionMessage(result))
+      return(invisible(NULL))
+    }
     if (is.null(result)) {
+      auth_set_cooldown("auth_signin_resend_ready_at", 60)
       set_auth_notice("success", "If that email exists and is not verified yet, a new verification email has been sent.")
       rv$auth_resend_available <- FALSE
+      auth_start_button_cooldown("resend_verification", "Resend verification email", 60)
       return(invisible(NULL))
     }
 
@@ -8816,7 +9072,9 @@ server <- function(input, output, session) {
     } else {
       set_auth_notice("success", "If that email exists and is not verified yet, a new verification email has been sent.")
     }
-    rv$auth_resend_available <- FALSE
+    auth_set_cooldown("auth_signin_resend_ready_at", 60)
+    rv$auth_resend_available <- TRUE
+    auth_start_button_cooldown("resend_verification", "Resend verification email", 60)
   })
 
   observeEvent(input$forgot_submit, {
@@ -8827,8 +9085,18 @@ server <- function(input, output, session) {
       set_auth_notice("error", "Enter your email first.")
       return(invisible(NULL))
     }
+    if (auth_cooldown_blocked("auth_reset_request_ready_at", "another password reset email")) {
+      return(invisible(NULL))
+    }
 
-    result <- featuremap_auth_request_password_reset(email)
+    result <- tryCatch(
+      featuremap_auth_request_password_reset(email),
+      error = function(e) e
+    )
+    if (inherits(result, "error")) {
+      set_auth_notice("error", conditionMessage(result))
+      return(invisible(NULL))
+    }
     if (!is.null(result)) {
       mail_result <- tryCatch(
         featuremap_auth_send_password_reset_email(result$email, result$reset_token, auth_public_base_url()),
@@ -8839,6 +9107,7 @@ server <- function(input, output, session) {
         return(invisible(NULL))
       }
     }
+    auth_set_cooldown("auth_reset_request_ready_at", 60)
     rv$auth_mode <- "signin"
     set_auth_notice("success", "If that email has an account, a password reset link has been sent.")
   })
@@ -8869,7 +9138,7 @@ server <- function(input, output, session) {
   })
 
   observeEvent(input$auth_continue, {
-    switch_page("upload")
+    switch_page(auth_return_page())
   })
 
   observeEvent(input$auth_logout, {
@@ -8895,7 +9164,14 @@ server <- function(input, output, session) {
       switch_page("home")
       return(invisible(NULL))
     }
-    if (is.null(rv$auth_user)) rv$auth_mode <- "signin"
+    if (is.null(rv$auth_user)) {
+      rv$auth_mode <- "signin"
+    } else {
+      current_page <- rv$current_page %||% "home"
+      if (current_page %in% pages && !identical(current_page, "signin")) {
+        rv$auth_account_return_page <- current_page
+      }
+    }
     switch_page("signin")
   })
 
