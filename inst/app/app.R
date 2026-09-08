@@ -6402,7 +6402,7 @@ ui <- fluidPage(
             ),
             tags$a(
               class = "btn btn-hero btn-hero-secondary",
-              href = "https://github.com/tidymass/featuremap_tutorial",
+              href = "https://www.tidymass.org/featuremap_tutorial/",
               target = "_blank",
               rel = "noopener noreferrer",
               icon("book"),
@@ -8019,7 +8019,7 @@ ui <- fluidPage(
         ),
         tags$a(
           class = "footer-link",
-          href = "https://github.com/tidymass/featuremap_tutorial",
+          href = "https://www.tidymass.org/featuremap_tutorial/",
           target = "_blank",
           rel = "noopener noreferrer",
           "Help"
