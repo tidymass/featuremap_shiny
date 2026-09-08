@@ -1021,6 +1021,8 @@ ui <- fluidPage(
         }
 
         #network_page .pcsf-network-stage > .empty-panel-fill,
+        #network_page .pcsf-network-stage > .visNetwork,
+        #network_page .pcsf-network-stage > .html-widget,
         #network_page .pcsf-network-stage > .shiny-vis-network {
           flex: 1;
           min-height: 100%;
@@ -6400,7 +6402,9 @@ ui <- fluidPage(
             ),
             tags$a(
               class = "btn btn-hero btn-hero-secondary",
-              onclick = "Shiny.setInputValue('footer_nav', 'docs', {priority: 'event'}); return false;",
+              href = "https://github.com/tidymass/featuremap_tutorial",
+              target = "_blank",
+              rel = "noopener noreferrer",
               icon("book"),
               "Documentation"
             )
@@ -7985,77 +7989,6 @@ ui <- fluidPage(
           uiOutput("auth_form_panel")
         )
       )
-    ),
-
-    # Documentation Page
-    tags$div(
-      id = "docs_page",
-      style = "display: none;",
-      tags$div(
-        class = "content-wrapper",
-        tags$div(
-          class = "step-box results-step-box",
-          tags$div(
-            class = "results-step-top",
-            tags$div(class = "results-kicker", icon("book-open"), "Help"),
-            tags$div(class = "results-step-number", "Docs")
-          ),
-          tags$div(class = "step-title", "Documentation"),
-          tags$div(
-            class = "step-description",
-            "Quick reference for preparing inputs, running the workflow, and exporting FeatureMAP results."
-          )
-        ),
-        fluidRow(
-          column(
-            width = 4,
-            tags$div(
-              class = "card",
-              tags$div(class = "card-header", icon("table"), " Required Inputs"),
-              tags$div(
-                class = "card-body",
-                tags$p("Prepare a feature table with m/z, retention time, polarity, intensity, condition, and statistical columns."),
-                tags$p("Optional MS/MS evidence can be uploaded to improve feature-to-metabolite annotation support.")
-              )
-            )
-          ),
-          column(
-            width = 4,
-            tags$div(
-              class = "card",
-              tags$div(class = "card-header", icon("route"), " Workflow"),
-              tags$div(
-                class = "card-body",
-                tags$p("FeatureMAP runs multi-evidence annotation, PCSF subnetwork extraction, module identification, function interpretation, and result export.")
-              )
-            )
-          ),
-          column(
-            width = 4,
-            tags$div(
-              class = "card",
-              tags$div(class = "card-header", icon("link"), " Resources"),
-              tags$div(
-                class = "card-body",
-                tags$p(
-                  tags$a(
-                    href = "https://www.shen-lab.org/featuremap-tutorial",
-                    target = "_blank",
-                    "Open the full online tutorial"
-                  )
-                ),
-                tags$p(
-                  tags$a(
-                    href = "https://github.com/tidymass/featuremap_shiny",
-                    target = "_blank",
-                    "View FeatureMAP Shiny on GitHub"
-                  )
-                )
-              )
-            )
-          )
-        )
-      )
     )
   ),
 
@@ -8086,7 +8019,9 @@ ui <- fluidPage(
         ),
         tags$a(
           class = "footer-link",
-          onclick = "Shiny.setInputValue('footer_nav', 'docs', {priority: 'event'}); return false;",
+          href = "https://github.com/tidymass/featuremap_tutorial",
+          target = "_blank",
+          rel = "noopener noreferrer",
           "Help"
         ),
         tags$a(
@@ -8214,7 +8149,7 @@ server <- function(input, output, session) {
   
   # Navigation system
   pages <- c("home", "upload", "annotation", "network", "modules", "function",
-             "results", "docs", "authors", "signin")
+             "results", "authors", "signin")
 
   # Steps grouped under the "Analysis" dropdown
   analysis_pages <- c("upload", "annotation", "network", "modules", "function", "results")
@@ -9175,7 +9110,6 @@ server <- function(input, output, session) {
   observeEvent(input$nav_modules, { switch_page("modules") })
   observeEvent(input$nav_function, { switch_page("function") })
   observeEvent(input$nav_results, { switch_page("results") })
-  observeEvent(input$nav_docs, { switch_page("docs") })
   observeEvent(input$nav_authors, { switch_page("authors") })
   observeEvent(input$nav_signin, {
     if (!auth_enabled) {
@@ -9350,7 +9284,7 @@ server <- function(input, output, session) {
 
   observeEvent(input$footer_nav, {
     target <- input$footer_nav
-    if (target %in% c("home", "upload", "annotation", "network", "modules", "function", "results", "docs")) {
+    if (target %in% c("home", "upload", "annotation", "network", "modules", "function", "results")) {
       switch_page(target)
     }
   })
@@ -10345,7 +10279,11 @@ server <- function(input, output, session) {
       tags$div(
         class = "pcsf-network-stage",
         style = stage_style,
-        visNetworkOutput("pcsf_network_plot", height = 560),
+        # "100%" (not a pixel value) is what lets the canvas fill the flex
+        # stage: visNetworkOutput writes the height as an INLINE style, which
+        # outranks the .pcsf-network-stage rule below and would otherwise pin
+        # the canvas to a fixed height inside a taller box.
+        visNetworkOutput("pcsf_network_plot", height = "100%", width = "100%"),
         uiOutput("pcsf_filter_panel")
       )
     } else if (rv$pcsf_status == "finished") {
