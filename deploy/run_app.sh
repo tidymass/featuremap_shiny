@@ -55,14 +55,30 @@ mkdir -p "$FM_ROOT/logs"
 ip_guess() { ip -4 addr show 2>/dev/null | awk '/inet /&&!/127\.0\.0\.1/{sub(/\/.*/,"",$2); print $2; exit}'; }
 
 pid_of() { [ -f "$PIDFILE" ] && cat "$PIDFILE" 2>/dev/null; }
+
+# `kill -0 $pid` only asks whether SOME process has that id. The pid file
+# survives a reboot while the process does not, and the kernel hands the same
+# number to something unrelated -- which made `start` report "Already running"
+# after the server came back up. So also confirm the process is ours.
 running() {
   local p; p=$(pid_of) || return 1
-  [ -n "${p:-}" ] && kill -0 "$p" 2>/dev/null
+  [ -n "${p:-}" ] || return 1
+  kill -0 "$p" 2>/dev/null || return 1
+  grep -qa "run_app\.R" "/proc/$p/cmdline" 2>/dev/null
+}
+
+# Drop a pid file left behind by a process that is gone.
+clear_stale_pid() {
+  if [ -f "$PIDFILE" ] && ! running; then
+    echo "Clearing stale pid file (pid $(pid_of) is not this app; the server most likely rebooted)."
+    rm -f "$PIDFILE"
+  fi
 }
 
 case "${1:-status}" in
 
   start)
+    clear_stale_pid
     if running; then echo "Already running (pid $(pid_of)). Use restart to reload."; exit 0; fi
     [ -d "$FM_LIB/featuremapshiny" ] || { echo "featuremapshiny is not installed. Run install_server.sh first."; exit 1; }
 
@@ -98,7 +114,7 @@ case "${1:-status}" in
       rm -f "$PIDFILE"
       echo "Stopped."
     else
-      rm -f "$PIDFILE"; echo "Not running."
+      clear_stale_pid; rm -f "$PIDFILE"; echo "Not running."
     fi
     ;;
 
@@ -114,6 +130,7 @@ case "${1:-status}" in
       echo "  log          : $LOG"
     else
       echo "NOT RUNNING"
+      [ -f "$PIDFILE" ] && echo "  (a stale pid file is present; 'start' will clear it)"
     fi
     ;;
 
