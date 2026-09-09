@@ -8078,6 +8078,8 @@ server <- function(input, output, session) {
     annotation_table2 = NULL,
     pcsf_status = "idle",
     pcsf_selected_node = NULL,
+    pcsf_selector_syncing = FALSE,
+    pcsf_selector_sync_token = 0L,
     ### Step 4
     module_res    = NULL,
     module_selected_node = NULL,
@@ -10908,6 +10910,15 @@ server <- function(input, output, session) {
 
     selected <- pcsf_selected_node_info()
 
+    rv$pcsf_selector_syncing <- TRUE
+    rv$pcsf_selector_sync_token <- rv$pcsf_selector_sync_token + 1L
+    sync_token <- rv$pcsf_selector_sync_token
+    shinyjs::delay(500, {
+      if (identical(rv$pcsf_selector_sync_token, sync_token)) {
+        rv$pcsf_selector_syncing <- FALSE
+      }
+    })
+
     freezeReactiveValue(input, "pcsf_feature_select")
     freezeReactiveValue(input, "pcsf_metabolite_select")
 
@@ -10934,6 +10945,10 @@ server <- function(input, output, session) {
   }, ignoreInit = FALSE)
 
   observeEvent(input$pcsf_feature_select, {
+    if (isTRUE(rv$pcsf_selector_syncing)) {
+      return()
+    }
+
     selected_id <- input$pcsf_feature_select
 
     if (is.null(selected_id) || !nzchar(selected_id)) {
@@ -10952,6 +10967,10 @@ server <- function(input, output, session) {
   }, ignoreInit = TRUE)
 
   observeEvent(input$pcsf_metabolite_select, {
+    if (isTRUE(rv$pcsf_selector_syncing)) {
+      return()
+    }
+
     selected_id <- input$pcsf_metabolite_select
 
     if (is.null(selected_id) || !nzchar(selected_id)) {
