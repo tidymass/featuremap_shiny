@@ -1952,6 +1952,11 @@ ui <- fluidPage(
           text-align: center;
         }
 
+        /* work areas without a tab strip (function page): cover the whole area */
+        #function_result_card .wb-empty-layer {
+          top: 0;
+        }
+
         .wb-empty-icon {
           width: 62px;
           height: 62px;
@@ -8582,6 +8587,14 @@ server <- function(input, output, session) {
     rv$results_export_networks_updating <- FALSE
     updateCheckboxGroupInput(session, "export_items", selected = character(0))
     updateCheckboxGroupInput(session, "network_export_items", selected = character(0))
+
+    # Put every parameter panel back to the values it had on a fresh load
+    # (numeric/select/slider/checkbox/text/password fields and file pickers).
+    for (card in c("upload_param_card", "annotation_param_card",
+                   "network_param_card", "modules_param_card",
+                   "function_param_card", "results_export_card")) {
+      shinyjs::reset(card)
+    }
   }
 
   quickstart_step_from_page <- function(page) {
