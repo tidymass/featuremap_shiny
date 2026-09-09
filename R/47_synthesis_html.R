@@ -38,203 +38,175 @@
 
 # ── CSS ───────────────────────────────────────────────────────
 .syn_css <- function() {
-'/* ============================================================
-   FeatureMAP -- cross-module synthesis network
-   ============================================================ */
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+'*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue",Arial,sans-serif;
+     background:#f4f5f7;color:#1c1f26;font-size:14px;line-height:1.55}
 
-:root{
-  --ink:#16233a; --ink-2:#3d4c61; --muted:#7b8b9f; --faint:#9fadbe;
-  --line:#e4eaf2; --line-2:#eef2f8;
-  --blue:#2f6fb0;  --blue-soft:#eaf1f9;
-  --teal:#28857e;  --teal-soft:#e5f3f1;
-  --amber:#b56c2b; --amber-soft:#fdf3e7;
-  --green:#2e8055; --green-soft:#e8f5ed;
-  --violet:#6f5ea8;--violet-soft:#f0edf8;
-  --slate:#5c6d84; --slate-soft:#edf1f7;
-  --canvas:#fbfcfe;
-  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
-  --lift:0 1px 2px rgba(18,38,66,.05), 0 8px 24px rgba(18,38,66,.06);
-}
+.page-header{background:#519d9e;color:#fff;padding:20px 30px 18px}
+.page-header h1{font-size:1.15rem;font-weight:600;letter-spacing:-.01em}
+.page-header .sub{font-size:.8rem;color:rgba(255,255,255,.82);margin-top:4px}
 
-html{-webkit-text-size-adjust:100%}
-body{
-  font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue",Arial,sans-serif;
-  background:radial-gradient(900px 380px at 50% -140px,#e8eff8 0%,rgba(232,239,248,0) 70%),#f4f6fa;
-  color:var(--ink);font-size:14px;line-height:1.6;
-  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
-}
+.layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(280px,1fr);
+        align-items:stretch;gap:14px;max-width:1360px;margin:0 auto;padding:18px 18px 0}
+.panel{background:#fff;border:1px solid #dbe5f2;border-radius:10px;overflow:hidden}
+.network-panel{display:flex;flex-direction:column;min-height:0}
 
-/* optional page header (unused by the generator, kept for standalone use) */
-.page-header{background:#fff;border-bottom:1px solid var(--line);padding:18px 30px 16px}
-.page-header h1{font-size:1.05rem;font-weight:700;letter-spacing:-.01em;color:var(--ink)}
-.page-header .sub{font-size:.78rem;color:var(--muted);margin-top:4px}
-.ctx-pill{display:inline-flex;align-items:center;font-size:.75rem;padding:3px 11px;
-          border-radius:999px;background:#fff;border:1px solid #dfe6ef;
-          color:var(--slate);margin-right:6px}
+/* toolbar + legend */
+.toolbar{padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+         border-bottom:1px solid #eef0f4}
+.toolbar label{font-size:.78rem;color:#4b5563;display:flex;align-items:center;gap:5px;
+               cursor:pointer}
+.toolbar input[type=text]{border:1px solid #d8dde6;border-radius:6px;padding:5px 9px;
+                          min-width:210px;font-size:.82rem;outline:none}
+.toolbar input[type=text]:focus{border-color:#3966a2}
+.legend{padding:8px 14px;display:flex;gap:8px 13px;flex-wrap:wrap;color:#6b7280;font-size:.73rem;
+        border-bottom:1px solid #eef0f4;align-items:center;overflow:visible}
+.legend span{display:inline-flex;align-items:center;gap:4px}
+.leg-circle{width:11px;height:11px;border-radius:50%;background:#667085;flex-shrink:0}
+.leg-edge-biochem{width:18px;height:0;border-top:2px dashed #2f9e6a;flex-shrink:0}
+.leg-edge-biology{width:18px;height:0;border-top:2px dashed #c1602e;flex-shrink:0}
+.leg-edge-both{width:18px;height:2px;background:#3966a2;flex-shrink:0}
+.leg-sep{width:1px;height:11px;background:#d1d5db}
+#cluster-legend{display:flex;gap:5px 10px;flex:1 0 100%;min-width:0;
+                flex-wrap:wrap;overflow:visible;white-space:normal}
+.cluster-filter{display:inline-flex;align-items:center;gap:4px;flex:0 0 auto;
+                border:0;background:transparent;color:#6b7280;font:inherit;
+                cursor:pointer;padding:2px 1px}
+.cluster-filter:hover,.cluster-filter.active{color:#1f2937}
+.cluster-filter.active{font-weight:600}
+.cluster-filter.dimmed{opacity:.36}
+.cluster-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
 
-/* ── layout ────────────────────────────────────────────────── */
-.layout{display:grid;grid-template-columns:minmax(0,1fr) 324px;gap:18px;
-        max-width:1400px;margin:0 auto;padding:24px 22px 0 22px}
-.panel{background:#fff;border:1px solid var(--line);border-radius:16px;
-       overflow:hidden;box-shadow:var(--lift)}
+/* network SVG */
+.network-wrap{position:relative;overflow:hidden;min-height:500px;height:auto;flex:1}
+svg{width:100%;height:100%;display:block;background:#fbfcfe}
+.edge{stroke-opacity:.65}
+.edge.biochemical{stroke:#2f9e6a;stroke-width:1.8;stroke-dasharray:5 4}
+.edge.biology{stroke:#c1602e;stroke-width:1.8;stroke-dasharray:5 4}
+.edge.both{stroke:#3966a2;stroke-width:2.6}
+.node{cursor:default}
+.node text{font-size:10.5px;fill:#1f2937;paint-order:stroke;stroke:#fbfcfe;
+           stroke-width:2.5px;user-select:none;pointer-events:none}
 
-/* ── toolbar ───────────────────────────────────────────────── */
-.toolbar{padding:13px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
-         border-bottom:1px solid var(--line-2);background:#fff}
-.toolbar label{
-  font-size:.775rem;font-weight:600;color:var(--slate);cursor:pointer;
-  display:inline-flex;align-items:center;gap:7px;
-  padding:5px 13px 5px 10px;border:1px solid var(--line);border-radius:999px;
-  background:#fff;transition:border-color .15s,background .15s,color .15s;
-}
-.toolbar label:hover{border-color:#c9d8e8}
-.toolbar label:has(input:checked){background:var(--blue-soft);border-color:#d3e3f3;color:#25588c}
-.toolbar input[type=checkbox]{accent-color:var(--blue);width:14px;height:14px;cursor:pointer}
-.toolbar input[type=text]{
-  margin-left:auto;border:1px solid var(--line);border-radius:999px;
-  padding:7px 15px;min-width:250px;font-size:.815rem;color:var(--ink);
-  background:#f9fbfd;outline:none;transition:border-color .15s,background .15s,box-shadow .15s;
-}
-.toolbar input[type=text]::placeholder{color:var(--faint)}
-.toolbar input[type=text]:focus{border-color:#a9c8e6;background:#fff;
-                                box-shadow:0 0 0 3px rgba(47,111,176,.10)}
+/* compact index for hypotheses without links */
+.unlinked{border-top:1px solid #eef0f4;background:#fff}
+.unlinked-toggle{width:100%;border:0;background:#fff;padding:9px 14px;
+                 display:flex;align-items:center;gap:8px;text-align:left;
+                 color:#4b5563;font-size:.76rem;font-weight:600;cursor:pointer}
+.unlinked-toggle:hover{background:#fafbfc}
+.unlinked-count{color:#8b909e;font-weight:500}
+.unlinked-chevron{margin-left:auto;color:#9ca3af;transition:transform .16s ease}
+.unlinked.open .unlinked-chevron{transform:rotate(180deg)}
+.unlinked-body{display:none;padding:3px 14px 12px}
+.unlinked.open .unlinked-body{display:block}
+.unlinked-group{display:grid;grid-template-columns:minmax(150px,230px) 1fr;
+                gap:10px;padding:7px 0;border-top:1px solid #f1f3f5}
+.unlinked-group:first-child{border-top:0}
+.unlinked-cluster{display:flex;align-items:center;gap:6px;min-width:0;
+                  color:#667085;font-size:.72rem}
+.unlinked-cluster span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.unlinked-nodes{display:flex;align-items:center;gap:7px 14px;flex-wrap:wrap}
+.unlinked-node{display:inline-flex;align-items:center;gap:5px;border:0;background:transparent;
+               color:#374151;font-size:.72rem;cursor:pointer;padding:1px 0}
+.unlinked-node:hover{color:#1f2937}
+.unlinked-node.dimmed{opacity:.22}
+.unlinked-node-dot{display:inline-block;border-radius:50%;flex:0 0 auto;
+                   border:1.5px solid #fff;box-shadow:0 0 0 1px #dfe3e8}
 
-/* ── legend ────────────────────────────────────────────────── */
-.legend{padding:10px 16px;display:flex;gap:14px;flex-wrap:wrap;align-items:center;
-        color:var(--muted);font-size:.735rem;font-weight:500;
-        background:#f9fbfd;border-bottom:1px solid var(--line-2)}
-.legend span{display:inline-flex;align-items:center;gap:5px}
-.leg-circle{width:11px;height:11px;border-radius:50%;background:var(--slate);flex-shrink:0}
-.leg-edge-d{width:20px;height:2px;border-radius:2px;background:var(--blue);flex-shrink:0}
-.leg-edge-i{width:20px;height:0;border-top:2px dashed var(--amber);flex-shrink:0}
-.leg-sep{width:1px;height:12px;background:#dbe3ee}
-#module-legend{display:flex;gap:9px;flex-wrap:wrap}
-#module-legend span{font-size:.725rem;color:var(--ink-2);
-                    background:#fff;border:1px solid var(--line);
-                    padding:2px 9px 2px 7px;border-radius:999px}
-.mod-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-
-/* ── network canvas ────────────────────────────────────────── */
-.network-wrap{position:relative;overflow:hidden;height:620px}
-svg{width:100%;height:100%;display:block;
-    background-color:var(--canvas);
-    background-image:radial-gradient(#e3eaf3 1px,transparent 1px);
-    background-size:22px 22px;background-position:-1px -1px}
-.edge{stroke-opacity:.62;transition:stroke-opacity .15s}
-.edge.direct  {stroke:var(--blue);stroke-width:2;stroke-linecap:round}
-.edge.indirect{stroke:var(--amber);stroke-width:1.7;stroke-dasharray:5 4;stroke-linecap:round}
-.node{cursor:pointer}
-.node text{font-size:10.5px;font-weight:600;fill:var(--ink);paint-order:stroke;
-           stroke:var(--canvas);stroke-width:3px;user-select:none;pointer-events:none}
-
-/* hover tooltip */
+/* hover tooltip — lightweight, title only, no pointer-events */
 #tooltip{position:absolute;pointer-events:none;display:none;z-index:30;
-         background:rgba(19,31,50,.90);color:#fff;
-         padding:6px 11px;border-radius:8px;
-         box-shadow:0 6px 18px rgba(12,24,44,.24);
+         background:rgba(28,31,38,.82);color:#fff;
+         padding:5px 10px;border-radius:6px;
          font-size:.76rem;font-weight:500;white-space:nowrap;
-         max-width:280px;overflow:hidden;text-overflow:ellipsis;line-height:1.45}
+         max-width:260px;overflow:hidden;text-overflow:ellipsis;
+         line-height:1.4}
 
-/* pinned card */
+/* pinned card — click to open, scrollable, pointer-events:auto */
 #pinned{position:absolute;display:none;z-index:40;
-        background:#fff;border:1px solid var(--line);border-radius:14px;
-        box-shadow:0 2px 6px rgba(18,38,66,.06),0 18px 44px rgba(18,38,66,.16);
-        width:292px;max-height:300px;flex-direction:column;overflow:hidden}
-#pinned .pin-hdr{padding:13px 14px 11px 14px;border-bottom:1px solid var(--line-2);
-                 display:flex;align-items:flex-start;gap:8px;flex-shrink:0;
-                 background:#fbfcfe}
-#pinned .pin-id{font-family:var(--mono);font-size:.66rem;font-weight:700;letter-spacing:.05em;
-                color:var(--blue);background:var(--blue-soft);border:1px solid #d8e6f4;
-                padding:3px 8px;border-radius:6px;flex-shrink:0}
-#pinned .pin-pills{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
-#pinned .pin-pill{font-size:.655rem;font-weight:600;padding:2px 8px;border-radius:999px;
-                  background:var(--slate-soft);color:var(--slate);border:1px solid #dfe6ef}
-#pinned .pin-pill.accepted{background:var(--green-soft);color:#256b45;border-color:#d1e7db}
-#pinned .pin-close{margin-left:auto;flex-shrink:0;cursor:pointer;font-size:.95rem;
-                   color:var(--faint);line-height:1;padding:2px 3px;user-select:none;
-                   border-radius:5px;transition:color .15s,background .15s}
-#pinned .pin-close:hover{color:var(--ink);background:var(--slate-soft)}
-#pinned .pin-body{padding:12px 14px 14px 14px;overflow-y:auto;flex:1}
-#pinned .pin-title{font-size:.855rem;font-weight:700;color:var(--ink);
-                   line-height:1.5;margin-bottom:9px}
-#pinned .pin-section{margin-top:11px;padding-top:11px;border-top:1px solid var(--line-2)}
+        background:#fff;border:1px solid #d1d5db;border-radius:10px;
+        box-shadow:0 6px 24px rgba(0,0,0,.16);
+        width:270px;max-height:280px;flex-direction:column;overflow:hidden}
+
+/* study-context pills in page header */
+.ctx-pill{display:inline-flex;align-items:center;
+          font-size:.75rem;padding:2px 10px;border-radius:20px;
+          background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);
+          color:#fff;margin-right:5px}
+#pinned .pin-hdr{padding:11px 13px 8px;border-bottom:1px solid #eef0f4;
+                 display:flex;align-items:flex-start;gap:6px;flex-shrink:0}
+#pinned .pin-id {font-size:.68rem;font-weight:700;color:#3966a2;
+                 background:#eef4fb;padding:1px 6px;border-radius:3px;flex-shrink:0}
+#pinned .pin-pills{display:flex;flex-wrap:wrap;gap:3px;margin-top:5px}
+#pinned .pin-pill{font-size:.67rem;padding:1px 6px;border-radius:3px;
+                  background:#f1f3f5;color:#4b5563;border:1px solid #e4e7ed}
+#pinned .pin-pill.accepted {background:#eaf7ef;color:#21643a;border-color:#bddfc9}
+#pinned .pin-close{margin-left:auto;flex-shrink:0;cursor:pointer;
+                   font-size:1rem;color:#9ca3af;line-height:1;
+                   padding:0 2px;user-select:none}
+#pinned .pin-close:hover{color:#374151}
+#pinned .pin-body{padding:10px 13px 13px;overflow-y:auto;flex:1}
+#pinned .pin-title{font-size:.85rem;font-weight:600;color:#1c1f26;
+                   line-height:1.45;margin-bottom:7px}
+#pinned .pin-section{margin-top:9px;padding-top:9px;border-top:1px solid #f0f2f5}
 #pinned .pin-section:first-child{margin-top:0;padding-top:0;border-top:none}
-#pinned .pin-lbl{font-size:.615rem;font-weight:700;letter-spacing:.12em;
-                 text-transform:uppercase;color:var(--faint);margin-bottom:4px}
-#pinned .pin-txt{font-size:.795rem;color:var(--ink-2);line-height:1.68;white-space:pre-wrap}
+#pinned .pin-lbl{font-size:.63rem;font-weight:700;letter-spacing:.08em;
+                 text-transform:uppercase;color:#9ca3af;margin-bottom:3px}
+#pinned .pin-txt{font-size:.79rem;color:#4b5563;line-height:1.6;white-space:pre-wrap}
 
-/* ── integrated summary panel ──────────────────────────────── */
-.sum-panel{padding:18px 19px;display:flex;flex-direction:column;
-           background:linear-gradient(180deg,#fbfdff 0%,#ffffff 120px)}
-.sum-panel h2{font-size:.9rem;font-weight:700;margin-bottom:8px;color:var(--ink)}
-.sum-label{font-size:.615rem;font-weight:700;letter-spacing:.13em;text-transform:uppercase;
-           color:var(--faint);margin-bottom:10px;padding-bottom:11px;
-           border-bottom:1px solid var(--line-2)}
-.sum-text{font-size:.825rem;color:var(--ink-2);line-height:1.75;white-space:pre-wrap;
-          overflow-y:auto;max-height:640px}
-.sum-empty{font-size:.82rem;color:var(--faint)}
+/* right summary panel */
+.sum-panel{padding:16px;display:flex;flex-direction:column;gap:0}
+.sum-panel h2{font-size:.9rem;font-weight:600;margin-bottom:8px;color:#1c1f26}
+.sum-label{font-size:.63rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+           color:#8b909e;margin-bottom:6px}
+.sum-text{font-size:.81rem;color:#374151;line-height:1.65;white-space:pre-wrap}
+.sum-empty{font-size:.82rem;color:#9ca3af;font-style:italic}
 
-/* ── bottom tables ─────────────────────────────────────────── */
-.table-wrap{max-width:1400px;margin:20px auto 30px auto;padding:0 22px}
-.tab-bar{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:0}
-.tab-btn{border:none;background:none;padding:10px 4px;margin-right:22px;
-         font-size:.815rem;font-weight:600;color:var(--muted);cursor:pointer;
-         border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .15s}
-.tab-btn.active{color:var(--blue);border-bottom-color:var(--blue)}
-.tab-btn:hover:not(.active){color:var(--ink-2)}
+/* bottom table tabs */
+.table-wrap{max-width:1360px;margin:14px auto 24px;padding:0 18px}
+.tab-bar{display:flex;border-bottom:2px solid #e4e7ed;margin-bottom:0}
+.tab-btn{border:none;background:none;padding:8px 18px;font-size:.8rem;font-weight:600;
+         color:#6b7280;cursor:pointer;border-bottom:2px solid transparent;
+         margin-bottom:-2px;transition:color .15s}
+.tab-btn.active{color:#3966a2;border-bottom-color:#3966a2}
+.tab-btn:hover:not(.active){color:#374151}
 .tab-panel{display:none}
 .tab-panel.active{display:block}
 
-.node-tbl{width:100%;border-collapse:separate;border-spacing:0;background:#fff;
-          border:1px solid var(--line);border-top:none;
-          border-radius:0 0 16px 16px;overflow:hidden;
-          font-size:.79rem;box-shadow:var(--lift)}
-.node-tbl thead tr{background:#f9fbfd}
-.node-tbl th{padding:11px 14px;text-align:left;font-size:.625rem;font-weight:700;
-             letter-spacing:.12em;text-transform:uppercase;color:var(--faint);
-             border-bottom:1px solid var(--line)}
-.node-tbl td{padding:11px 14px;border-bottom:1px solid var(--line-2);
-             color:var(--ink-2);vertical-align:top;line-height:1.6}
+.node-tbl{width:100%;border-collapse:collapse;background:#fff;
+          border:1px solid #dbe5f2;border-radius:0 0 10px 10px;overflow:hidden;
+          font-size:.78rem;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.node-tbl thead tr{background:#f8f9fb;border-bottom:2px solid #dbe5f2}
+.node-tbl th{padding:9px 12px;text-align:left;font-size:.66rem;font-weight:700;
+             letter-spacing:.07em;text-transform:uppercase;color:#6b7280}
+.node-tbl td{padding:8px 12px;border-bottom:1px solid #f0f2f5;color:#374151;
+             vertical-align:top}
 .node-tbl tr:last-child td{border-bottom:none}
-.node-tbl tbody tr{transition:background .12s}
-.node-tbl tbody tr:hover td{background:#f8fbfe}
-.tbl-id{font-family:var(--mono);font-weight:700;color:var(--blue);white-space:nowrap}
-.tbl-mod{white-space:nowrap;color:var(--ink)}
-.tbl-pill{display:inline-block;font-size:.645rem;font-weight:700;letter-spacing:.06em;
-          padding:3px 9px;border-radius:999px;white-space:nowrap;text-transform:uppercase}
-.tbl-direct  {background:var(--blue-soft);color:#25588c;border:1px solid #d8e6f4}
-.tbl-indirect{background:var(--amber-soft);color:#8d5520;border:1px solid #f0dcc4}
-.tbl-conf{color:var(--muted);font-size:.755rem}
-.tbl-rat{font-size:.775rem;color:var(--muted);line-height:1.65}
+.node-tbl tr:hover td{background:#fafbff}
+.tbl-id{font-weight:600;color:#3966a2;white-space:nowrap}
+.tbl-mod{white-space:nowrap}
+.tbl-pill{display:inline-block;font-size:.66rem;padding:1px 6px;border-radius:3px;
+          font-weight:600;white-space:nowrap}
+.tbl-biochemical{background:#eaf7ef;color:#21643a;border:1px solid #bddfc9}
+.tbl-biology{background:#faece7;color:#993c1d;border:1px solid #f0997b}
+.tbl-both{background:#eef4fb;color:#1c3957;border:1px solid #cfe0f2}
+.tbl-conf{color:#6b7280;font-size:.74rem}
+.tbl-rat{font-size:.76rem;color:#6b7280;line-height:1.55}
 
-/* hypothesis type pills -- pinned card + table */
-.type-endo {background:var(--green-soft);color:#256b45;border:1px solid #d1e7db}
-.type-micro{background:var(--amber-soft);color:#8d5520;border:1px solid #f0dcc4}
-.type-diet {background:var(--blue-soft);color:#25588c;border:1px solid #d8e6f4}
-.type-xeno {background:var(--violet-soft);color:#584a86;border:1px solid #dfd8f0}
-.type-mixed{background:var(--slate-soft);color:var(--slate);border:1px solid #dfe6ef}
-.tbl-type{display:inline-block;font-size:.65rem;font-weight:600;padding:3px 9px;
-          border-radius:999px;white-space:nowrap;border:1px solid #dfe6ef;
-          background:var(--slate-soft);color:var(--slate)}
+/* hypothesis type pills — pinned card + table */
+.type-endo {background:#eaf7ef;color:#21643a;border:1px solid #bddfc9}
+.type-micro {background:#fff6e6;color:#80551b;border:1px solid #f2d29a}
+.type-diet  {background:#eef4fb;color:#3966a2;border:1px solid #cfe0f2}
+.type-xeno  {background:#faece7;color:#993c1d;border:1px solid #f0997b}
+.type-mixed {background:#eef1f5;color:#44546b;border:1px solid #d7dee7}
+.tbl-type{display:inline-block;font-size:.66rem;padding:1px 7px;border-radius:3px;
+          font-weight:500;white-space:nowrap;border:1px solid #dbe5f2;
+          background:#f1f3f5;color:#4b5563}
 
-/* ── responsive ────────────────────────────────────────────── */
-@media(max-width:980px){
-  .layout{grid-template-columns:minmax(0,1fr);padding:18px 14px 0 14px;gap:14px}
-  .network-wrap{height:460px}
-  .sum-text{max-height:none}
-  .table-wrap{padding:0 14px}
-  .toolbar input[type=text]{margin-left:0;min-width:0;width:100%}
-}
-
-/* ── print / PDF export ────────────────────────────────────── */
-@media print{
-  body{background:#fff}
-  .panel,.node-tbl{box-shadow:none}
-  .toolbar,.tab-bar{display:none}
-  .tab-panel{display:block !important;margin-top:16px}
-  .node-tbl{border-top:1px solid var(--line);border-radius:12px}
-  .node-tbl tr{break-inside:avoid}
+@media(max-width:960px){
+  .layout{grid-template-columns:1fr}
+  .sum-panel{margin-top:0}
+  .network-wrap{height:460px;min-height:460px;flex:none}
+  .unlinked-group{grid-template-columns:1fr;gap:5px}
 }'
 }
 
@@ -248,33 +220,63 @@ const tooltip = document.getElementById("tooltip");
 const pinned  = document.getElementById("pinned");
 const search  = document.getElementById("search");
 const controls = {
-  direct:   document.getElementById("fDirect"),
-  indirect: document.getElementById("fIndirect")
+  biochemical: document.getElementById("fBiochemical"),
+  biology:     document.getElementById("fBiology"),
+  both:        document.getElementById("fBoth")
 };
 let pinnedNode = null;
+let activeCluster = null;
+let unlinkedOpen = false;
 
 /* ── colour / size maps ── */
 const PALETTE = [
-  "#3d7ebb","#2f9189","#c07b3a","#3f9b6a",
-  "#8a6fb8","#c2607f","#4a8fb0","#a08a34",
-  "#6b8f45","#a5634a","#5f74b5","#7c8a99"
+  "#3966a2","#519d9e","#c1602e","#2f9e6a",
+  "#b5892f","#7a5ea0","#4a7c8c","#a24a6b",
+  "#5c8a3f","#8a5a3f","#3f6b8a","#6b6f4a"
 ];
-const moduleIds   = [...new Set(data.nodes.map(d => d.module_id))].sort();
-const moduleColor = Object.fromEntries(
-  moduleIds.map((m, i) => [m, PALETTE[i % PALETTE.length]])
+const UNCLUSTERED = "Unclustered";
+const clusterId = n => (n.cluster_id && n.cluster_id.trim()) ? n.cluster_id : UNCLUSTERED;
+const naturalCollator = new Intl.Collator(undefined, {numeric: true, sensitivity: "base"});
+function clusterCompare(a, b){
+  if (a === UNCLUSTERED) return b === UNCLUSTERED ? 0 : 1;
+  if (b === UNCLUSTERED) return -1;
+  return naturalCollator.compare(a, b);
+}
+const clusterRows = data.clusters || [];
+const clusterTheme = Object.fromEntries(
+  clusterRows.map(c => [c.cluster_id, c.cluster_theme || c.cluster_id])
+);
+const clusterIds = [...new Set(data.nodes.map(clusterId))]
+  .sort(clusterCompare);
+const clusterColor = Object.fromEntries(
+  clusterIds.map((c, i) => [c, c === UNCLUSTERED ? "#667085" : PALETTE[i % PALETTE.length]])
 );
 const SIZE = {high: 17, medium: 13, low: 10};
 const DEF_SIZE = 12;
 
 function nodeSize(n) { return SIZE[n.confidence_label] || DEF_SIZE; }
-function nodeColor(n){ return moduleColor[n.module_id] || "#5c6d84"; }
+function nodeColor(n){ return clusterColor[clusterId(n)] || "#667085"; }
+function edgeType(e){ return e.relation_type || e.relation_class || ""; }
 
-/* ── module colour legend ── */
-const modLeg = document.getElementById("module-legend");
-moduleIds.forEach(m => {
-  const sp = document.createElement("span");
-  sp.innerHTML = `<i class="mod-dot" style="background:${nodeColor({module_id:m})}"></i>${esc(m)}`;
-  modLeg.appendChild(sp);
+/* ── cluster colour legend ── */
+const clusterLeg = document.getElementById("cluster-legend");
+clusterIds.forEach(c => {
+  const sp = document.createElement("button");
+  sp.type = "button";
+  sp.className = "cluster-filter";
+  sp.dataset.cluster = c;
+  const label = c === UNCLUSTERED ? c : `${c}: ${clusterTheme[c] || c}`;
+  sp.innerHTML = `<i class="cluster-dot" style="background:${clusterColor[c]}"></i>${esc(label)}`;
+  sp.addEventListener("click", () => {
+    activeCluster = activeCluster === c ? null : c;
+    document.querySelectorAll(".cluster-filter").forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.cluster === activeCluster);
+      btn.classList.toggle("dimmed", activeCluster && btn.dataset.cluster !== activeCluster);
+    });
+    render();
+    renderUnlinked();
+  });
+  clusterLeg.appendChild(sp);
 });
 
 /* ── node / edge data ── */
@@ -283,6 +285,12 @@ const nodeById = Object.fromEntries(nodes.map(d => [d.node_id, d]));
 let edges = data.edges
   .map(e => ({...e, source: nodeById[e.node_1], target: nodeById[e.node_2]}))
   .filter(e => e.source && e.target);
+const structurallyConnectedIds = new Set();
+edges.forEach(e => {
+  structurallyConnectedIds.add(e.node_1);
+  structurallyConnectedIds.add(e.node_2);
+});
+nodes.forEach(n => { n.isIsolated = !structurallyConnectedIds.has(n.node_id); });
 
 /* ── helpers ── */
 function esc(s){
@@ -306,8 +314,9 @@ function typeCls(t){
 
 function filters(){
   return {
-    direct:   controls.direct.checked,
-    indirect: controls.indirect.checked,
+    biochemical: controls.biochemical.checked,
+    biology:     controls.biology.checked,
+    both:        controls.both.checked,
     q: search.value.trim().toLowerCase()
   };
 }
@@ -315,7 +324,7 @@ function filters(){
 function nodeVisible(n, f){
   if (f.q){
     const hay = [n.node_id,n.module_id,n.hypothesis_id,n.hypothesis_type,
-                 n.title,n.functional_summary,n.phenotype_relationship]
+                 n.cluster_id,n.title,n.functional_summary,n.phenotype_relationship]
                 .join(" ").toLowerCase();
     if (!hay.includes(f.q)) return false;
   }
@@ -324,8 +333,10 @@ function nodeVisible(n, f){
 
 function edgeVisible(e, visIds, f){
   if (!visIds.has(e.node_1) || !visIds.has(e.node_2)) return false;
-  if (e.relation_class === "direct")   return f.direct;
-  if (e.relation_class === "indirect") return f.indirect;
+  const t = edgeType(e);
+  if (t === "biochemical") return f.biochemical;
+  if (t === "biology")     return f.biology;
+  if (t === "both")        return f.both;
   return false;
 }
 
@@ -375,12 +386,15 @@ function pinSection(label, text){
 function showPin(ev, n){
   pinnedNode = n.node_id;
   const confLabel = n.confidence_label ? n.confidence_label + " confidence" : "";
+  const cl = clusterId(n);
+  const clLabel = cl === UNCLUSTERED ? cl : `${cl}: ${clusterTheme[cl] || cl}`;
   pinned.innerHTML =
     `<div class="pin-hdr">
        <div>
          <span class="pin-id">${esc(n.node_id)}</span>
          <div class="pin-pills">
            ${confLabel ? `<span class="pin-pill">${esc(confLabel)}</span>` : ""}
+           <span class="pin-pill">${esc(clLabel)}</span>
            ${n.hypothesis_type ? `<span class="pin-pill ${typeCls(n.hypothesis_type)}">${esc(n.hypothesis_type)}</span>` : ""}
          </div>
        </div>
@@ -395,8 +409,8 @@ function showPin(ev, n){
   const wrap = document.querySelector(".network-wrap");
   const wW = wrap.offsetWidth, wH = wrap.offsetHeight;
   const cardW = 270, cardH = Math.min(280, wH - 20);
-  let px = n.x + nodeSize(n) + 10;
-  let py = n.y - 60;
+  let px = n.isIsolated ? wW - cardW - 12 : n.x + nodeSize(n) + 10;
+  let py = n.isIsolated ? 12 : n.y - 60;
   if (px + cardW > wW - 8) px = n.x - nodeSize(n) - cardW - 10;
   if (py + cardH > wH - 8) py = wH - cardH - 8;
   if (py < 8) py = 8;
@@ -423,7 +437,7 @@ svg.addEventListener("mousemove", ev => {
   const mx = ev.clientX - r.left;
   const my = ev.clientY - r.top;
   const f  = filters();
-  const vis    = nodes.filter(n => nodeVisible(n, f));
+  const vis    = nodes.filter(n => !n.isIsolated && nodeVisible(n, f));
   const visIds = new Set(vis.map(n => n.node_id));
   let hit = null;
   for (let i = vis.length - 1; i >= 0; i--) {
@@ -444,7 +458,7 @@ svg.addEventListener("mousemove", ev => {
       }
     }
     if (hitEdge) {
-      tooltip.textContent = hitEdge.relation_class + "  ·  " + (hitEdge.subtype || "");
+      tooltip.textContent = edgeType(hitEdge);
       tooltip.style.display = "block";
       positionTooltip(ev);
     } else {
@@ -465,7 +479,7 @@ svg.addEventListener("click", ev => {
   const mx = ev.clientX - r.left;
   const my = ev.clientY - r.top;
   const f  = filters();
-  const vis = nodes.filter(n => nodeVisible(n, f));
+  const vis = nodes.filter(n => !n.isIsolated && nodeVisible(n, f));
   const hit = vis.find(n => isOver(n, mx, my));
   if (hit) {
     tooltip.style.display = "none";
@@ -477,77 +491,126 @@ svg.addEventListener("click", ev => {
 });
 
 /* ── static layout ── */
+function connectedComponents(connectedNodes){
+  const adjacency = new Map(connectedNodes.map(n => [n.node_id, []]));
+  edges.forEach(e => {
+    adjacency.get(e.node_1)?.push(e.node_2);
+    adjacency.get(e.node_2)?.push(e.node_1);
+  });
+
+  const visited = new Set();
+  const components = [];
+  connectedNodes
+    .slice()
+    .sort((a, b) => naturalCollator.compare(a.node_id, b.node_id))
+    .forEach(start => {
+      if (visited.has(start.node_id)) return;
+      const queue = [start.node_id];
+      const component = [];
+      visited.add(start.node_id);
+      while (queue.length){
+        const id = queue.shift();
+        component.push(nodeById[id]);
+        (adjacency.get(id) || []).forEach(next => {
+          if (!visited.has(next)){
+            visited.add(next);
+            queue.push(next);
+          }
+        });
+      }
+      components.push(component);
+    });
+
+  return components.sort((a, b) =>
+    b.length - a.length || naturalCollator.compare(a[0].node_id, b[0].node_id)
+  );
+}
+
+function componentCentres(count, x, y, width, height){
+  if (count <= 0) return [];
+  const cols = count === 1
+    ? 1
+    : Math.min(count, Math.max(1, Math.ceil(Math.sqrt(count * width / Math.max(height, 1)))));
+  const rows = Math.ceil(count / cols);
+  const cellW = width / cols;
+  const cellH = height / rows;
+  return Array.from({length: count}, (_, i) => ({
+    x: x + (i % cols + 0.5) * cellW,
+    y: y + (Math.floor(i / cols) + 0.5) * cellH
+  }));
+}
+
 function computeLayout(){
   const rect = svg.getBoundingClientRect();
-  const W = rect.width  || 860;
+  const W = rect.width || 860;
   const H = rect.height || 560;
-  const cx = W / 2, cy = H / 2;
+  const connectedNodes = nodes.filter(n => !n.isIsolated);
+  const components = connectedComponents(connectedNodes);
+  const compactW = Math.min(W - 40, Math.max(500, W * 0.80));
+  const compactH = Math.min(H - 36, Math.max(360, H * 0.78));
+  const originX = (W - compactW) / 2;
+  const originY = (H - compactH) / 2;
+  const centres = componentCentres(components.length, originX, originY, compactW, compactH);
 
-  /* group nodes by module */
-  const groups = {};
-  nodes.forEach(n => { (groups[n.module_id] = groups[n.module_id] || []).push(n); });
-  const mids = Object.keys(groups).sort();
-  const nMod = mids.length;
+  components.forEach((component, ci) => {
+    const cx = centres[ci].x;
+    const cy = centres[ci].y;
+    const radius = Math.min(72, Math.max(38, 24 + component.length * 7));
 
-  /* place module centres in a circle */
-  const Rmod = Math.min(cx, cy) * (nMod <= 2 ? 0.30 : nMod <= 4 ? 0.44 : 0.52);
-  mids.forEach((mid, mi) => {
-    const angle = 2 * Math.PI * mi / nMod - Math.PI / 2;
-    const mcx   = cx + Rmod * Math.cos(angle);
-    const mcy   = cy + Rmod * Math.sin(angle);
-    const grp   = groups[mid];
-    const nN    = grp.length;
-    /* spread nodes in a small circle around module centre */
-    const Rnode = nN === 1 ? 0 : Math.max(28, nN * 13);
-    grp.forEach((n, ni) => {
-      const a = 2 * Math.PI * ni / nN - Math.PI / 2;
-      n.x = mcx + Rnode * Math.cos(a);
-      n.y = mcy + Rnode * Math.sin(a);
+    component.forEach((n, i) => {
+      const angle = 2 * Math.PI * i / component.length - Math.PI / 2;
+      const spread = component.length === 2 ? 48 : radius;
+      n.x = component.length === 2 ? cx + (i === 0 ? -spread : spread) : cx + spread * Math.cos(angle);
+      n.y = component.length === 2 ? cy : cy + spread * Math.sin(angle);
+      n.layoutComponent = ci;
     });
   });
 
-  /* iterative overlap resolution — no animation, just converge */
-  for (let iter = 0; iter < 200; iter++){
-    /* repulsion between all pairs */
-    for (let i = 0; i < nodes.length; i++){
-      for (let j = i+1; j < nodes.length; j++){
-        const a = nodes[i], b = nodes[j];
+  /* Global relaxation prevents neighbouring components and labels from colliding. */
+  for (let iter = 0; iter < 320; iter++){
+    for (let i = 0; i < connectedNodes.length; i++){
+      for (let j = i + 1; j < connectedNodes.length; j++){
+        const a = connectedNodes[i], b = connectedNodes[j];
         let dx = a.x - b.x, dy = a.y - b.y;
-        const d2 = dx*dx + dy*dy + 0.01;
-        const d  = Math.sqrt(d2);
-        const minD = nodeSize(a) + nodeSize(b) + 44;
-        if (d < minD){
-          const push = (minD - d) * 0.45;
-          dx /= d; dy /= d;
-          a.x += dx * push; a.y += dy * push;
-          b.x -= dx * push; b.y -= dy * push;
+        const absX = Math.abs(dx), absY = Math.abs(dy);
+        const minX = nodeSize(a) + nodeSize(b) + 64;
+        const minY = nodeSize(a) + nodeSize(b) + 22;
+        if (absX < minX && absY < minY){
+          const overlapX = minX - absX;
+          const overlapY = minY - absY;
+          if (overlapX < overlapY){
+            const dir = dx === 0 ? (i % 2 === 0 ? -1 : 1) : Math.sign(dx);
+            const push = overlapX * 0.26;
+            a.x += dir * push;
+            b.x -= dir * push;
+          } else {
+            const dir = dy === 0 ? (i % 2 === 0 ? -1 : 1) : Math.sign(dy);
+            const push = overlapY * 0.26;
+            a.y += dir * push;
+            b.y -= dir * push;
+          }
         }
       }
     }
-    /* gentle spring along edges (pull connected nodes closer) */
+
     edges.forEach(e => {
       const a = e.source, b = e.target;
       let dx = b.x - a.x, dy = b.y - a.y;
-      const d = Math.sqrt(dx*dx + dy*dy) + 0.01;
-      const target = e.relation_class === "direct" ? 140 : 180;
-      if (d > target){
-        const pull = (d - target) * 0.04;
-        dx /= d; dy /= d;
-        a.x += dx * pull; a.y += dy * pull;
-        b.x -= dx * pull; b.y -= dy * pull;
-      }
+      const d = Math.sqrt(dx * dx + dy * dy) + 0.01;
+      const target = edgeType(e) === "both" ? 88 : 110;
+      const pull = (d - target) * 0.032;
+      dx /= d; dy /= d;
+      a.x += dx * pull; a.y += dy * pull;
+      b.x -= dx * pull; b.y -= dy * pull;
     });
-    /* soft pull back to module centre */
-    mids.forEach(mid => {
-      const grp = groups[mid];
-      const mcx = grp.reduce((s, n) => s + n.x, 0) / grp.length;  /* current centroid */
-      const mcy = grp.reduce((s, n) => s + n.y, 0) / grp.length;
-    });
-    /* boundary clamp */
-    nodes.forEach(n => {
-      const pad = nodeSize(n) + 16;
-      n.x = Math.max(pad, Math.min(W - pad, n.x));
-      n.y = Math.max(pad, Math.min(H - pad, n.y));
+
+    connectedNodes.forEach(n => {
+      const centre = centres[n.layoutComponent];
+      n.x += (centre.x - n.x) * 0.0035;
+      n.y += (centre.y - n.y) * 0.0035;
+      const pad = nodeSize(n) + 18;
+      n.x = Math.max(originX + pad, Math.min(originX + compactW - pad - 54, n.x));
+      n.y = Math.max(originY + pad, Math.min(originY + compactH - pad, n.y));
     });
   }
 }
@@ -555,7 +618,7 @@ function computeLayout(){
 /* ── render ── */
 function render(){
   const f      = filters();
-  const vis    = nodes.filter(n => nodeVisible(n, f));
+  const vis    = nodes.filter(n => !n.isIsolated && nodeVisible(n, f));
   const visIds = new Set(vis.map(n => n.node_id));
   const visE   = edges.filter(e => edgeVisible(e, visIds, f));
 
@@ -565,7 +628,12 @@ function render(){
     const line = document.createElementNS("http://www.w3.org/2000/svg","line");
     line.setAttribute("x1", e.source.x); line.setAttribute("y1", e.source.y);
     line.setAttribute("x2", e.target.x); line.setAttribute("y2", e.target.y);
-    line.setAttribute("class", `edge ${e.relation_class}`);
+    line.setAttribute("class", `edge ${edgeType(e)}`);
+    if (activeCluster){
+      const sourceMatch = clusterId(e.source) === activeCluster;
+      const targetMatch = clusterId(e.target) === activeCluster;
+      line.setAttribute("opacity", sourceMatch && targetMatch ? 1 : sourceMatch || targetMatch ? 0.32 : 0.07);
+    }
     gEdges.appendChild(line);
   }
 
@@ -575,6 +643,7 @@ function render(){
     const grp = document.createElementNS("http://www.w3.org/2000/svg","g");
     grp.setAttribute("class", "node");
     grp.setAttribute("transform", `translate(${n.x},${n.y})`);
+    if (activeCluster && clusterId(n) !== activeCluster) grp.setAttribute("opacity", 0.16);
 
     const sz   = nodeSize(n);
     const fill = nodeColor(n);
@@ -584,7 +653,7 @@ function render(){
     shape.setAttribute("r", sz);
     const isPinned = n.node_id === pinnedNode;
     shape.setAttribute("fill", fill);
-    shape.setAttribute("stroke", isPinned ? "#16233a" : "#fff");
+    shape.setAttribute("stroke", isPinned ? "#1c1f26" : "#fff");
     shape.setAttribute("stroke-width", isPinned ? "3.5" : "2.5");
 
     const t = document.createElementNS("http://www.w3.org/2000/svg","text");
@@ -598,30 +667,106 @@ function render(){
   }
 }
 
+/* ── compact index for hypotheses without relationships ── */
+function renderUnlinked(){
+  const wrap = document.getElementById("unlinked");
+  const body = document.getElementById("unlinked-body");
+  const count = document.getElementById("unlinked-count");
+  const toggle = document.getElementById("unlinked-toggle");
+  const f = filters();
+  const allUnlinked = nodes.filter(n => n.isIsolated);
+  const visibleUnlinked = allUnlinked.filter(n => nodeVisible(n, f));
+
+  wrap.hidden = allUnlinked.length === 0;
+  if (allUnlinked.length === 0) return;
+
+  const searchOpen = Boolean(f.q);
+  wrap.classList.toggle("open", unlinkedOpen || searchOpen);
+  toggle.setAttribute("aria-expanded", String(unlinkedOpen || searchOpen));
+  count.textContent = f.q
+    ? `${visibleUnlinked.length} of ${allUnlinked.length}`
+    : String(allUnlinked.length);
+  body.innerHTML = "";
+
+  clusterIds.forEach(id => {
+    const groupNodes = visibleUnlinked
+      .filter(n => clusterId(n) === id)
+      .sort((a, b) => naturalCollator.compare(a.node_id, b.node_id));
+    if (groupNodes.length === 0) return;
+
+    const group = document.createElement("div");
+    group.className = "unlinked-group";
+
+    const cluster = document.createElement("div");
+    cluster.className = "unlinked-cluster";
+    cluster.innerHTML =
+      `<i class="cluster-dot" style="background:${clusterColor[id]}"></i>` +
+      `<span>${esc(id === UNCLUSTERED ? id : `${id}: ${clusterTheme[id] || id}`)}</span>`;
+
+    const nodeList = document.createElement("div");
+    nodeList.className = "unlinked-nodes";
+    groupNodes.forEach(n => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "unlinked-node";
+      if (activeCluster && clusterId(n) !== activeCluster) button.classList.add("dimmed");
+      button.title = n.title || n.node_id;
+      button.setAttribute("aria-label", `${n.node_id}: ${n.title || "Unlinked hypothesis"}`);
+
+      const dot = document.createElement("i");
+      const dotSize = Math.max(7, Math.round(nodeSize(n) * 0.62));
+      dot.className = "unlinked-node-dot";
+      dot.style.width = dotSize + "px";
+      dot.style.height = dotSize + "px";
+      dot.style.background = nodeColor(n);
+
+      const label = document.createElement("span");
+      label.textContent = n.node_id;
+      button.appendChild(dot);
+      button.appendChild(label);
+      button.addEventListener("click", ev => {
+        ev.stopPropagation();
+        showPin(ev, n);
+      });
+      nodeList.appendChild(button);
+    });
+
+    group.appendChild(cluster);
+    group.appendChild(nodeList);
+    body.appendChild(group);
+  });
+}
+
 /* ── node table ── */
 const tbody = document.getElementById("tbl-body");
-nodes.forEach(n => {
-  const tr = document.createElement("tr");
-  tr.innerHTML =
-    `<td class="tbl-id">${esc(n.node_id)}</td>` +
-    `<td class="tbl-mod">${esc(n.module_id)}</td>` +
-    `<td><span class="tbl-type ${typeCls(n.hypothesis_type)}">${esc(n.hypothesis_type || "—")}</span></td>` +
-    `<td class="tbl-conf">${esc(n.confidence_label || "—")}</td>` +
-    `<td>${esc(n.title || "—")}</td>`;
-  tbody.appendChild(tr);
-});
+[...nodes]
+  .sort((a, b) => clusterCompare(clusterId(a), clusterId(b)) ||
+    naturalCollator.compare(a.node_id, b.node_id))
+  .forEach(n => {
+    const tr = document.createElement("tr");
+    tr.innerHTML =
+      `<td class="tbl-id">${esc(n.node_id)}</td>` +
+      `<td class="tbl-mod">${esc(n.module_id)}</td>` +
+      `<td class="tbl-mod">${esc(clusterId(n))}</td>` +
+      `<td><span class="tbl-type ${typeCls(n.hypothesis_type)}">${esc(n.hypothesis_type || "—")}</span></td>` +
+      `<td class="tbl-conf">${esc(n.confidence_label || "—")}</td>` +
+      `<td>${esc(n.title || "—")}</td>`;
+    tbody.appendChild(tr);
+  });
 
 /* ── edge table ── */
 const etbody = document.getElementById("etbl-body");
 data.edges.forEach(e => {
   const tr = document.createElement("tr");
-  const pillCls = e.relation_class === "direct" ? "tbl-direct" : "tbl-indirect";
+  const rel = edgeType(e);
+  const pillCls = rel === "both" ? "tbl-both" :
+    rel === "biochemical" ? "tbl-biochemical" : "tbl-biology";
   tr.innerHTML =
     `<td class="tbl-id">${esc(e.node_1)}</td>` +
     `<td class="tbl-id">${esc(e.node_2)}</td>` +
-    `<td><span class="tbl-pill ${pillCls}">${esc(e.relation_class)}</span></td>` +
-    `<td>${esc(e.subtype || "—")}</td>` +
-    `<td class="tbl-rat">${esc(e.rationale || "—")}</td>`;
+    `<td><span class="tbl-pill ${pillCls}">${esc(rel)}</span></td>` +
+    `<td class="tbl-rat">${esc(e.biochemical_evidence_detail || "—")}</td>` +
+    `<td class="tbl-rat">${esc(e.biology_rationale || "—")}</td>`;
   etbody.appendChild(tr);
 });
 
@@ -645,11 +790,22 @@ if (data.summary && data.summary.trim()) {
 
 /* ── wire controls ── */
 for (const el of Object.values(controls)) el.addEventListener("change", render);
-search.addEventListener("input", render);
+for (const el of Object.values(controls)) {
+  el.addEventListener("change", renderUnlinked);
+}
+search.addEventListener("input", () => {
+  render();
+  renderUnlinked();
+});
+document.getElementById("unlinked-toggle").addEventListener("click", () => {
+  unlinkedOpen = !unlinkedOpen;
+  renderUnlinked();
+});
 
 window.addEventListener("load", function(){
   computeLayout();
   render();
+  renderUnlinked();
 });'
 }
 
@@ -680,9 +836,12 @@ generate_synthesis_network_html <- function(synthesis,
   if (is.null(relationships) || !is.data.frame(relationships)) {
     relationships <- data.frame(
       node_1 = character(), node_2 = character(),
-      relation_class = character(), subtype = character(),
+      relation_type = character(), relation_class = character(), subtype = character(),
       rationale = character(), stringsAsFactors = FALSE
     )
+  }
+  if (!"relation_type" %in% colnames(relationships)) {
+    relationships$relation_type <- relationships$relation_class %||% NA_character_
   }
 
   nodes <- nodes[nodes$verdict_status == "accepted", , drop = FALSE]
@@ -690,13 +849,14 @@ generate_synthesis_network_html <- function(synthesis,
   relationships <- relationships[
     relationships$node_1 %in% vn &
     relationships$node_2 %in% vn &
-    relationships$relation_class %in% c("direct","indirect"),
+    relationships$relation_type %in% c("biochemical", "biology", "both"),
     , drop = FALSE
   ]
 
   graph_json <- jsonlite::toJSON(
     list(nodes   = .syn_json_records(nodes),
          edges   = .syn_json_records(relationships),
+         clusters = .syn_json_records(synthesis$clusters),
          summary = .syn_scalar(synthesis$summary, "")),
     auto_unbox = TRUE, dataframe = "rows", na = "null"
   )
@@ -716,26 +876,36 @@ generate_synthesis_network_html <- function(synthesis,
 <div class="layout">
 
   <!-- network -->
-  <div class="panel">
+  <div class="panel network-panel">
     <div class="toolbar">
-      <label><input type="checkbox" id="fDirect"   checked> Direct edges</label>
-      <label><input type="checkbox" id="fIndirect" checked> Indirect edges</label>
-      <input type="text" id="search" placeholder="Search module, hypothesis, title&hellip;">
+      <label><input type="checkbox" id="fBiochemical" checked> Biochemical links</label>
+      <label><input type="checkbox" id="fBiology" checked> Biology links</label>
+      <label><input type="checkbox" id="fBoth" checked> Both</label>
+      <input type="text" id="search" placeholder="Search module, cluster, hypothesis, title&hellip;">
     </div>
     <div class="legend">
-      <span><i class="leg-circle"></i>Node</span>
+      <span><i class="leg-circle" style="background:#667085"></i>Node color&nbsp;&rarr;&nbsp;cluster</span>
       <i class="leg-sep"></i>
       <span>Size&nbsp;&rarr;&nbsp;confidence</span>
       <i class="leg-sep"></i>
-      <span><i class="leg-edge-d"></i>Direct</span>
-      <span><i class="leg-edge-i"></i>Indirect</span>
+      <span><i class="leg-edge-biochem"></i>Biochemical</span>
+      <span><i class="leg-edge-biology"></i>Biology</span>
+      <span><i class="leg-edge-both"></i>Both</span>
       <i class="leg-sep"></i>
-      <div id="module-legend"></div>
+      <div id="cluster-legend"></div>
     </div>
     <div class="network-wrap">
       <svg id="network"><g id="edges"></g><g id="nodes"></g></svg>
       <div id="tooltip"></div>
       <div id="pinned"></div>
+    </div>
+    <div class="unlinked" id="unlinked" hidden>
+      <button class="unlinked-toggle" id="unlinked-toggle" type="button" aria-expanded="false">
+        <span>Unlinked hypotheses</span>
+        <span class="unlinked-count" id="unlinked-count"></span>
+        <span class="unlinked-chevron" aria-hidden="true">&#9662;</span>
+      </button>
+      <div class="unlinked-body" id="unlinked-body"></div>
     </div>
   </div>
 
@@ -760,6 +930,7 @@ generate_synthesis_network_html <- function(synthesis,
         <tr>
           <th>Hypothesis</th>
           <th>Module</th>
+          <th>Cluster</th>
           <th>Type</th>
           <th>Confidence</th>
           <th>Title</th>
@@ -776,8 +947,8 @@ generate_synthesis_network_html <- function(synthesis,
           <th>Node 1</th>
           <th>Node 2</th>
           <th>Relation</th>
-          <th>Subtype</th>
-          <th>Rationale</th>
+          <th>Biochemical Evidence</th>
+          <th>Biology Rationale</th>
         </tr>
       </thead>
       <tbody id="etbl-body"></tbody>
