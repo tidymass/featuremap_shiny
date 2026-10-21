@@ -11,43 +11,51 @@ extract_subnetwork(
   mrn = NULL,
   workers = 4,
   times = 100,
-  b = 40,
+  b = 20,
   mu = 1e-04,
-  w = 30,
-  r = 0.3,
+  w = 25,
+  r = 0.2,
   grid_tune = FALSE,
   b_grid = seq(20, 40, by = 5),
-  w_grid = seq(25, 40, by = 5),
+  w_grid = seq(20, 40, by = 5),
   times_tune = 10
 )
 }
 \arguments{
 \item{res}{A \code{featuremap_result} object returned by
-\code{\link{annotate_feature}} or a later stage.}
+\code{\link{annotate_feature}} (or a later stage). It must contain at
+least \code{feature_table}, \code{anno_feature_table1}, and \code{refdata},
+and should be at stage \code{"feature_annotated"} or later.}
 
-\item{feature}{Character. Feature selection mode: \code{"all"} or
-\code{"sig"}.}
+\item{feature}{Character. Feature selection mode:
+\itemize{
+\item \code{"all"}: use all rows in \code{res$feature_table}
+\item \code{"sig"}: use only rows with \code{pvalue < pcutoff}
+}}
 
 \item{pcutoff}{Numeric. Significance threshold used only when
-\code{feature = "sig"}.}
+\code{feature = "sig"} to filter \code{res$feature_table$pvalue}.}
 
-\item{mrn}{An \code{igraph} object for the metabolic reaction network.
-If \code{NULL}, shiny loads the built-in
+\item{mrn}{An \code{igraph}/\code{tidygraph::tbl_graph} object for the
+metabolic reaction network. If \code{NULL}, shiny loads the built-in
 \code{metabolic_reaction_network.rda}.}
 
 \item{workers}{Integer. Number of parallel workers used in repeated PCSF runs.}
 
-\item{times}{Integer. Number of PCSF repeats for final subnetwork
-construction.}
+\item{times}{Integer. Number of PCSF repeats for final subnetwork construction.
+Larger values usually improve robustness but increase runtime.}
 
 \item{b}{Numeric. Prize scaling factor for terminal nodes in PCSF.}
 
-\item{mu}{Numeric. Hub penalty coefficient.}
+\item{mu}{Numeric. Hub penalty coefficient. Non-terminal nodes receive a
+negative prize proportional to their network degree; larger values penalize
+high-degree nodes more strongly.}
 
 \item{w}{Numeric. Dummy edge cost in PCSF.}
 
-\item{r}{Numeric. Random perturbation magnitude applied to edge weights
-across repeats.}
+\item{r}{Numeric. Relative Gaussian edge-cost noise applied across repeated
+PCSF runs. For example, \code{r = 0.20} perturbs each edge cost by a
+multiplicative factor sampled from \code{N(1, 0.20)}.}
 
 \item{grid_tune}{Logical. Whether to tune \code{b} and \code{w} on a grid
 before the final run.}
@@ -62,18 +70,47 @@ before the final run.}
 grid tuning.}
 }
 \value{
-The input \code{res} object updated with \code{feature_table},
-\code{pcsf_subnet}, \code{node_frequency}, \code{edge_frequency},
-\code{anno_feature_table2}, optional \code{tuning_grid}/\code{tuning_best},
-and \code{stage = "subnetwork_extracted"}.
+The input \code{res} object updated in-place with:
+\itemize{
+\item \code{feature_table}: with derived \code{importance} score columns
+\item \code{pcsf_subnet}: final PCSF-derived subnetwork (\code{igraph})
+\item \code{node_frequency}: node appearance frequency across repeats
+\item \code{edge_frequency}: edge appearance frequency across repeats
+\item \code{anno_feature_table2}: network-supported feature-metabolite
+annotation table including \code{INCHI_ID}, \code{edge_freq},
+\code{weighted_anno_score}, and feature-level \code{importance}
+\item \code{tuning_grid} and \code{tuning_best}: (if \code{grid_tune = TRUE})
+tuning summary
+\item \code{stage}: updated to \code{"subnetwork_extracted"}
+}
 }
 \description{
 Construct a prize-collecting Steiner forest (PCSF)-based metabolic
-sub-network from annotated metabolomics features and a reference metabolic
-reaction network.
+sub-network from annotated metabolomics features and a reference
+metabolic reaction network (MRN).
+}
+\details{
+This function integrates feature-level statistical scores with a
+metabolic reaction network and identifies a robust sub-network
+through repeated PCSF optimization. Optional grid tuning of
+parameters \code{b} and \code{w} is supported.
+
+Annotation rows are projected to the MRN at the metabolite-node level using
+\code{HMDB.ID} first and \code{KEGG.ID} as fallback when no HMDB-based match
+is available. Only annotation rows supported by the final PCSF subnetwork are
+retained in \code{anno_feature_table2}.
+
+Feature importance scores are derived from effects value and p-value.
+The PCSF algorithm is executed multiple times with relative Gaussian
+perturbation of edge costs to estimate robustness. Final subnetworks are
+constructed based on node and edge frequency across runs.
+Network-supported annotation confidence combines normalized annotation score
+and edge frequency with a global adaptive edge-frequency weight bounded
+between 0.1 and 0.3.
 }
 \examples{
 \dontrun{
+# res should be generated from annotate_feature() first
 res <- extract_subnetwork(
   res = res,
   feature = "sig",
@@ -81,11 +118,12 @@ res <- extract_subnetwork(
   mrn = NULL,
   workers = 4,
   times = 100,
-  b = 40,
+  b = 20,
   mu = 1e-4,
-  w = 35,
-  r = 0.30,
+  w = 25,
+  r = 0.20,
   grid_tune = FALSE
 )
 }
+
 }

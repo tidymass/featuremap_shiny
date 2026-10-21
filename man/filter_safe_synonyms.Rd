@@ -26,11 +26,11 @@ The following entries are removed:
 \item Duplicates and leading/trailing whitespace (via \code{unique} +
 \code{trimws}).
 \item Strings with 3 or fewer characters.
-\item Strings matching purely uppercase abbreviations of 1–4 letters
+\item Strings matching purely uppercase abbreviations of 1-4 letters
 (e.g. \code{"ATP"}, \code{"NAD"}).
 \item Strings matching a single uppercase letter followed by exactly
 two lowercase letters (e.g. \code{"Glc"}, \code{"Ser"}).
-\item Strings composed entirely of 1–4 letters in any case.
+\item Strings composed entirely of 1-4 letters in any case.
 }
 }
 \examples{

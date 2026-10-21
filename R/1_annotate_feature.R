@@ -72,11 +72,11 @@ annotate_feature <- function(feature_table,
 ){
   load_bundled_metabolite_database <- function() {
     candidate_paths <- c(
-      system.file("app/www/featuremap_compound.rda", package = "featuremapshiny"),
-      system.file("www/featuremap_compound.rda", package = "featuremapshiny"),
-      file.path("inst", "app", "www", "featuremap_compound.rda"),
-      file.path("app", "www", "featuremap_compound.rda"),
-      file.path("www", "featuremap_compound.rda")
+      system.file("app/reference/featuremap_compound.rda", package = "featuremapshiny"),
+      system.file("reference/featuremap_compound.rda", package = "featuremapshiny"),
+      file.path("inst", "app", "reference", "featuremap_compound.rda"),
+      file.path("app", "reference", "featuremap_compound.rda"),
+      file.path("reference", "featuremap_compound.rda")
     )
     candidate_paths <- unique(candidate_paths[nzchar(candidate_paths)])
     candidate_paths <- candidate_paths[file.exists(candidate_paths)]

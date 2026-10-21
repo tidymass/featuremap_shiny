@@ -1,7 +1,7 @@
 Package: featuremapshiny
 Type: Package
 Title: Interactive Shiny Interface for FeatureMAP
-Version: 0.1.0
+Version: 1.0.0
 Depends: R (>= 3.5.0)
 Author: Yuting Wang [aut, cre], Xiaotao Shen [aut, cph]
 Maintainer: Yuting Wang <ytwangzero@outlook.com>
@@ -59,12 +59,13 @@ Imports:
     pcsf2featuremap,
     Rdisop,
     masstools,
+    methods,
     rlang,
     cli
 Remotes:
     tidymass/massdataset,
     tidymass/metid,
     tidymass/pcsf2featuremap,
-    gitlab::tidymass/masstools
+    tidymass/masstools
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3

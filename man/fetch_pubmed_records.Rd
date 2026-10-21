@@ -18,9 +18,9 @@ Pass \code{NULL} (default) to use the anonymous limit.}
 \value{
 Named list with two character vectors:
 \itemize{
-\item \code{titles} — article titles, one element per PMID; empty
+\item \code{titles} - article titles, one element per PMID; empty
 string when the title node is absent.
-\item \code{abstracts} — full abstract text (structured abstract
+\item \code{abstracts} - full abstract text (structured abstract
 sections are concatenated with a space); empty string when no
 abstract is present.
 }

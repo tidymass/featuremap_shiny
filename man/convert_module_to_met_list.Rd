@@ -4,7 +4,7 @@
 \alias{convert_module_to_met_list}
 \title{Convert Module Data Frame to Metabolite List}
 \usage{
-convert_module_to_met_list(module_df, refdata = c("hmdb", "kegg"))
+convert_module_to_met_list(module_df, refdata = c("hmdb", "kegg", "auto"))
 }
 \arguments{
 \item{module_df}{Data frame. Metabolite annotation table. Required
@@ -22,9 +22,9 @@ Controls which ID column is used as the list key and for deduplication.}
 Named list where each element is named by its database ID
 (\code{HMDB_ID} or \code{KEGG_ID}) and contains:
 \itemize{
-\item \code{HMDB_ID} / \code{KEGG_ID} — the metabolite identifier.
-\item \code{name} — primary metabolite name.
-\item \code{synonyms} — cleaned synonym vector (via \code{clean_field}).
+\item \code{HMDB_ID} / \code{KEGG_ID} - the metabolite identifier.
+\item \code{name} - primary metabolite name.
+\item \code{synonyms} - cleaned synonym vector (via \code{clean_field}).
 }
 }
 \description{

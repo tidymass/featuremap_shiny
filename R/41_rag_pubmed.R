@@ -1,5 +1,5 @@
 # ============================================================
-# 1. 辅助工具函数
+# 1. Helper functions
 # ============================================================
 
 #' Clean Field Values
@@ -52,7 +52,7 @@ escape_regex <- function(x) {
 
 
 # ============================================================
-# 2. 同义词过滤
+# 2. Synonym filtering
 # ============================================================
 
 #' Filter Safe Synonyms
@@ -74,11 +74,11 @@ escape_regex <- function(x) {
 #'   \item Duplicates and leading/trailing whitespace (via \code{unique} +
 #'     \code{trimws}).
 #'   \item Strings with 3 or fewer characters.
-#'   \item Strings matching purely uppercase abbreviations of 1–4 letters
+#'   \item Strings matching purely uppercase abbreviations of 1-4 letters
 #'     (e.g. \code{"ATP"}, \code{"NAD"}).
 #'   \item Strings matching a single uppercase letter followed by exactly
 #'     two lowercase letters (e.g. \code{"Glc"}, \code{"Ser"}).
-#'   \item Strings composed entirely of 1–4 letters in any case.
+#'   \item Strings composed entirely of 1-4 letters in any case.
 #' }
 #'
 
@@ -103,7 +103,7 @@ filter_safe_synonyms <- function(synonyms) {
 
 
 # ============================================================
-# 3. 数据结构转换
+# 3. Data structure conversion
 # ============================================================
 
 #' Convert Module Data Frame to Metabolite List
@@ -124,9 +124,9 @@ filter_safe_synonyms <- function(synonyms) {
 #' @return Named list where each element is named by its database ID
 #'   (\code{HMDB_ID} or \code{KEGG_ID}) and contains:
 #'   \itemize{
-#'     \item \code{HMDB_ID} / \code{KEGG_ID} — the metabolite identifier.
-#'     \item \code{name} — primary metabolite name.
-#'     \item \code{synonyms} — cleaned synonym vector (via \code{clean_field}).
+#'     \item \code{HMDB_ID} / \code{KEGG_ID} - the metabolite identifier.
+#'     \item \code{name} - primary metabolite name.
+#'     \item \code{synonyms} - cleaned synonym vector (via \code{clean_field}).
 #'   }
 #'
 #' @details
@@ -200,7 +200,7 @@ convert_module_to_met_list <- function(module_df, refdata = c("hmdb", "kegg", "a
 
 
 # ============================================================
-# 4. PubMed 查询构建
+# 4. PubMed query construction
 # ============================================================
 
 #' Build PubMed Query String
@@ -287,7 +287,7 @@ build_pubmed_query <- function(met_name,
 
 
 # ============================================================
-# 5. PubMed 检索与记录获取
+# 5. PubMed search and record retrieval
 # ============================================================
 
 #' Search PubMed Database
@@ -355,9 +355,9 @@ search_pubmed <- function(query,
 #'
 #' @return Named list with two character vectors:
 #'   \itemize{
-#'     \item \code{titles} — article titles, one element per PMID; empty
+#'     \item \code{titles} - article titles, one element per PMID; empty
 #'       string when the title node is absent.
-#'     \item \code{abstracts} — full abstract text (structured abstract
+#'     \item \code{abstracts} - full abstract text (structured abstract
 #'       sections are concatenated with a space); empty string when no
 #'       abstract is present.
 #'   }
@@ -403,7 +403,7 @@ fetch_pubmed_records <- function(pmids, NCBI_api_key = NULL) {
 
 
 # ============================================================
-# 6. 摘要相关性过滤
+# 6. Abstract relevance filtering
 # ============================================================
 
 #' Check Whether an Abstract Mentions a Metabolite
@@ -420,7 +420,7 @@ fetch_pubmed_records <- function(pmids, NCBI_api_key = NULL) {
 #'   (e.g. \code{"glucose"}).
 #' @param synonyms Character vector or \code{NULL}. Additional synonym
 #'   strings to search for alongside \code{met_name}. \code{NA} entries
-#'   and strings of length ≤ 1 are silently dropped before matching.
+#'   and strings of length <= 1 are silently dropped before matching.
 #'
 #' @return Logical scalar. \code{TRUE} if at least one term produces a
 #'   whole-word match in the abstract; \code{FALSE} otherwise.
@@ -450,20 +450,20 @@ abstract_mentions_metabolite <- function(abstract,
 
 
 # ============================================================
-# 7. 单个代谢物注释
+# 7. Single-metabolite annotation
 # ============================================================
 
 #' Annotate a Single Metabolite with PubMed Literature
 #'
 #' Runs the complete PubMed annotation pipeline for one metabolite:
-#' query construction → search → record fetch → abstract filtering.
+#' query construction -> search -> record fetch -> abstract filtering.
 #'
 #' @param met_info Named list. Metabolite metadata, typically one element
 #'   from the list produced by \code{convert_module_to_met_list}. Must
 #'   contain at minimum:
 #'   \itemize{
-#'     \item \code{name} — primary metabolite name (character string).
-#'     \item \code{synonyms} — synonym vector (character or \code{NULL});
+#'     \item \code{name} - primary metabolite name (character string).
+#'     \item \code{synonyms} - synonym vector (character or \code{NULL});
 #'       processed through \code{clean_field} internally.
 #'   }
 #' @param phenotype Character string or \code{NULL}. Optional phenotype /
@@ -482,11 +482,11 @@ abstract_mentions_metabolite <- function(abstract,
 #'
 #' @return Named list with three elements:
 #'   \itemize{
-#'     \item \code{pmids} — character vector of PMIDs that passed the
+#'     \item \code{pmids} - character vector of PMIDs that passed the
 #'       abstract relevance filter.
-#'     \item \code{titles} — character vector of corresponding article
+#'     \item \code{titles} - character vector of corresponding article
 #'       titles.
-#'     \item \code{abstracts} — character vector of corresponding
+#'     \item \code{abstracts} - character vector of corresponding
 #'       abstracts.
 #'   }
 #'   All three vectors are \code{character(0)} when no relevant articles
@@ -592,7 +592,7 @@ extract_metabolite_context <- function(abstract,
 
 
 # ============================================================
-# 8. 模块级批量注释（入口函数）
+# 8. Module-level batch annotation(entry point)
 # ============================================================
 
 #' Annotate All Metabolites in a Module with PubMed Literature
@@ -610,7 +610,7 @@ extract_metabolite_context <- function(abstract,
 #'   (e.g. \code{"obesity"}). Pass \code{NULL} (default) to omit.
 #' @param NCBI_api_key Character string or \code{NULL}. NCBI API key
 #'   shared across all requests. Pass \code{NULL} (default) for anonymous
-#'   access (≤ 3 requests/second).
+#'   access (<= 3 requests/second).
 #' @param retmax Numeric scalar. Maximum number of PubMed hits to retrieve
 #'   per metabolite (default: \code{10}).
 #' @param years Numeric scalar. Number of years to look back for the
@@ -625,7 +625,7 @@ extract_metabolite_context <- function(abstract,
 #' Processing is intentionally sequential (via \code{lapply}) rather than
 #' parallel to respect NCBI rate limits. If parallel execution is required,
 #' supply a valid \code{NCBI_api_key} and implement appropriate throttling
-#' (≤ 10 requests/second per key).
+#' (<= 10 requests/second per key).
 #'
 
 #'
@@ -664,7 +664,7 @@ annotate_pubmed_for_module <- function(module_anno,
 
 
 # ============================================================
-# 9. Module-level PubMed search  (Fast Mode – after Call 1)
+# 9. Module-level PubMed search  (Fast Mode - after Call 1)
 # ============================================================
 
 #' Build a PubMed Query for a Module Title + Phenotype

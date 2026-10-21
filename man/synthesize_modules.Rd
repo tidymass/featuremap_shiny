@@ -30,7 +30,8 @@ synthesize_modules(
 
 \item{llm_model}{Model name (e.g. \code{"gpt-4.1-mini"}).}
 
-\item{base_url}{Optional custom API base URL for compatible LLM providers.}
+\item{base_url}{Character or NULL. Optional API base URL for an
+OpenAI-compatible provider.}
 
 \item{max_tokens}{Max tokens for the LLM response (default 4000).}
 
@@ -52,9 +53,8 @@ result and runs a single LLM call to produce:
 \itemize{
 \item Thematic clusters of hypotheses
 \item LLM-inferred biology links from hypothesis titles/summaries
-\item Deterministic biochemical links from direct MRN top-metabolite edges plus
-metabolic pathway ID overlap
-\item A completed pairwise relationship table
+\item Deterministic biochemical links from direct MRN top-metabolite edges
+and metabolic pathway ID overlap
 \item An overall narrative summary
 }
 }

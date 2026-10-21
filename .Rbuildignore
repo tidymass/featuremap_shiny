@@ -1,6 +1,9 @@
 ^\.Rproj\.user$
 ^featuremap_shiny\.Rproj$
-^\.DS_Store$
+^(.*/)?\.DS_Store$
 ^\.Rhistory$
 ^[.].*Rcheck$
 ^.*[.]Rcheck$
+^(.*/)?[.]featuremap_auth[.]sqlite(-wal|-shm)?$
+^\.fm_preview.*[.]html$
+^inst/app/synthesis_network[.]html$

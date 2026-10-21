@@ -107,11 +107,11 @@ extract_subnetwork = function(res = NULL,
                               times_tune = 10){
   load_bundled_mrn <- function() {
     candidate_paths <- c(
-      system.file("app/www/metabolic_reaction_network.rda", package = "featuremapshiny"),
-      system.file("www/metabolic_reaction_network.rda", package = "featuremapshiny"),
-      file.path("inst", "app", "www", "metabolic_reaction_network.rda"),
-      file.path("app", "www", "metabolic_reaction_network.rda"),
-      file.path("www", "metabolic_reaction_network.rda")
+      system.file("app/reference/metabolic_reaction_network.rda", package = "featuremapshiny"),
+      system.file("reference/metabolic_reaction_network.rda", package = "featuremapshiny"),
+      file.path("inst", "app", "reference", "metabolic_reaction_network.rda"),
+      file.path("app", "reference", "metabolic_reaction_network.rda"),
+      file.path("reference", "metabolic_reaction_network.rda")
     )
     candidate_paths <- unique(candidate_paths[nzchar(candidate_paths)])
     candidate_paths <- candidate_paths[file.exists(candidate_paths)]

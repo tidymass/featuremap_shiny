@@ -138,7 +138,12 @@ resolve_top_metabolite_refs <- function(top_ids = NULL,
   }
 
   out_table <- if (nrow(matched_rows) == 0) {
-    tibble::tibble()
+    tibble::tibble(
+      top_id = character(0),
+      metabolite_name = character(0),
+      Compound_ID = character(0),
+      ref_type = character(0)
+    )
   } else {
     tibble::tibble(
       top_id = as.character(matched_rows$top_id),
@@ -166,8 +171,12 @@ resolve_top_metabolite_refs <- function(top_ids = NULL,
 #' Compute Global Directionality for a Metabolic Module
 #'
 #' Matches module metabolites to features via anno_feature_table2 and computes
-#' a weighted mean of condition values (log2FC or correlation coefficients).
-#' The result is stored as an output label only — it does NOT enter LLM prompts.
+#' a weighted mean of condition values (log2FC or correlation coefficients),
+#' using weighted_anno_score as weights. A module is labelled "up" ("down")
+#' only when the weighted mean is positive (negative) AND at least
+#' \code{consistency} of the total weight comes from features changing in that
+#' direction; otherwise it is labelled "mixed".
+#' The result is stored as an output label only - it does NOT enter LLM prompts.
 #'
 #' @param module_df Data frame of module metabolites. Must contain HMDB_ID and
 #'   KEGG_ID columns.
@@ -176,16 +185,22 @@ resolve_top_metabolite_refs <- function(top_ids = NULL,
 #' @param anno_feature_table2 Data frame linking features to compounds. Must
 #'   contain variable_id, and at least one of HMDB.ID / HMDB_ID, KEGG.ID /
 #'   KEGG_ID, plus \code{weighted_anno_score}.
+#' @param consistency Numeric in (0.5, 1]. Minimum weighted fraction of
+#'   features sharing the sign of the weighted mean for a module to be
+#'   labelled "up" or "down". Default 2/3.
 #'
 #' @return A named list:
 #'   \item{direction_label}{Character: "up", "down", or "mixed". NA if input
 #'     is unavailable.}
 #'   \item{weighted_mean_condition}{Numeric weighted mean of condition, or NA.}
+#'   \item{up_fraction}{Numeric. Weighted fraction of features with condition > 0.}
 #'   \item{n_features}{Integer. Number of matched features used.}
-compute_global_direction <- function(module_df, feature_table, anno_feature_table2) {
+compute_global_direction <- function(module_df, feature_table, anno_feature_table2,
+                                     consistency = 2 / 3) {
 
   na_result <- list(direction_label = NA_character_,
                     weighted_mean_condition = NA_real_,
+                    up_fraction = NA_real_,
                     n_features = 0L)
 
   if (is.null(feature_table) || !is.data.frame(feature_table) ||
@@ -247,11 +262,22 @@ compute_global_direction <- function(module_df, feature_table, anno_feature_tabl
 
   wmean <- sum(combined$condition * combined$score) / sum(combined$score)
 
-  direction_label <- if (wmean > 0) "up" else if (wmean < 0) "down" else "mixed"
+  w_total   <- sum(combined$score)
+  frac_up   <- sum(combined$score[combined$condition > 0]) / w_total
+  frac_down <- sum(combined$score[combined$condition < 0]) / w_total
+
+  direction_label <- if (wmean > 0 && frac_up >= consistency) {
+    "up"
+  } else if (wmean < 0 && frac_down >= consistency) {
+    "down"
+  } else {
+    "mixed"
+  }
 
   list(
     direction_label         = direction_label,
     weighted_mean_condition = round(wmean, 4),
+    up_fraction             = round(frac_up, 3),
     n_features              = nrow(combined)
   )
 }
@@ -272,18 +298,18 @@ compute_global_direction <- function(module_df, feature_table, anno_feature_tabl
 #'   KEGG_ID columns.
 #' @param pathway_hmdb Data frame loaded via
 #'   \code{featuremap_load_resource("pathway_hmdb")} with columns
-#'   pathway_id, pathway_name, HMDB_ID, n_metabolites. Pass \code{NULL} to
-#'   skip.
+#'   pathway_id, pathway_name, HMDB_ID, n_metabolites, and optionally
+#'   pathway_class. Pass \code{NULL} to skip.
 #' @param pathway_kegg Data frame loaded via
 #'   \code{featuremap_load_resource("pathway_kegg")} with columns
-#'   pathway_id, pathway_name, KEGG_ID, n_metabolites. Pass \code{NULL} to
-#'   skip.
+#'   pathway_id, pathway_name, KEGG_ID, n_metabolites, and optionally
+#'   pathway_class. Pass \code{NULL} to skip.
 #' @param top_n Integer. Maximum number of pathways to return per database
 #'   (default: 3).
 #'
 #' @return A named list with components \code{hmdb} and \code{kegg}, each a
 #'   tibble with columns pathway_id, pathway_name, n_hit, n_metabolites,
-#'   coverage.
+#'   coverage, plus pathway_class when available in the pathway database.
 #'   Empty tibble when the database is unavailable or no hits are found.
 compute_pathway_coverage <- function(module_df,
                                      pathway_hmdb = NULL,
@@ -297,15 +323,20 @@ compute_pathway_coverage <- function(module_df,
       return(tibble::tibble())
     if (length(module_ids) == 0)                           return(tibble::tibble())
 
-    # Per-pathway total size (one canonical value per pathway_id)
+    has_pathway_class <- "pathway_class" %in% colnames(pathway_db)
+    pathway_meta_cols <- c("pathway_id", "n_metabolites")
+    if (has_pathway_class) pathway_meta_cols <- c(pathway_meta_cols, "pathway_class")
+
+    # Per-pathway total size/class (one canonical value per pathway_id)
     pathway_sizes <- pathway_db[!duplicated(pathway_db$pathway_id),
-                                c("pathway_id", "n_metabolites"), drop = FALSE]
+                                pathway_meta_cols, drop = FALSE]
 
     hits <- pathway_db[pathway_db[[id_col]] %in% module_ids, , drop = FALSE]
     if (nrow(hits) == 0) return(tibble::tibble())
 
+    group_cols <- c("pathway_id", "pathway_name")
     agg <- aggregate(
-      as.formula(paste(id_col, "~ pathway_id + pathway_name")),
+      as.formula(paste(id_col, "~", paste(group_cols, collapse = " + "))),
       data = hits,
       FUN  = function(x) length(unique(x))
     )
@@ -315,8 +346,10 @@ compute_pathway_coverage <- function(module_df,
     agg$coverage <- round(agg$n_hit / pmax(agg$n_metabolites, 1L), 3)
     agg <- agg[order(-agg$coverage, -agg$n_hit), , drop = FALSE]
     agg <- agg[seq_len(min(top_n, nrow(agg))), , drop = FALSE]
-    tibble::as_tibble(agg[, c("pathway_id", "pathway_name", "n_hit",
-                              "n_metabolites", "coverage"), drop = FALSE])
+    out_cols <- c("pathway_id", "pathway_name")
+    if ("pathway_class" %in% colnames(agg)) out_cols <- c(out_cols, "pathway_class")
+    out_cols <- c(out_cols, "n_hit", "n_metabolites", "coverage")
+    tibble::as_tibble(agg[, out_cols, drop = FALSE])
   }
 
   hmdb_ids <- unique(module_df$HMDB_ID[
@@ -653,7 +686,7 @@ compute_isolated_outliers <- function(
   top_hmdb_members <- get_top_pathway_members(pathway_hmdb, top_hmdb_ids, "HMDB_ID")
 
   # ---- KEGG membership ----
-  # Map topN HMDB IDs → KEGG IDs via module_df for per-metabolite check when
+  # Map topN HMDB IDs -> KEGG IDs via module_df for per-metabolite check when
   # topN_df does not already carry KEGG_ID.
   # Use the full module KEGG ID set to rank which KEGG pathways are "top".
   top_kegg_for_top <- top_kegg_ids
@@ -694,7 +727,7 @@ compute_isolated_outliers <- function(
   }
 
   # ---- Classify each topN metabolite ----
-  in_hmdb_top  <- top_ids %in% top_hmdb_members
+  in_hmdb_top  <- nzchar(top_hmdb_ids) & (top_hmdb_ids %in% top_hmdb_members)
   in_kegg_top  <- nzchar(top_kegg_for_top) & (top_kegg_for_top %in% top_kegg_members)
 
   in_dom_class <- rep(FALSE, n_top)

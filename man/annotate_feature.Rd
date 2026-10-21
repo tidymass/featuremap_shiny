@@ -39,14 +39,15 @@ rules. Must be one of \code{"rp"} or \code{"hilic"}.}
 \item{ms1_match_ppm}{Numeric. MS1 mass tolerance (ppm) used in candidate
 matching.}
 
-\item{mfc_rt_tol}{Numeric. Retention-time tolerance used in metabolite-feature
-cluster scoring and isotope consistency checks.}
+\item{mfc_rt_tol}{Numeric. Retention-time tolerance (same unit as
+\code{feature_table$rt}) used in metabolite-feature-cluster scoring
+and isotope consistency checks.}
 
 \item{isotope_number}{Integer. Maximum isotope depth used in isotope
 annotation.}
 
-\item{workers}{Integer. Number of workers for isotope annotation and threads
-passed to \code{metid::annotate_metabolites()}.}
+\item{workers}{Integer. Number of workers for parallel steps (isotope
+annotation) and threads passed to \code{metid::annotate_metabolites()}.}
 }
 \value{
 A \code{featuremap_result} R6 object containing at least:
@@ -60,9 +61,10 @@ A \code{featuremap_result} R6 object containing at least:
 }
 }
 \description{
-Perform preliminary metabolite annotation for raw MS1 features by matching
-against a reference metabolite database using mass accuracy, retention time,
-isotope patterns, and optional MS2 confirmation.
+Perform preliminary metabolite annotation for raw MS1 features
+by matching against a reference metabolite database using mass
+accuracy, retention time tolerance, isotope patterns, and optional
+MS2 confirmation.
 }
 \examples{
 \dontrun{
@@ -80,4 +82,5 @@ res <- annotate_feature(
   workers = 4
 )
 }
+
 }

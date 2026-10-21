@@ -215,7 +215,14 @@ featuremap_auth_db_path <- function() {
   if (nzchar(trimws(env_path))) {
     return(path.expand(env_path))
   }
-  file.path(getwd(), ".featuremap_auth.sqlite")
+
+  # Never create account data inside the installed package or application
+  # directory. Those locations may be read-only, replaced during deployment,
+  # or accidentally included when the source directory is copied elsewhere.
+  file.path(
+    tools::R_user_dir("featuremapshiny", which = "data"),
+    "featuremap_auth.sqlite"
+  )
 }
 
 featuremap_auth_connect <- function() {
@@ -6407,7 +6414,7 @@ ui <- fluidPage(
             ),
             tags$a(
               class = "btn btn-hero btn-hero-secondary",
-              href = "https://www.tidymass.org/featuremap_tutorial/",
+              href = "https://tidymass.github.io/featuremap_tutorial/",
               target = "_blank",
               rel = "noopener noreferrer",
               icon("book"),
@@ -6513,16 +6520,16 @@ ui <- fluidPage(
                     tags$strong("Citation"),
                     tags$br(),
                     tags$em(
-                      "FeatureMAP enables unbiased discovery and interpretation of dysregulated metabolic modules from untargeted metabolomics"
+                      "FeatureMAP enables network-guided discovery and interpretation of dysregulated metabolic modules from untargeted metabolomics"
                     ),
                     tags$br(),
                     HTML(
-                      "Yuting Wang<sup>1,2,+</sup>, Feifan Zhang<sup>1,2,+</sup>, Yijiang Liu<sup>1,2</sup>, Jiramet Kinchagawat<sup>1,2</sup>, Guoping Peng, Zeng Li, Chuchu Wang<sup>1</sup>, and Xiaotao Shen<sup>1,2,3,*</sup>"
+                      "Yuting Wang<sup>+</sup>, Feifan Zhang<sup>+</sup>, Guoping Peng, Zeng Li, Yijiang Liu, Jiramet Kinchagawat, Xicheng Yang, Tao Huan, Chang Liu, Caroline Johnson, Qi Su, Chuchu Wang, and Xiaotao Shen<sup>*</sup>"
                     ),
                     tags$br(),
                     tags$span(
                       style = "font-style: italic; color: #7a8aa0; font-size: 0.92em;",
-                      "(Manuscript in preparation — citation to be updated upon submission)"
+                      "(Manuscript in preparation; + equal contribution; * corresponding author)"
                     )
                   )
                 )
@@ -8024,7 +8031,7 @@ ui <- fluidPage(
         ),
         tags$a(
           class = "footer-link",
-          href = "https://www.tidymass.org/featuremap_tutorial/",
+          href = "https://tidymass.github.io/featuremap_tutorial/",
           target = "_blank",
           rel = "noopener noreferrer",
           "Help"
@@ -9400,11 +9407,11 @@ server <- function(input, output, session) {
       # references
       if (input$ref_source == "default") {
         e_mrn <- new.env()
-        load("www/metabolic_reaction_network.rda", envir = e_mrn)
+        load("reference/metabolic_reaction_network.rda", envir = e_mrn)
         mrn_obj <- e_mrn[[ls(e_mrn)[1]]]
 
         e_ref <- new.env()
-        load("www/featuremap_compound.rda", envir = e_ref)
+        load("reference/featuremap_compound.rda", envir = e_ref)
         ref_label <- "Built-in merged database"
         ref_db_obj <- e_ref[[ls(e_ref)[1]]]
       } else {
@@ -9482,12 +9489,12 @@ server <- function(input, output, session) {
   observeEvent(input$use_demo_both, {
     staged <- tryCatch({
       e_feat <- new.env()
-      load("www/demo_feature_table.rda", envir = e_feat)
+      load("reference/demo_feature_table.rda", envir = e_feat)
       feature_tbl <- e_feat[[ls(e_feat)[1]]]
       check_feature_columns(feature_tbl)
 
       e_ms2 <- new.env()
-      load("www/demo_ms2.rda", envir = e_ms2)
+      load("reference/demo_ms2.rda", envir = e_ms2)
       ms2_tbl <- e_ms2[[ls(e_ms2)[1]]] %>%
         dplyr::ungroup() %>%
         dplyr::select(variable_id, dplyr::any_of(c("HMDB.ID", "KEGG.ID", "SS", "Level")))
@@ -9604,10 +9611,10 @@ server <- function(input, output, session) {
     content = function(file) {
       resolve_demo_file <- function(filename) {
         candidate_paths <- c(
-          system.file(file.path("app", "www", filename), package = "featuremapshiny"),
-          system.file(file.path("www", filename), package = "featuremapshiny"),
-          file.path("www", filename),
-          file.path("inst", "app", "www", filename)
+          system.file(file.path("app", "reference", filename), package = "featuremapshiny"),
+          system.file(file.path("reference", filename), package = "featuremapshiny"),
+          file.path("reference", filename),
+          file.path("inst", "app", "reference", filename)
         )
         candidate_paths <- unique(candidate_paths[nzchar(candidate_paths)])
         candidate_paths <- candidate_paths[file.exists(candidate_paths)]

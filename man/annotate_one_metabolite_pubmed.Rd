@@ -17,8 +17,8 @@ annotate_one_metabolite_pubmed(
 from the list produced by \code{convert_module_to_met_list}. Must
 contain at minimum:
 \itemize{
-\item \code{name} — primary metabolite name (character string).
-\item \code{synonyms} — synonym vector (character or \code{NULL});
+\item \code{name} - primary metabolite name (character string).
+\item \code{synonyms} - synonym vector (character or \code{NULL});
 processed through \code{clean_field} internally.
 }}
 
@@ -42,11 +42,11 @@ the publication date filter. Passed to \code{build_pubmed_query}.}
 \value{
 Named list with three elements:
 \itemize{
-\item \code{pmids} — character vector of PMIDs that passed the
+\item \code{pmids} - character vector of PMIDs that passed the
 abstract relevance filter.
-\item \code{titles} — character vector of corresponding article
+\item \code{titles} - character vector of corresponding article
 titles.
-\item \code{abstracts} — character vector of corresponding
+\item \code{abstracts} - character vector of corresponding
 abstracts.
 }
 All three vectors are \code{character(0)} when no relevant articles
@@ -54,7 +54,7 @@ are found or when the search or fetch step fails.
 }
 \description{
 Runs the complete PubMed annotation pipeline for one metabolite:
-query construction → search → record fetch → abstract filtering.
+query construction -> search -> record fetch -> abstract filtering.
 }
 \details{
 After retrieving raw PubMed records, each abstract is passed to

@@ -9,133 +9,173 @@ annotate_module(
   p = "fdr",
   pcutoff = 0.05,
   ref_data = NULL,
+  mode = c("fast", "advanced"),
   species = "human",
   biospecimen = NULL,
   phenotype = NULL,
   pubmed = TRUE,
   years = 5,
-  top_paper = 3,
-  min_similarity = 0.6,
   provider = "openai",
-  embed_model = "text-embedding-3-small",
   llm_model = "gpt-4.1-mini",
   NCBI_api_key = "",
-  llm_api_key = ""
+  llm_api_key = "",
+  base_url = NULL,
+  synthesize = FALSE,
+  synthesis_model = llm_model,
+  debate_html = FALSE,
+  html_dir = getwd(),
+  debate_html_dir = html_dir
 )
 }
 \arguments{
 \item{res}{A \code{featuremap_result} object returned by
 \code{\link{identify_module}} (or already module-annotated). Must contain
-\code{module_table} and \code{module_score}. Expected
-stage is \code{"module_identified"} or \code{"module_annotated"}.}
+\code{module_table} and \code{module_score}.}
 
 \item{p}{Character. Column name in \code{res$module_score} used for module
-significance filtering.}
+significance filtering (e.g. \code{"p"} or \code{"fdr"}).}
 
-\item{pcutoff}{Numeric. Threshold applied to \code{res$module_score[[p]]}
-for selecting modules to annotate.}
+\item{pcutoff}{Numeric. Threshold applied to \code{res$module_score[[p]]}.}
 
-\item{ref_data}{Functional reference metadata. Can be either:
+\item{ref_data}{Functional reference metadata. Can be:
 \itemize{
-\item \code{NULL}, in which case cached HMDB and KEGG reference resources
-are loaded automatically
-\item a single data frame with an \code{id} column (used for both HMDB
-and KEGG lookups)
-\item a list with components \code{hmdb} and \code{kegg}, each containing
-a data frame with an \code{id} column
-}
-Module annotation uses HMDB reference metadata first and fills remaining
-missing annotations with KEGG reference metadata.}
+\item \code{NULL}: bundled HMDB and KEGG references are loaded automatically.
+\item A single data frame with an \code{id} column (used for both lookups).
+\item A list with components \code{hmdb} and \code{kegg}.
+}}
 
-\item{species}{Character. Species context passed to the final LLM prompt.}
+\item{mode}{Character. \code{"fast"} (default) runs the two-call pipeline
+with pathway coverage, origin profiling, and directed confidence scoring.
+\code{"advanced"} runs the multi-agent debate pipeline: Proposer generates
+1-3 candidate biochemical hypotheses, Skeptic challenges them (up to 2 rounds), and an
+Arbiter delivers final \code{accepted / rejected} verdicts with
+confidence scores.}
 
-\item{biospecimen}{Character. Biospecimen context passed to the final LLM prompt.}
+\item{species}{Character. Species context for LLM confidence scoring.}
 
-\item{phenotype}{Character. Phenotype/context string passed to the final
-module interpretation prompt and used only for confidence assessment.}
+\item{biospecimen}{Character. Biospecimen type (e.g. plasma, urine, tissue).}
 
-\item{pubmed}{Logical. Whether to perform PubMed retrieval + embedding + reranking
-before LLM summarization.}
+\item{phenotype}{Character. Phenotype/disease string used in PubMed retrieval
+(when \code{pubmed = TRUE}) and confidence assessment.}
 
-\item{years}{Integer. Look-back years for PubMed search when
-\code{pubmed = TRUE}.}
+\item{pubmed}{Logical. Whether to retrieve PubMed evidence after LLM Call 1.
+When \code{TRUE}, the module title and each anchor metabolite selected in
+Call 1 are searched
+separately; up to three papers are retained per query and deduplicated by
+PMID before LLM Call 2.}
 
-\item{top_paper}{Integer. Number of re-ranked papers retained for each
-metabolite during literature refinement.}
+\item{years}{Integer. PubMed look-back years when \code{pubmed = TRUE}.}
 
-\item{min_similarity}{Numeric. Similarity cutoff used to retain literature
-evidence after embedding-based matching.}
+\item{provider}{Character. LLM provider (\code{"openai"}, \code{"siliconflow"},
+\code{"gemini"}).}
 
-\item{provider}{Character. LLM provider name used by embedding and generation
-helper functions.}
+\item{llm_model}{Character. LLM model identifier.}
 
-\item{embed_model}{Character. Embedding model identifier used when
-\code{pubmed = TRUE}.}
+\item{NCBI_api_key}{Character. NCBI Entrez API key when \code{pubmed = TRUE}.}
 
-\item{llm_model}{Character. LLM model identifier used for paper reranking and
-final summarization.}
+\item{llm_api_key}{Character. API key for \code{provider}.}
 
-\item{NCBI_api_key}{Character. NCBI Entrez API key passed to
-\code{rentrez::set_entrez_key()} when \code{pubmed = TRUE}.}
+\item{base_url}{Optional custom API base URL for compatible LLM providers.}
 
-\item{llm_api_key}{Character. API key for \code{provider}. Required for final
-LLM module annotation; also required for embedding/reranking when
-\code{pubmed = TRUE}.}
+\item{synthesize}{Logical. In advanced mode, whether to run the final
+cross-module synthesis agent after module annotation. When \code{TRUE},
+accepted hypotheses are integrated into \code{res$module_synthesis} and an
+interactive synthesis network HTML is exported to \code{html_dir}.
+Ignored in fast mode.}
+
+\item{synthesis_model}{Character. LLM model used by the synthesis agent.
+Defaults to \code{llm_model}.}
+
+\item{debate_html}{Logical. In advanced mode, whether to export one
+chat-style HTML debate trace per annotated module (default \code{FALSE}).}
+
+\item{html_dir}{Character. Directory where advanced-mode HTML outputs are
+written. Debate trace pages are written here when \code{debate_html = TRUE};
+the synthesis network page is written here when \code{synthesize = TRUE}.
+Defaults to \code{getwd()}.}
+
+\item{debate_html_dir}{Deprecated alias for \code{html_dir}.}
 }
 \value{
 The input \code{res} object updated with:
 \itemize{
-\item \code{module_function}: module-level functional annotation output
-returned by LLM helpers (or empty tibble when no modules pass filter)
-\item \code{module_top_metabolite_pmids}: tidy mapping table of top
-metabolites to PubMed IDs (PMIDs) retained after reranking. Its
-\code{Module} column matches the character module IDs generated by
-\code{\link{identify_module}} (for example \code{"M1"})
-\item \code{stage}: updated to \code{"module_annotated"}
+\item \code{module_function}: data frame with one row per annotated module
+or accepted hypothesis, containing the compact user-facing
+annotation fields, including \code{anchor_metabolites},
+\code{anchor_metabolite_ids}, \code{top_metabolites}, and
+\code{top_metabolite_ids}. Fast mode includes
+\code{annotation_mode = "fast"}. Advanced mode includes
+\code{verdict_status} when available.
+\item \code{module_evidence}: list of computed evidence tables used for
+annotation, with components \code{class_coverage},
+\code{pathway_coverage$hmdb}, \code{pathway_coverage$kegg},
+\code{pubmed_evidence}, \code{top_metabolites},
+\code{anchor_metabolites}, \code{debate_trace}, and
+\code{debate_html_payload}.
+\item \code{module_synthesis}: optional list created when
+\code{mode = "advanced"} and \code{synthesize = TRUE}, containing
+hypothesis nodes, thematic clusters, sparse and completed
+relationship tables, the final summary, and the raw synthesis
+response.
+\item \code{stage}: updated to \code{"module_annotated"}.
 }
 }
 \description{
-Perform functional annotation of statistically significant metabolic
-modules by integrating:
-\itemize{
-\item Database-derived metabolite annotations
-\item Literature evidence from PubMed (optional)
-\item Large language model (LLM)-based functional interpretation
-}
+Perform functional annotation of statistically significant metabolic modules
+by integrating database-derived annotations, optional PubMed literature
+evidence, and large language model (LLM) functional interpretation.
 }
 \details{
-Module annotation proceeds in three stages:
+\strong{Fast Mode pipeline (default):}
 \enumerate{
-\item Database-based metabolite annotation and ranking
-\item Literature retrieval and embedding-based filtering (optional)
-\item LLM-based functional summarization and confidence scoring
+\item Load functional reference databases (HMDB + KEGG).
+\item Annotate significant module metabolites via database lookup.
+\item Compute per-module: Signal_concentration (HHI), pathway coverage
+(KEGG + HMDB), global directionality, and origin profile.
+\item LLM Call 1 - hypothesis_type + title + functional_summary (no study context).
+\item Optional PubMed search using module title, anchor metabolites,
+phenotype, and PMID deduplication.
+\item LLM Call 2 - phenotype_relationship + confidence_label + rationale.
 }
 
-Database annotation uses HMDB functional references first and fills remaining
-missing annotations with KEGG functional references. When \code{pubmed = TRUE},
-literature retrieval is performed for top metabolites derived from each
-significant module; phenotype is not injected into the PubMed query itself.
-Module IDs are consumed exactly as stored by \code{\link{identify_module}},
-using character labels such as \code{"M1"}, \code{"M2"}, ...
-
-Only statistically significant modules (based on \code{p} and \code{pcutoff})
-are annotated. If no modules pass the threshold, an empty result is returned.
+\strong{Advanced Mode pipeline:}
+\enumerate{
+\item Same data preparation as fast mode (steps 1-3).
+\item P0 Proposer: generates 1-3 candidate biochemical hypotheses from metabolite
+data only (no study context).
+\item S1 Skeptic: challenges each hypothesis on biochemical, origin,
+species, and biospecimen grounds (no phenotype, no PubMed).
+\item P1 Proposer revision: keep / modify / drop each hypothesis.
+\item (Conditional) S2 + P2: second debate round if revisions were made
+or major challenges were kept without revision.
+\item Optional PubMed: deduplicated anchor-metabolite search plus
+per-hypothesis title search, results held for Arbiter only.
+\item Optional PubMed: phenotype relationships are summarized per
+hypothesis before Arbiter.
+\item A0 Arbiter: final accepted / rejected verdicts using
+the surviving hypotheses, debate digest, study context, and
+pre-computed phenotype relationship summaries.
+\item Optional synthesis agent: if \code{synthesize = TRUE}, accepted
+hypotheses across modules are integrated into thematic
+clusters, a completed relationship table, and an overall summary;
+an interactive synthesis network HTML is exported automatically.
+}
 }
 \examples{
 \dontrun{
-# res should be generated by identify_module() first
 res <- annotate_module(
-  res = res,
-  p = "fdr",
-  pcutoff = 0.05,
-  ref_data = NULL,
-  species = "human",
+  res        = res,
+  p          = "fdr",
+  pcutoff    = 0.05,
+  mode       = "fast",
+  species    = "human",
   biospecimen = "plasma",
-  phenotype = "disease phenotype",
-  pubmed = FALSE,
-  provider = "openai",
-  llm_model = "gpt-4.1-mini",
+  phenotype  = "type 2 diabetes",
+  pubmed     = FALSE,
+  provider   = "openai",
+  llm_model  = "gpt-4.1-mini",
   llm_api_key = Sys.getenv("OPENAI_API_KEY")
 )
 }
+
 }

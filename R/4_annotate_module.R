@@ -41,7 +41,8 @@
 #' @param phenotype Character. Phenotype/disease string used in PubMed retrieval
 #'   (when \code{pubmed = TRUE}) and confidence assessment.
 #' @param pubmed Logical. Whether to retrieve PubMed evidence after LLM Call 1.
-#'   When \code{TRUE}, the module title and every top metabolite are searched
+#'   When \code{TRUE}, the module title and each anchor metabolite selected in
+#'   Call 1 are searched
 #'   separately; up to three papers are retained per query and deduplicated by
 #'   PMID before LLM Call 2.
 #' @param years Integer. PubMed look-back years when \code{pubmed = TRUE}.
@@ -82,10 +83,10 @@
 #'   \item Annotate significant module metabolites via database lookup.
 #'   \item Compute per-module: Signal_concentration (HHI), pathway coverage
 #'         (KEGG + HMDB), global directionality, and origin profile.
-#'   \item LLM Call 1 — hypothesis_type + title + functional_summary (no study context).
-#'   \item Optional PubMed search using module title, all top metabolites,
+#'   \item LLM Call 1 - hypothesis_type + title + functional_summary (no study context).
+#'   \item Optional PubMed search using module title, anchor metabolites,
 #'         phenotype, and PMID deduplication.
-#'   \item LLM Call 2 — phenotype_relationship + confidence_label + rationale.
+#'   \item LLM Call 2 - phenotype_relationship + confidence_label + rationale.
 #' }
 #'
 #' \strong{Advanced Mode pipeline:}
@@ -157,11 +158,11 @@ annotate_module <- function(res                  = NULL,
 
   load_bundled_function_ref <- function(filename) {
     candidate_paths <- c(
-      system.file(file.path("app", "www", filename), package = "featuremapshiny"),
-      system.file(file.path("www", filename), package = "featuremapshiny"),
-      file.path("inst", "app", "www", filename),
-      file.path("app", "www", filename),
-      file.path("www", filename)
+      system.file(file.path("app", "reference", filename), package = "featuremapshiny"),
+      system.file(file.path("reference", filename), package = "featuremapshiny"),
+      file.path("inst", "app", "reference", filename),
+      file.path("app", "reference", filename),
+      file.path("reference", filename)
     )
     candidate_paths <- unique(candidate_paths[nzchar(candidate_paths)])
     candidate_paths <- candidate_paths[file.exists(candidate_paths)]
