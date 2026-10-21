@@ -59,6 +59,10 @@ load_featuremap_functions <- function() {
 
 load_featuremap_functions()
 
+# Also run here so launches that bypass run_featuremap() (shiny::runApp() on
+# the source tree, Shiny Server) get the same sign-in configuration check.
+featuremap_check_auth_setup()
+
 # Shiny's 5 MB default rejects almost every real feature table, and reference
 # databases are larger still. Override with the featuremap.max_upload_mb
 # option or the FEATUREMAP_MAX_UPLOAD_MB environment variable.

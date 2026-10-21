@@ -10,7 +10,6 @@
 #' @importFrom bslib bs_theme
 #' @importFrom curl send_mail
 #' @importFrom data.table as.data.table rbindlist
-#' @importFrom DBI dbConnect dbDisconnect dbExecute dbGetQuery dbWithTransaction
 #' @importFrom dplyr arrange bind_rows coalesce desc filter group_by if_else left_join mutate n pull select ungroup
 #' @importFrom furrr furrr_options future_map future_map_dfr
 #' @importFrom future multisession plan
@@ -27,11 +26,9 @@
 #' @importFrom rlang %||% .data
 #' @importFrom scales rescale
 #' @importFrom shinyjs useShinyjs
-#' @importFrom sodium password_store password_verify
 #' @importFrom stats aggregate as.formula p.adjust pgamma quantile rt setNames var weighted.mean
 #' @importFrom stringr str_detect str_extract str_replace
 #' @importFrom tibble tibble
-#' @importFrom RSQLite SQLite
 #' @importFrom utils combn head
 #' @importFrom visNetwork visNetwork
 NULL

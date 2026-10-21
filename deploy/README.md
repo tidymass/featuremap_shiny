@@ -198,7 +198,7 @@ export FEATUREMAP_SMTP_FROM="${FEATUREMAP_SMTP_FROM:-featuremapofficial@gmail.co
 - **`FM_HOST`** —— 必须是 `0.0.0.0`，别人才连得上。Shiny 默认的 `127.0.0.1` 只接受服务器本机连接。
 - **`FM_PORT`** —— 换端口后组员的地址也要跟着变。
 - **`FEATUREMAP_MAX_UPLOAD_MB`** —— Shiny 自带默认值是 5 MB，基本挡住所有真实的 feature table。
-- **`FEATUREMAP_AUTH_ENABLED`** —— 登录开关。本地/内部使用建议保持 `false`；公开公网版本设成 `true` 后，分析页面需要登录。
+- **`FEATUREMAP_AUTH_ENABLED`** —— 登录开关。本地/课题组内部使用保持 `false`（默认）；公开公网版本设成 `true` 后，分析页面需要登录。设成 `true` 时，app 启动阶段会检查：`DBI`/`RSQLite`/`sodium` 是否已安装、`FEATUREMAP_SMTP_PASSWORD` 和 `FEATUREMAP_PUBLIC_URL` 是否已设置。缺任何一项都会拒绝启动，并在 `logs/app.log` 里列出缺了什么。测试时可以设 `FEATUREMAP_EMAIL_DRY_RUN=true` 跳过邮件相关的检查。这三个 R 包现在属于可选依赖（`Suggests`），`install_server.sh` 和 `run_app.sh update` 用 `dependencies = TRUE` 安装，会自动装上。
 - **`FEATUREMAP_AUTH_DB`** —— 账号 SQLite 数据库位置。公开部署时放在 `~/featuremap-deploy/` 这类持久目录，不要提交到 git。
 - **`FEATUREMAP_PUBLIC_URL`** —— 公开访问地址，用来生成邮箱验证和重置密码链接。公网部署时一定要设成最终 URL。
 - **`FEATUREMAP_SMTP_USERNAME` / `FEATUREMAP_SMTP_FROM`** —— 发件邮箱，默认 `featuremapofficial@gmail.com`。

@@ -128,3 +128,93 @@ featuremap_max_upload_label <- function() {
     paste0(format(round(mb), trim = TRUE), " MB")
   }
 }
+
+#' Read a true/false environment variable
+#'
+#' @param name Environment variable name.
+#' @param default Value used when the variable is unset.
+#'
+#' @return `TRUE` for "true", "1", "yes", "y" or "on" (any case).
+#' @noRd
+featuremap_env_flag <- function(name, default = "false") {
+  value <- tolower(trimws(Sys.getenv(name, unset = default)))
+  value %in% c("true", "1", "yes", "y", "on")
+}
+
+#' Fail fast when sign-in is switched on but not set up
+#'
+#' Sign-in is off by default (local installs and the lab server) and only a
+#' public deployment sets `FEATUREMAP_AUTH_ENABLED=true`. When it is on, the
+#' account system needs DBI, RSQLite and sodium (kept in Suggests so local
+#' users never have to install libsodium) plus working SMTP settings and a
+#' public URL for the links in verification and password-reset emails.
+#' Without this check those gaps only surfaced when the first visitor tried
+#' to register; now the app refuses to start and says what is missing.
+#'
+#' `FEATUREMAP_EMAIL_DRY_RUN=true` skips the email checks, for testing the
+#' sign-in flow without sending mail.
+#'
+#' @return `TRUE` invisibly when sign-in is on and ready, `FALSE` when it is
+#'   off. Stops with a list of every problem otherwise.
+#' @noRd
+featuremap_check_auth_setup <- function() {
+  if (!featuremap_env_flag("FEATUREMAP_AUTH_ENABLED")) {
+    return(invisible(FALSE))
+  }
+
+  problems <- character(0)
+
+  auth_packages <- c("DBI", "RSQLite", "sodium")
+  missing_packages <- auth_packages[!vapply(
+    auth_packages,
+    requireNamespace,
+    logical(1),
+    quietly = TRUE
+  )]
+  if (length(missing_packages) > 0) {
+    problems <- c(problems, paste0(
+      "R packages needed for sign-in are not installed: ",
+      paste(missing_packages, collapse = ", "),
+      ". Install them with install.packages(c(",
+      paste0("\"", missing_packages, "\"", collapse = ", "),
+      ")). On Linux, sodium also needs the system library libsodium ",
+      "(e.g. libsodium-dev)."
+    ))
+  }
+
+  if (!featuremap_env_flag("FEATUREMAP_EMAIL_DRY_RUN")) {
+    password <- Sys.getenv("FEATUREMAP_SMTP_PASSWORD", unset = "")
+    if (!nzchar(password)) password <- Sys.getenv("SMTP_PASSWORD", unset = "")
+    if (!nzchar(trimws(password))) {
+      problems <- c(problems, paste0(
+        "FEATUREMAP_SMTP_PASSWORD is not set, so verification and ",
+        "password-reset emails cannot be sent. For Gmail use an app password."
+      ))
+    }
+
+    public_url <- trimws(Sys.getenv("FEATUREMAP_PUBLIC_URL", unset = ""))
+    if (!nzchar(public_url)) {
+      problems <- c(problems, paste0(
+        "FEATUREMAP_PUBLIC_URL is not set, so links in account emails would ",
+        "point at the wrong address. Set it to the URL visitors open, ",
+        "e.g. https://featuremap.example.org."
+      ))
+    } else if (!grepl("^https?://", public_url, ignore.case = TRUE)) {
+      problems <- c(problems, paste0(
+        "FEATUREMAP_PUBLIC_URL must start with http:// or https:// (got \"",
+        public_url, "\")."
+      ))
+    }
+  }
+
+  if (length(problems) > 0) {
+    stop(
+      "FEATUREMAP_AUTH_ENABLED=true, but sign-in is not ready:\n",
+      paste0("  - ", problems, collapse = "\n"),
+      "\nFix the above, or set FEATUREMAP_AUTH_ENABLED=false to run without sign-in.",
+      call. = FALSE
+    )
+  }
+
+  invisible(TRUE)
+}

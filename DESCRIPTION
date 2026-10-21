@@ -39,9 +39,6 @@ Imports:
     glue,
     jsonlite,
     data.table,
-    DBI,
-    RSQLite,
-    sodium,
     digest,
     curl,
     openssl,
@@ -62,6 +59,10 @@ Imports:
     methods,
     rlang,
     cli
+Suggests:
+    DBI,
+    RSQLite,
+    sodium
 Remotes:
     tidymass/massdataset,
     tidymass/metid,

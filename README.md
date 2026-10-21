@@ -37,7 +37,6 @@ Then install `featuremapshiny` and its remaining dependencies:
 ```r
 remotes::install_github(
   "tidymass/featuremap_shiny",
-  dependencies = TRUE,
   repos = BiocManager::repositories(),
   upgrade = "ask"
 )
@@ -50,10 +49,22 @@ library(featuremapshiny)
 run_featuremap()
 ```
 
-Authentication is disabled by default for local use. For a public deployment,
-set `FEATUREMAP_AUTH_ENABLED=true`, configure `FEATUREMAP_AUTH_DB` to use a
-persistent SQLite path, and provide the required SMTP settings for email
-verification and password reset. Detailed server instructions are available in
+Sign-in is disabled by default, so local installs and internal lab servers need
+no account setup and do not install the account packages. Only a public
+deployment needs it:
+
+1. Install the optional account packages:
+   `install.packages(c("DBI", "RSQLite", "sodium"))` (on Linux, `sodium` also
+   needs the system library `libsodium-dev`).
+2. Set `FEATUREMAP_AUTH_ENABLED=true`.
+3. Set `FEATUREMAP_PUBLIC_URL` to the address visitors open, and
+   `FEATUREMAP_SMTP_PASSWORD` (plus the other SMTP settings if not using the
+   defaults) for verification and password-reset emails.
+4. Optionally set `FEATUREMAP_AUTH_DB` to a persistent SQLite path.
+
+With sign-in switched on, the app checks all of this at launch and refuses to
+start, listing what is missing, rather than failing at the first sign-up.
+Detailed server instructions are available in
 [`deploy/README.md`](deploy/README.md).
 
 ## Tutorial

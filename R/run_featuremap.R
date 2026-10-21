@@ -13,5 +13,9 @@ run_featuremap <- function(...) {
     stop("Could not find the packaged Shiny application directory.", call. = FALSE)
   }
 
+  # Check before binding the port, so a public deployment with sign-in
+  # switched on but not configured fails at launch, not at first sign-up.
+  featuremap_check_auth_setup()
+
   shiny::runApp(appDir = app_dir, ...)
 }
