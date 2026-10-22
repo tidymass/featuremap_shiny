@@ -27,6 +27,13 @@
 #'   predictable (each analysis also starts its own parallel workers, see
 #'   `featuremap_max_threads()`).
 #'
+#' - `FEATUREMAP_MEMORY_LIMIT_GB`: hard cap on the memory of one analysis
+#'   (the worker process plus every process it starts, e.g. metid's parallel
+#'   workers). Checked every 2 seconds; a job that goes over is stopped, the
+#'   visitor is told why, and a fresh worker is started. Unset (the default)
+#'   means no cap. Linux only (reads /proc). Each finished job's peak memory
+#'   is written to the log, which is how to choose the value.
+#'
 #' Requires the callr package (Suggests) and shiny >= 1.8.1 (ExtendedTask).
 #' If either is missing, the app logs why and falls back to running jobs
 #' inside the Shiny process rather than failing to start.
@@ -162,6 +169,72 @@ featuremap_bg_package_source <- function() {
   list(path = getNamespaceInfo(ns, "path"), dev = dev)
 }
 
+#' Memory cap for one analysis, in bytes
+#'
+#' @return `NULL` when `FEATUREMAP_MEMORY_LIMIT_GB` is unset or invalid.
+#' @noRd
+featuremap_bg_memory_limit <- function() {
+  gb <- suppressWarnings(as.numeric(Sys.getenv("FEATUREMAP_MEMORY_LIMIT_GB", unset = "")))
+  if (length(gb) != 1 || is.na(gb) || gb <= 0) return(NULL)
+  gb * 1024^3
+}
+
+#' Resident memory of a process and all its descendants, in bytes
+#'
+#' Reads /proc directly (one pass over all processes), so it is cheap enough
+#' to run every couple of seconds. Returns `NA` where /proc is unavailable
+#' (macOS, Windows), in which case no cap is enforced.
+#'
+#' @param pid Root process id.
+#' @noRd
+featuremap_bg_tree_rss <- function(pid) {
+  if (is.null(pid) || is.na(pid) || !dir.exists("/proc")) return(NA_real_)
+  pids <- list.files("/proc", pattern = "^[0-9]+$")
+  if (length(pids) == 0) return(NA_real_)
+
+  info <- lapply(pids, function(p) {
+    line <- tryCatch(readLines(file.path("/proc", p, "stat"), n = 1, warn = FALSE),
+                     error = function(e) NULL)
+    if (length(line) != 1) return(NULL)
+    # The command name is in parentheses and may contain spaces, so split
+    # only what follows the last ")": state ppid ... rss is the 22nd field.
+    rest <- strsplit(trimws(sub("^.*\\)", "", line)), " +")[[1]]
+    if (length(rest) < 22) return(NULL)
+    c(pid = as.numeric(p), ppid = as.numeric(rest[2]), rss = as.numeric(rest[22]))
+  })
+  info <- do.call(rbind, Filter(Negate(is.null), info))
+  if (is.null(info)) return(NA_real_)
+
+  tree <- as.numeric(pid)
+  repeat {
+    children <- info[info[, "ppid"] %in% tree & !(info[, "pid"] %in% tree), "pid"]
+    if (length(children) == 0) break
+    tree <- c(tree, children)
+  }
+
+  page <- .featuremap_bg$page_size
+  if (is.null(page)) {
+    page <- suppressWarnings(as.numeric(system("getconf PAGESIZE", intern = TRUE)))
+    if (length(page) != 1 || is.na(page)) page <- 4096
+    .featuremap_bg$page_size <- page
+  }
+  sum(info[info[, "pid"] %in% tree, "rss"]) * page
+}
+
+# Stop a worker process together with everything it started (metid's
+# parallel R workers would otherwise be left running), then replace it.
+featuremap_bg_replace_worker <- function(w) {
+  killed <- tryCatch({ w$session$kill_tree(); TRUE }, error = function(e) FALSE)
+  if (!killed) try(w$session$kill(), silent = TRUE)
+  w$session <- featuremap_bg_new_session()
+  w$checked_at <- NULL
+  invisible(NULL)
+}
+
+featuremap_bg_gb <- function(bytes) {
+  if (is.null(bytes) || is.na(bytes)) "unknown" else sprintf("%.1f GB", bytes / 1024^3)
+}
+
 #' Run one analysis job (worker side)
 #'
 #' Called inside a worker process, or inline when no worker is running.
@@ -283,7 +356,9 @@ featuremap_bg_dispatch <- function() {
     job$args <- NULL  # the worker has its own copy now
     if (sent) {
       job$started <- TRUE
+      job$peak <- NA_real_
       w$job <- job
+      w$checked_at <- NULL
     }
   }
   invisible(NULL)
@@ -292,9 +367,40 @@ featuremap_bg_dispatch <- function() {
 # Collect finished jobs. Runs on the Shiny process's event loop (later) while
 # any job is queued or running, so the interface is never blocked waiting.
 featuremap_bg_poll <- function() {
+  limit <- featuremap_bg_memory_limit()
   for (w in .featuremap_bg$workers) {
     job <- w$job
     if (is.null(job)) next
+
+    # Memory check every 2 seconds: track the peak, and stop the job before
+    # it can starve the rest of the server.
+    now <- Sys.time()
+    if (is.null(w$checked_at) || as.numeric(now - w$checked_at, units = "secs") >= 2) {
+      w$checked_at <- now
+      rss <- featuremap_bg_tree_rss(w$session$get_pid())
+      if (!is.na(rss)) job$peak <- max(job$peak, rss, na.rm = TRUE)
+      if (!is.null(limit) && !is.na(rss) && rss > limit) {
+        message(
+          "FeatureMAP ", job$fun_name, " job stopped: memory ", featuremap_bg_gb(rss),
+          " exceeded FEATUREMAP_MEMORY_LIMIT_GB (", featuremap_bg_gb(limit), ")"
+        )
+        w$job <- NULL
+        if (!job$cancelled) {
+          job$resolve(structure(
+            list(message = paste0(
+              "This analysis needed more memory than this server allows (",
+              featuremap_bg_gb(limit), "), so it was stopped to keep the server ",
+              "running. Try a smaller dataset, or install FeatureMAP on your own ",
+              "computer to run it without this limit."
+            )),
+            class = "featuremap_bg_error"
+          ))
+        }
+        featuremap_bg_replace_worker(w)
+        next
+      }
+    }
+
     if (w$session$poll_process(0) != "ready") next
 
     msg <- tryCatch(w$session$read(), error = function(e) {
@@ -308,6 +414,8 @@ featuremap_bg_poll <- function() {
 
     if (identical(as.integer(msg$code), 200L)) {
       w$job <- NULL
+      message("FeatureMAP ", job$fun_name, " job finished; peak memory ",
+              featuremap_bg_gb(job$peak))
       if (!job$cancelled) {
         if (!is.null(msg$error)) {
           job$resolve(structure(
@@ -328,8 +436,7 @@ featuremap_bg_poll <- function() {
           "(possibly out of memory). Please try again, or use fewer threads."
         )))
       }
-      try(w$session$kill(), silent = TRUE)
-      w$session <- featuremap_bg_new_session()
+      featuremap_bg_replace_worker(w)
     }
     # Other codes (e.g. 301, progress messages) need no action.
   }
@@ -390,8 +497,7 @@ featuremap_bg_cancel <- function(job) {
   for (w in .featuremap_bg$workers) {
     if (identical(w$job, job)) {
       w$job <- NULL
-      try(w$session$kill(), silent = TRUE)
-      w$session <- featuremap_bg_new_session()
+      featuremap_bg_replace_worker(w)
     }
   }
   featuremap_bg_dispatch()
