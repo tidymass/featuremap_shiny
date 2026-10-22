@@ -634,7 +634,7 @@ annotate_one_module <- function(module_obj,
                            stage_label) {
     parsed   <- NULL
     raw_text <- NA_character_
-    cur_max  <- if (identical(provider, "gemini")) max(4000L, max_tokens) else max_tokens
+    cur_max  <- if (identical(provider, "gemini")) gemini_initial_max_tokens(max_tokens, model) else max_tokens
     
     for (attempt in 1:2) {
       res_call <- safe_chat_call(
@@ -657,17 +657,20 @@ annotate_one_module <- function(module_obj,
         
         message("[annotate_module] No valid JSON (module ", mid, ", ",
                 stage_label, ", attempt ", attempt, ")")
-        
-        # Gemini truncation workaround
-        if (identical(provider, "gemini") &&
-            !is.null(res_call$finish_reason) &&
-            identical(toupper(as.character(res_call$finish_reason)), "MAX_TOKENS")) {
-          cur_max <- min(max(3000L, cur_max * 2L), 8192L)
-          message("[annotate_module] Gemini MAX_TOKENS; retrying with max_tokens = ", cur_max)
-        }
       } else {
         message("[annotate_module] Empty response (module ", mid, ", ",
                 stage_label, ", attempt ", attempt, ")")
+      }
+
+      # Gemini stopped at the output limit. Thinking counts against that
+      # limit, so the answer can be cut short or missing entirely (empty
+      # parts); either way, retry with more room.
+      if (identical(provider, "gemini") && gemini_hit_max_tokens(res_call)) {
+        next_max <- gemini_next_max_tokens(cur_max, model)
+        if (!is.null(next_max)) {
+          cur_max <- next_max
+          message("[annotate_module] Gemini MAX_TOKENS; retrying with max_tokens = ", cur_max)
+        }
       }
       
       if (attempt == 1) {

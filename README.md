@@ -7,7 +7,7 @@ identification, and functional interpretation.
 ## Online application
 
 The hosted application will be available at
-[featuremap_shiny.jaspershenlab.com](https://featuremap_shiny.jaspershenlab.com).
+[featuremap.jaspershenlab.com](https://featuremap.jaspershenlab.com).
 
 ## Installation
 
@@ -56,7 +56,12 @@ deployment needs it:
 1. Install the optional account packages:
    `install.packages(c("DBI", "RSQLite", "sodium"))` (on Linux, `sodium` also
    needs the system library `libsodium-dev`).
-2. Set `FEATUREMAP_AUTH_ENABLED=true`.
+2. Set `FEATUREMAP_PUBLIC_MODE=true`. This turns sign-in on and adds the
+   restrictions an open server needs: visitors must enter their own LLM and
+   NCBI API keys (keys in the server's environment are never used), and the
+   "Local" LLM provider is hidden, since its base URL would let visitors make
+   the server call arbitrary addresses. To require sign-in without those
+   restrictions, set `FEATUREMAP_AUTH_ENABLED=true` instead.
 3. Set `FEATUREMAP_PUBLIC_URL` to the address visitors open, and
    `FEATUREMAP_SMTP_PASSWORD` (plus the other SMTP settings if not using the
    defaults) for verification and password-reset emails.

@@ -31,6 +31,10 @@ export FM_HOST="${FM_HOST:-0.0.0.0}"
 export FM_PORT="${FM_PORT:-3838}"
 export FEATUREMAP_MAX_UPLOAD_MB="${FEATUREMAP_MAX_UPLOAD_MB:-500}"
 export FEATUREMAP_AUTH_ENABLED="${FEATUREMAP_AUTH_ENABLED:-false}"
+# export FEATUREMAP_PUBLIC_MODE=true   # public server only: sign-in + visitors' own API keys
+# Shared server: run analyses in a background R process so one person's job
+# does not freeze the app for others; further jobs queue. 0 = old behaviour.
+export FEATUREMAP_BG_WORKERS="${FEATUREMAP_BG_WORKERS:-1}"
 export FEATUREMAP_AUTH_DB="${FEATUREMAP_AUTH_DB:-$FM_ROOT/auth/featuremap_auth.sqlite}"
 export FEATUREMAP_PUBLIC_URL="${FEATUREMAP_PUBLIC_URL:-}"
 export FEATUREMAP_SMTP_HOST="${FEATUREMAP_SMTP_HOST:-smtp.gmail.com}"

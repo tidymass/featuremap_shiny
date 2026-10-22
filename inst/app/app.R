@@ -63,6 +63,35 @@ load_featuremap_functions()
 # the source tree, Shiny Server) get the same sign-in configuration check.
 featuremap_check_auth_setup()
 
+# Safety net for per-session output directories whose session never
+# reported its end: sweep hourly for ones untouched for a day
+# (FEATUREMAP_TEMP_MAX_AGE_HOURS). Normally a session removes its own
+# directories when it closes; see session$onSessionEnded() in the server.
+local({
+  sweep <- function() {
+    try(featuremap_sweep_session_dirs(), silent = TRUE)
+    later::later(sweep, 3600)
+  }
+  later::later(sweep, 3600)
+})
+
+# FEATUREMAP_PUBLIC_MODE=true: sign-in required, visitors bring their own
+# API keys, no "Local" LLM provider. See featuremap_public_mode().
+featuremap_is_public <- featuremap_public_mode()
+
+# On servers, long analysis steps (2-5) run in a background R process
+# (callr) shared by all sessions, so one visitor's job never freezes the app
+# for everyone else; further jobs queue (see R/49_background.R).
+# FEATUREMAP_BG_WORKERS sets how many analyses run at once: 0 by default
+# (local installs, unchanged behaviour), 1 in public mode and on the lab
+# server (deploy/run_app.sh).
+featuremap_bg_start()
+shiny::onStop(featuremap_bg_stop)
+
+# Upper limit for the Threads inputs (FEATUREMAP_MAX_THREADS).
+featuremap_thread_max <- featuremap_max_threads()
+featuremap_thread_default <- min(4L, featuremap_thread_max)
+
 # Shiny's 5 MB default rejects almost every real feature table, and reference
 # databases are larger still. Override with the featuremap.max_upload_mb
 # option or the FEATUREMAP_MAX_UPLOAD_MB environment variable.
@@ -88,8 +117,8 @@ build_info_icon <- function(content) {
 }
 
 featuremap_auth_enabled <- function() {
-  value <- tolower(trimws(Sys.getenv("FEATUREMAP_AUTH_ENABLED", unset = "false")))
-  value %in% c("true", "1", "yes", "y", "on")
+  # FEATUREMAP_AUTH_ENABLED, or implied by FEATUREMAP_PUBLIC_MODE.
+  featuremap_auth_required()
 }
 
 featuremap_truthy <- function(value, default = "false") {
@@ -6928,11 +6957,12 @@ ui <- fluidPage(
                   choices = c("Reverse Phase" = "rp", "HILIC" = "hilic")
                 ),
                 numericInput("isotope_num", "Isotope number", value = 3, min = 1, max = 5),
-                numericInput("workers", "Threads", value = 4, min = 1, max = 16)
+                numericInput("workers", "Threads", value = featuremap_thread_default, min = 1, max = featuremap_thread_max)
               )
             ),
 
             # ---------------- Sticky actions ----------------
+            uiOutput("bg_notice_annotation"),
             tags$div(
               class = "wb-actions",
               actionButton(
@@ -7135,11 +7165,12 @@ ui <- fluidPage(
                   numericInput("pcsf_times_tune", "Iterations (grid tuning)", value = 10, min = 1, step = 1)
                 ),
 
-                numericInput("pcsf_workers", "Threads", value = 4, min = 1, max = 16),
+                numericInput("pcsf_workers", "Threads", value = featuremap_thread_default, min = 1, max = featuremap_thread_max),
                 checkboxInput("pcsf_show_network", "Visualize PCSF subnetwork", value = TRUE)
               )
             ),
 
+            uiOutput("bg_notice_pcsf"),
             tags$div(
               class = "wb-actions",
               actionButton(
@@ -7334,10 +7365,11 @@ ui <- fluidPage(
                 ),
                 numericInput("n_perm", "Permutations", value = 100, min = 10, max = 1000),
                 numericInput("module_seed", "Random seed", value = 123),
-                numericInput("module_workers", "Threads", value = 4, min = 1, max = 16)
+                numericInput("module_workers", "Threads", value = featuremap_thread_default, min = 1, max = featuremap_thread_max)
               )
             ),
 
+            uiOutput("bg_notice_modules"),
             tags$div(
               class = "wb-actions",
               actionButton(
@@ -7596,22 +7628,39 @@ ui <- fluidPage(
                 ),
                 selectInput(
                   "func_provider", "Provider",
-                  choices = c(
-                    "OpenAI" = "openai",
-                    "Google Gemini" = "gemini",
-                    "SiliconFlow" = "siliconflow",
-                    "Local" = "local"
-                  )
+                  # A public server never offers "Local": its base URL would
+                  # let visitors make the server call any address, including
+                  # machines on the internal network.
+                  choices = if (featuremap_is_public) {
+                    c(
+                      "OpenAI" = "openai",
+                      "Google Gemini" = "gemini",
+                      "SiliconFlow" = "siliconflow"
+                    )
+                  } else {
+                    c(
+                      "OpenAI" = "openai",
+                      "Google Gemini" = "gemini",
+                      "SiliconFlow" = "siliconflow",
+                      "Local" = "local"
+                    )
+                  }
                 ),
                 textInput("func_llm_model", "Model ID", placeholder = "e.g. gpt-5.4"),
-                conditionalPanel(
-                  condition = "input.func_provider == 'local'",
-                  textInput("func_base_url", "Local base URL", placeholder = "e.g. http://localhost:8000")
-                ),
-                passwordInput("func_llm_key", "API key (optional for Local)")
+                if (!featuremap_is_public) {
+                  conditionalPanel(
+                    condition = "input.func_provider == 'local'",
+                    textInput("func_base_url", "Local base URL", placeholder = "e.g. http://localhost:8000")
+                  )
+                },
+                passwordInput(
+                  "func_llm_key",
+                  if (featuremap_is_public) "API key" else "API key (optional for Local)"
+                )
               )
             ),
 
+            uiOutput("bg_notice_function"),
             tags$div(
               class = "wb-actions",
               actionButton(
@@ -8801,6 +8850,164 @@ server <- function(input, output, session) {
     close_process_modal(2600)
   }
 
+  # Step 5 writes each run's HTML into a per-session directory
+  # (session_html_dir()). Remove them when the visitor leaves; before this
+  # they stayed on disk until the app restarted. (Uploaded files are already
+  # removed by Shiny itself when the session ends.)
+  session$onSessionEnded(function() {
+    featuremap_remove_session_dirs(session$token)
+  })
+
+  ## Background jobs ==========================================================
+  # Steps 2-5 run in the shared background worker (R/49_background.R) instead
+  # of inside this process, so a long analysis no longer freezes every other
+  # visitor's page. Jobs from all sessions queue first come, first served.
+  # Each step owns one ExtendedTask; bg_running holds what this session has
+  # queued or running, so the modal can show its place in the queue and the
+  # job can be cancelled if the visitor leaves first.
+  bg_running <- reactiveVal(list())
+  bg_shown <- new.env(parent = emptyenv())  # step -> text currently in the modal
+
+  bg_forget <- function(step) {
+    if (exists(step, envir = bg_shown, inherits = FALSE)) rm(list = step, envir = bg_shown)
+    running <- isolate(bg_running())
+    running[[step]] <- NULL
+    bg_running(running)
+  }
+
+  # step:       short id, also the key in bg_running
+  # fun_name:   analysis function to call on the worker
+  # on_success: function(result), runs here once the job is done
+  # on_error:   function(message)
+  bg_task <- function(step, fun_name, on_success, on_error) {
+    # No background worker (the default for local installs): run in this
+    # process exactly as before. The short delay lets the "running" modal
+    # reach the browser before the computation blocks the process.
+    if (!featuremap_bg_active()) {
+      return(list(
+        run = function(args, title, text) {
+          shinyjs::delay(100, {
+            value <- featuremap_bg_run(fun_name, args, clean_up = FALSE)
+            if (inherits(value, "featuremap_bg_error")) {
+              on_error(value$message)
+            } else {
+              on_success(value)
+            }
+          })
+        }
+      ))
+    }
+
+    task <- ExtendedTask$new(function(args) {
+      job <- featuremap_bg_submit(fun_name, args)
+      running <- isolate(bg_running())
+      if (!is.null(running[[step]])) {
+        running[[step]]$job <- job
+        bg_running(running)
+      }
+      job$promise
+    })
+
+    observeEvent(task$status(), {
+      status <- task$status()
+      if (!(status %in% c("success", "error"))) return()
+      bg_forget(step)
+
+      value <- tryCatch(task$result(), error = function(e) e)
+      if (inherits(value, "featuremap_bg_error") || inherits(value, "error")) {
+        message("FeatureMAP ", step, " job failed: ", featuremap_bg_error_message(value))
+        on_error(featuremap_bg_error_message(value))
+      } else {
+        on_success(value)
+      }
+    }, ignoreInit = TRUE)
+
+    list(
+      # title/text: what the running modal says once the job has started
+      run = function(args, title, text) {
+        running <- isolate(bg_running())
+        running[[step]] <- list(title = title, text = text)
+        bg_running(running)
+        assign(step, text, envir = bg_shown)
+        task$invoke(args)
+      }
+    )
+  }
+
+  # While a job waits for the worker, say how many jobs are ahead of it;
+  # switch back to the step's own message once the worker picks it up.
+  observe({
+    running <- bg_running()
+    req(length(running) > 0)
+    invalidateLater(1500)
+
+    for (step in names(running)) {
+      info <- running[[step]]
+      if (is.null(info$job)) next
+      ahead <- featuremap_bg_jobs_ahead(info$job)
+      text <- if (!isTRUE(info$job$started) && ahead > 0) {
+        paste0(
+          "Queued: ", ahead, if (ahead == 1) " analysis is" else " analyses are",
+          " ahead of yours on the server. Yours starts automatically when ",
+          "they finish; please keep this page open."
+        )
+      } else {
+        info$text
+      }
+      shown <- get0(step, envir = bg_shown, inherits = FALSE)
+      if (!identical(text, shown)) {
+        set_process_state("running", info$title, text)
+        assign(step, text, envir = bg_shown)
+      }
+    }
+  })
+
+  # Above each Run button: let visitors know before they click when the
+  # server is already busy with someone else's analysis.
+  bg_server_load <- reactive({
+    if (!featuremap_bg_active()) return(NULL)
+    invalidateLater(3000)
+    featuremap_bg_load()
+  })
+
+  bg_notice <- function() {
+    renderUI({
+      load <- bg_server_load()
+      if (is.null(load)) return(NULL)
+      busy <- load$running + load$waiting
+      own <- length(bg_running())
+      others <- busy - own
+      if (others <= 0) return(NULL)
+      tags$div(
+        class = "wb-empty-foot",
+        style = "margin: 0 0 10px; font-size: 12.5px; color: #8a5a00;",
+        icon("hourglass-half"),
+        paste0(
+          " The server is busy with ", others,
+          if (others == 1) " other analysis" else " other analyses",
+          ". If you click Run now, your job will wait in the queue and start automatically."
+        )
+      )
+    })
+  }
+  output$bg_notice_annotation <- bg_notice()
+  output$bg_notice_pcsf <- bg_notice()
+  output$bg_notice_modules <- bg_notice()
+  output$bg_notice_function <- bg_notice()
+  # The step pages are shown and hidden by our own page switcher, so keep
+  # these updating while hidden; otherwise a notice can stay empty after
+  # the visitor switches to the page.
+  for (id in c("bg_notice_annotation", "bg_notice_pcsf", "bg_notice_modules", "bg_notice_function")) {
+    outputOptions(output, id, suspendWhenHidden = FALSE)
+  }
+
+  # A visitor who leaves should not keep the worker busy.
+  session$onSessionEnded(function() {
+    for (info in isolate(bg_running())) {
+      if (!is.null(info$job)) featuremap_bg_cancel(info$job)
+    }
+  })
+
   post_auth_target <- function() {
     rv$auth_redirect_after_login <- NULL
     "home"
@@ -9758,6 +9965,50 @@ server <- function(input, output, session) {
   })
   
   ## Step 2 Feature annotation====================================
+  annotation_job <- bg_task(
+    "annotation", "annotate_feature",
+    on_success = function(res) {
+      rv$annotation_object  <- res
+      rv$annotated_table    <- res$anno_feature_table1
+      rv$annotation_summary <- res$anno_redundancy
+      rv$annotation_status  <- "finished"
+
+      tbl <- res$anno_feature_table1
+      n_entries <- if (is.data.frame(tbl)) nrow(tbl) else 0L
+      feature_col <- if (is.data.frame(tbl)) {
+        pick_first_col(tbl, c("variable_id", "feature_id", "feature", "feature_name", "id"))
+      } else NULL
+      n_annotated <- if (!is.null(feature_col)) {
+        length(unique(stats::na.omit(tbl[[feature_col]])))
+      } else n_entries
+      n_total <- if (!is.null(rv$feature_data)) nrow(rv$feature_data) else NA_integer_
+      annotated_txt <- paste0(
+        format(n_annotated, big.mark = ","),
+        if (!is.na(n_total)) {
+          paste0(" / ", format(n_total, big.mark = ","),
+                 if (n_total > 0) sprintf("  (%.1f%%)", 100 * n_annotated / n_total) else "")
+        } else ""
+      )
+
+      finish_process_modal(
+        "Annotation finished",
+        "You can continue to PCSF Subnetwork.",
+        list(
+          proc_row("bullseye", "Annotated features", annotated_txt),
+          proc_row("link", "Feature-metabolite pairs", format(n_entries, big.mark = ","))
+        )
+      )
+
+      shinyjs::enable("run_annotation")
+    },
+    on_error = function(message) {
+      rv$annotation_status <- "error"
+      update_process_modal("error", "Step 2 Failed", message)
+      close_process_modal(1800)
+      shinyjs::enable("run_annotation")
+    }
+  )
+
   observeEvent(input$run_annotation, {
     if (!require_auth("annotation")) return(invisible(NULL))
     
@@ -9770,62 +10021,20 @@ server <- function(input, output, session) {
     
     rv$annotation_status <- "running"
     shinyjs::disable("run_annotation")
-    shinyjs::delay(100, {
-      res <- tryCatch({
-        annotate_feature(
-          feature_table = rv$feature_data,
-          ms2_table = rv$ms2_data,
-          metabolite_database = rv$ref_database,
-          column = input$column_type,
-          ms1_match_ppm = input$ms1_ppm,
-          mfc_rt_tol = input$rt_tol,
-          isotope_number = input$isotope_num,
-          workers = input$workers
-        )
-      }, error = function(e) e)
-      
-      if (inherits(res, "error")) {
-        rv$annotation_status <- "error"
-        update_process_modal("error", "Step 2 Failed", res$message)
-        close_process_modal(1800)
-        shinyjs::enable("run_annotation")
-      } else {
-        rv$annotation_object  <- res
-        rv$annotated_table    <- res$anno_feature_table1
-        rv$annotation_summary <- res$anno_redundancy
-        rv$annotation_status  <- "finished"
-
-        tbl <- res$anno_feature_table1
-        n_entries <- if (is.data.frame(tbl)) nrow(tbl) else 0L
-        feature_col <- if (is.data.frame(tbl)) {
-          pick_first_col(tbl, c("variable_id", "feature_id", "feature", "feature_name", "id"))
-        } else NULL
-        n_annotated <- if (!is.null(feature_col)) {
-          length(unique(stats::na.omit(tbl[[feature_col]])))
-        } else n_entries
-        n_total <- if (!is.null(rv$feature_data)) nrow(rv$feature_data) else NA_integer_
-        annotated_txt <- paste0(
-          format(n_annotated, big.mark = ","),
-          if (!is.na(n_total)) {
-            paste0(" / ", format(n_total, big.mark = ","),
-                   if (n_total > 0) sprintf("  (%.1f%%)", 100 * n_annotated / n_total) else "")
-          } else ""
-        )
-
-        finish_process_modal(
-          "Annotation finished",
-          "You can continue to PCSF Subnetwork.",
-          list(
-            proc_row("bullseye", "Annotated features", annotated_txt),
-            proc_row("link", "Feature-metabolite pairs", format(n_entries, big.mark = ","))
-          )
-        )
-        
-        shinyjs::enable("run_annotation")
-      }
-      
-      shinyjs::enable("run_annotation")
-    })
+    annotation_job$run(
+      list(
+        feature_table = rv$feature_data,
+        ms2_table = rv$ms2_data,
+        metabolite_database = rv$ref_database,
+        column = input$column_type,
+        ms1_match_ppm = input$ms1_ppm,
+        mfc_rt_tol = input$rt_tol,
+        isotope_number = input$isotope_num,
+        workers = featuremap_clamp_threads(input$workers)
+      ),
+      title = "Step 2 Running",
+      text = "Feature annotation is in progress. Please wait."
+    )
   })
 
   observeEvent(input$next_to_network, {
@@ -10182,6 +10391,39 @@ server <- function(input, output, session) {
   })
   
   ## Step 3: Extract Subnetwork ======================================
+  pcsf_job <- bg_task(
+    "pcsf", "extract_subnetwork",
+    on_success = function(res) {
+      rv$annotation_object <- res
+      rv$annotation_table2 <- res$anno_feature_table2
+      rv$pcsf_status <- "finished"
+      rv$pcsf_selected_node <- NULL
+
+      g <- res$pcsf_subnet
+      fmt_n <- function(x) if (is.null(x) || is.na(x)) "-" else format(x, big.mark = ",")
+      finish_process_modal(
+        "Subnetwork extracted",
+        "You can continue to Module Identification.",
+        list(
+          proc_row("circle-nodes", "Metabolite nodes",
+                   fmt_n(if (methods::is(g, "igraph")) igraph::vcount(g) else NA_integer_)),
+          proc_row("link", "Reaction edges",
+                   fmt_n(if (methods::is(g, "igraph")) igraph::gsize(g) else NA_integer_)),
+          proc_row("table", "Annotation table 2",
+                   fmt_n(if (is.data.frame(res$anno_feature_table2)) nrow(res$anno_feature_table2) else NA_integer_))
+        )
+      )
+
+      shinyjs::enable("run_pcsf")
+    },
+    on_error = function(message) {
+      rv$pcsf_status <- "idle"
+      update_process_modal("error", "Step 3 Failed", message)
+      close_process_modal(1800)
+      shinyjs::enable("run_pcsf")
+    }
+  )
+
   observeEvent(input$run_pcsf, {
     if (!require_auth("network")) return(invisible(NULL))
     
@@ -10231,58 +10473,29 @@ server <- function(input, output, session) {
       text = "PCSF subnetwork extraction is in progress. Please wait."
     )
     
-    shinyjs::delay(100, {
-      
-      res <- tryCatch({
-        extract_subnetwork(
-          res = rv$annotation_object,
-          feature = input$pcsf_feature,
-          pcutoff = input$pcsf_pcutoff,
-          mrn = rv$mrn,
-          workers = input$pcsf_workers,
-          
-          b = input$pcsf_b,
-          w = input$pcsf_w,
-          
-          grid_tune = input$pcsf_grid_tune,
-          b_grid = b_grid,
-          w_grid = w_grid,
-          times_tune = if (isTRUE(input$pcsf_grid_tune)) input$pcsf_times_tune else 10,
-          
-          mu = 1e-4,
-          r = 0.30,
-          times = input$pcsf_times
-        )
-      }, error = function(e) e)
-      
-      if (inherits(res, "error")) {
-        rv$pcsf_status <- "idle"
-        update_process_modal("error", "Step 3 Failed", res$message)
-        close_process_modal(1800)
-      } else {
-        rv$annotation_object <- res
-        rv$annotation_table2 <- res$anno_feature_table2
-        rv$pcsf_status <- "finished"
-        rv$pcsf_selected_node <- NULL
-
-        g <- res$pcsf_subnet
-        fmt_n <- function(x) if (is.null(x) || is.na(x)) "-" else format(x, big.mark = ",")
-        finish_process_modal(
-          "Subnetwork extracted",
-          "You can continue to Module Identification.",
-          list(
-            proc_row("circle-nodes", "Metabolite nodes",
-                     fmt_n(if (methods::is(g, "igraph")) igraph::vcount(g) else NA_integer_)),
-            proc_row("link", "Reaction edges",
-                     fmt_n(if (methods::is(g, "igraph")) igraph::gsize(g) else NA_integer_)),
-            proc_row("table", "Annotation table 2",
-                     fmt_n(if (is.data.frame(res$anno_feature_table2)) nrow(res$anno_feature_table2) else NA_integer_))
-          )
-        )
-      }
-      
-      shinyjs::enable("run_pcsf")
-    })
+    pcsf_job$run(
+      list(
+        res = rv$annotation_object,
+        feature = input$pcsf_feature,
+        pcutoff = input$pcsf_pcutoff,
+        mrn = rv$mrn,
+        workers = featuremap_clamp_threads(input$pcsf_workers),
+        
+        b = input$pcsf_b,
+        w = input$pcsf_w,
+        
+        grid_tune = input$pcsf_grid_tune,
+        b_grid = b_grid,
+        w_grid = w_grid,
+        times_tune = if (isTRUE(input$pcsf_grid_tune)) input$pcsf_times_tune else 10,
+        
+        mu = 1e-4,
+        r = 0.30,
+        times = input$pcsf_times
+      ),
+      title = "Step 3 Running",
+      text = "PCSF subnetwork extraction is in progress. Please wait."
+    )
   })
   
 
@@ -11058,6 +11271,52 @@ server <- function(input, output, session) {
   
  
   ## Step 4: Module Identification =====================================
+  module_job <- bg_task(
+    "modules", "identify_module",
+    on_success = function(res) {
+      rv$module_res    <- res
+      rv$mrn           <- res$mrn
+      rv$module_status <- "finished"
+
+      score_tbl <- res$module_score
+      n_modules <- 0L
+      n_p <- NA_integer_
+      n_fdr <- NA_integer_
+      if (is.data.frame(score_tbl) && nrow(score_tbl) > 0) {
+        module_col <- pick_first_col(score_tbl, c("Module", "module", "module_id"))
+        n_modules <- if (!is.null(module_col)) {
+          length(unique(stats::na.omit(score_tbl[[module_col]])))
+        } else nrow(score_tbl)
+        count_sig <- function(cands) {
+          col <- pick_first_col(score_tbl, cands)
+          if (is.null(col)) return(NA_integer_)
+          v <- suppressWarnings(as.numeric(score_tbl[[col]]))
+          sum(is.finite(v) & v < 0.05, na.rm = TRUE)
+        }
+        n_p <- count_sig(c("p", "pvalue", "p_value", "P", "P.Value"))
+        n_fdr <- count_sig(c("fdr", "FDR", "qvalue", "q_value", "padj", "p_adj"))
+      }
+
+      finish_process_modal(
+        "Modules identified",
+        "You can continue to Function Interpretation.",
+        list(
+          proc_row("layer-group", "Modules detected", format(n_modules, big.mark = ",")),
+          proc_row("star", "p < 0.05", if (is.na(n_p)) "-" else format(n_p, big.mark = ",")),
+          proc_row("filter-circle-dollar", "FDR < 0.05", if (is.na(n_fdr)) "-" else format(n_fdr, big.mark = ","))
+        )
+      )
+
+      shinyjs::enable("run_modules")
+    },
+    on_error = function(message) {
+      rv$module_status <- "idle"
+      shinyjs::enable("run_modules")
+      update_process_modal("error", "Step 4 Failed", message)
+      close_process_modal(1800)
+    }
+  )
+
   observeEvent(input$run_modules, {
     if (!require_auth("modules")) return(invisible(NULL))
 
@@ -11069,72 +11328,29 @@ server <- function(input, output, session) {
     )
     rv$module_status <- "running"
     shinyjs::disable("run_modules")
-    shinyjs::delay(100, {
-      res <- tryCatch({
-        identify_module(
-          res        = rv$annotation_object,
-          method     = input$module_method,
-          min_size   = input$min_module_size,
-          n_perm     = input$n_perm,
-          seed       = input$module_seed,
-          workers    = input$module_workers,
-          node_freq  = input$node_freq,
-          louvain_resolution = if (input$module_method == "louvain") {
-            input$louvain_res
-          } else {
-            1
-          },
-          walktrap_steps = if (input$module_method == "walktrap") {
-            input$walktrap_steps
-          } else {
-            4
-          }
-        )
-      }, error = function(e) e)
-      
-      if (inherits(res, "error")) {
-        rv$module_status <- "idle"
-        shinyjs::enable("run_modules")
-        update_process_modal("error", "Step 4 Failed", res$message)
-        close_process_modal(1800)
-      } else {
-        rv$module_res    <- res
-        rv$mrn           <- res$mrn
-        rv$module_status <- "finished"
-
-        score_tbl <- res$module_score
-        n_modules <- 0L
-        n_p <- NA_integer_
-        n_fdr <- NA_integer_
-        if (is.data.frame(score_tbl) && nrow(score_tbl) > 0) {
-          module_col <- pick_first_col(score_tbl, c("Module", "module", "module_id"))
-          n_modules <- if (!is.null(module_col)) {
-            length(unique(stats::na.omit(score_tbl[[module_col]])))
-          } else nrow(score_tbl)
-          count_sig <- function(cands) {
-            col <- pick_first_col(score_tbl, cands)
-            if (is.null(col)) return(NA_integer_)
-            v <- suppressWarnings(as.numeric(score_tbl[[col]]))
-            sum(is.finite(v) & v < 0.05, na.rm = TRUE)
-          }
-          n_p <- count_sig(c("p", "pvalue", "p_value", "P", "P.Value"))
-          n_fdr <- count_sig(c("fdr", "FDR", "qvalue", "q_value", "padj", "p_adj"))
+    module_job$run(
+      list(
+        res        = rv$annotation_object,
+        method     = input$module_method,
+        min_size   = input$min_module_size,
+        n_perm     = input$n_perm,
+        seed       = input$module_seed,
+        workers    = featuremap_clamp_threads(input$module_workers),
+        node_freq  = input$node_freq,
+        louvain_resolution = if (input$module_method == "louvain") {
+          input$louvain_res
+        } else {
+          1
+        },
+        walktrap_steps = if (input$module_method == "walktrap") {
+          input$walktrap_steps
+        } else {
+          4
         }
-
-        finish_process_modal(
-          "Modules identified",
-          "You can continue to Function Interpretation.",
-          list(
-            proc_row("layer-group", "Modules detected", format(n_modules, big.mark = ",")),
-            proc_row("star", "p < 0.05", if (is.na(n_p)) "-" else format(n_p, big.mark = ",")),
-            proc_row("filter-circle-dollar", "FDR < 0.05", if (is.na(n_fdr)) "-" else format(n_fdr, big.mark = ","))
-          )
-        )
-      }
-      
-      
-      shinyjs::enable("run_modules")
-    })
+      ),
+      title = "Step 4 Running",
+      text = "Module identification is in progress. Please wait."
+    )
   })
   output$module_network_ui <- renderUI({
     if (rv$module_status == "running") {
@@ -11549,6 +11765,68 @@ server <- function(input, output, session) {
   
   
   ## Step 5: Function Interpretation =====================================
+  function_job <- bg_task(
+    "function", "annotate_module",
+    on_success = function(res) {
+      # ---- normalize empty result as "finished" ----
+      mf <- res$module_function
+      is_empty <- is.null(mf) || !is.data.frame(mf) || nrow(mf) == 0
+
+      rv$function_result <- res
+      rv$function_status <- "finished"
+
+      rv$function_synthesis_html_path <- NULL
+      if (!is.null(res$module_synthesis)) {
+        candidate <- file.path(rv$function_html_dir, "synthesis_network.html")
+        if (!file.exists(candidate)) {
+          candidate <- tryCatch(
+            export_synthesis_network_html(
+              res = res,
+              html_dir = rv$function_html_dir,
+              output_file = "synthesis_network.html",
+              show_same_module = FALSE
+            ),
+            error = function(e) NULL
+          )
+        }
+        if (file.exists(candidate)) {
+          rv$function_synthesis_html_path <- candidate
+        }
+      }
+
+      # (function_module_selector rebuilds itself via renderUI whenever
+      # rv$function_result/rv$function_status change, so no manual
+      # update*Input() call is needed here.)
+
+      mf <- rv$function_result$module_function
+      n_mod <- if (is.data.frame(mf) && "module_id" %in% names(mf)) {
+        length(unique(stats::na.omit(mf$module_id)))
+      } else 0L
+
+      finish_process_modal(
+        "Interpretation finished",
+        "You can continue to Results Download.",
+        list(
+          proc_row("layer-group", "Modules interpreted", format(n_mod, big.mark = ",")),
+          proc_row("wand-magic-sparkles", "Mode",
+                   if (identical(rv$function_mode_used, "advanced")) "Advanced" else "Fast")
+        )
+      )
+
+      shinyjs::enable("run_function_annotation")
+    },
+    on_error = function(message) {
+      rv$function_status <- "error"
+      shinyjs::enable("run_function_annotation")
+      update_process_modal(
+        "error",
+        "Step 5 Failed",
+        paste("Functional interpretation failed:", message)
+      )
+      close_process_modal(2200)
+    }
+  )
+
   observeEvent(input$run_function_annotation, {
     if (!require_auth("function")) return(invisible(NULL))
     
@@ -11558,50 +11836,64 @@ server <- function(input, output, session) {
     # ---- basic checks ----
     req(nzchar(input$func_llm_model))
     
+    # On a public server visitors bring their own keys: keys set in the
+    # server's environment are never used (anyone could spend them), and the
+    # Local provider is refused because its base URL would let a visitor make
+    # the server call arbitrary addresses, including internal machines. The
+    # UI already hides Local there; this check covers a tampered request.
+    server_keys_allowed <- !featuremap_is_public
+    server_env <- function(name) {
+      if (server_keys_allowed) trimws(Sys.getenv(name, unset = "")) else ""
+    }
+    env_hint <- function(name) {
+      if (server_keys_allowed) paste0(", or set ", name, " in the environment") else ""
+    }
+
+    if (featuremap_is_public && identical(input$func_provider, "local")) {
+      show_error_modal(
+        "Provider not available",
+        "The Local provider is not available on this public server. Choose OpenAI, Google Gemini or SiliconFlow."
+      )
+      return()
+    }
+
     llm_key <- trimws(input$func_llm_key)
     if (!nzchar(llm_key)) {
-      llm_key <- trimws(Sys.getenv("FEATUREMAP_LLM_API_KEY", unset = ""))
+      llm_key <- server_env("FEATUREMAP_LLM_API_KEY")
     }
     if (!identical(input$func_provider, "local") && !nzchar(llm_key)) {
       show_error_modal(
         "LLM API key missing",
-        "Fill the API key input, or set FEATUREMAP_LLM_API_KEY in the environment."
+        paste0("Fill the API key input", env_hint("FEATUREMAP_LLM_API_KEY"), ".")
       )
       return()
     }
 
     llm_base_url <- NULL
     if (identical(input$func_provider, "local")) {
-      llm_base_url <- trimws(input$func_base_url)
+      llm_base_url <- trimws(input$func_base_url %||% "")
       if (!nzchar(llm_base_url)) {
-        llm_base_url <- trimws(Sys.getenv("FEATUREMAP_LLM_BASE_URL", unset = ""))
+        llm_base_url <- server_env("FEATUREMAP_LLM_BASE_URL")
       }
       if (!nzchar(llm_base_url)) {
         show_error_modal(
           "Local base URL missing",
-          "Fill the base URL input, or set FEATUREMAP_LLM_BASE_URL in the environment."
+          paste0("Fill the base URL input", env_hint("FEATUREMAP_LLM_BASE_URL"), ".")
         )
         return()
       }
     }
     
-    if (isTRUE(input$func_use_pubmed)) {
-      ncbi_key <- trimws(input$func_ncbi_key)
-      if (!nzchar(ncbi_key)) {
-        ncbi_key <- trimws(Sys.getenv("FEATUREMAP_NCBI_API_KEY", unset = ""))
-      }
-      if (!nzchar(ncbi_key)) {
-        show_error_modal(
-          "NCBI API key missing",
-          "Fill the NCBI key input, or set FEATUREMAP_NCBI_API_KEY in the environment."
-        )
-        return()
-      }
-    } else {
-      ncbi_key <- trimws(input$func_ncbi_key)
-      if (!nzchar(ncbi_key)) {
-        ncbi_key <- trimws(Sys.getenv("FEATUREMAP_NCBI_API_KEY", unset = ""))
-      }
+    ncbi_key <- trimws(input$func_ncbi_key)
+    if (!nzchar(ncbi_key)) {
+      ncbi_key <- server_env("FEATUREMAP_NCBI_API_KEY")
+    }
+    if (isTRUE(input$func_use_pubmed) && !nzchar(ncbi_key)) {
+      show_error_modal(
+        "NCBI API key missing",
+        paste0("Fill the NCBI key input", env_hint("FEATUREMAP_NCBI_API_KEY"), ".")
+      )
+      return()
     }
     
     # Reference database is always the built-in FeatureMAP database.
@@ -11636,110 +11928,40 @@ server <- function(input, output, session) {
     rv$function_debate_html_used <- func_debate_html
     shinyjs::disable("run_function_annotation")
     
-    shinyjs::delay(100, {
-      
-      res <- tryCatch({
-        
-        # ---- run annotation ----
-        result <- annotate_module(
-          res           = rv$module_res,
-          p             = input$func_p_type,
-          pcutoff       = input$func_p_cutoff,
-          ref_data      = ref_data,
-          species       = {
-            x <- trimws(input$func_species)
-            if (nzchar(x)) x else ""
-          } ,
-          biospecimen = {
-            x <- trimws(input$func_biospecimen)
-            if (nzchar(x)) x else ""
-          },
-          phenotype = {
-            x <- trimws(input$func_phenotype)
-            if (nzchar(x)) x else ""
-          },
-          mode          = func_mode,
-          pubmed        = input$func_use_pubmed,
-          years         = input$func_pubmed_years,
-          provider      = input$func_provider,
-          llm_model     = input$func_llm_model,
-          NCBI_api_key  = ncbi_key,
-          llm_api_key   = llm_key,
-          base_url      = llm_base_url,
-          synthesize      = func_synthesize,
-          synthesis_model = input$func_llm_model,
-          debate_html     = func_debate_html,
-          html_dir        = function_html_dir
-        )
-        
-        result
-        
-      }, error = function(e) {
-        e
-      })
-      
-      # ---- handle result ----
-      if (inherits(res, "error")) {
-        cat("Error detected, reverting status\n")
-        rv$function_status <- "error"
-        shinyjs::enable("run_function_annotation")
-        
-        update_process_modal(
-          "error",
-          "Step 5 Failed",
-          paste("Functional interpretation failed:", res$message)
-        )
-        close_process_modal(2200)
-        
-      } else {
-        # ---- normalize empty result as "finished" ----
-        mf <- res$module_function
-        is_empty <- is.null(mf) || !is.data.frame(mf) || nrow(mf) == 0
-
-        rv$function_result <- res
-        rv$function_status <- "finished"
-
-        rv$function_synthesis_html_path <- NULL
-        if (!is.null(res$module_synthesis)) {
-          candidate <- file.path(function_html_dir, "synthesis_network.html")
-          if (!file.exists(candidate)) {
-            candidate <- tryCatch(
-              export_synthesis_network_html(
-                res = res,
-                html_dir = function_html_dir,
-                output_file = "synthesis_network.html",
-                show_same_module = FALSE
-              ),
-              error = function(e) NULL
-            )
-          }
-          if (file.exists(candidate)) {
-            rv$function_synthesis_html_path <- candidate
-          }
-        }
-
-        # (function_module_selector rebuilds itself via renderUI whenever
-        # rv$function_result/rv$function_status change, so no manual
-        # update*Input() call is needed here.)
-
-        mf <- rv$function_result$module_function
-        n_mod <- if (is.data.frame(mf) && "module_id" %in% names(mf)) {
-          length(unique(stats::na.omit(mf$module_id)))
-        } else 0L
-
-        finish_process_modal(
-          "Interpretation finished",
-          "You can continue to Results Download.",
-          list(
-            proc_row("layer-group", "Modules interpreted", format(n_mod, big.mark = ",")),
-            proc_row("wand-magic-sparkles", "Mode",
-                     if (identical(rv$function_mode_used, "advanced")) "Advanced" else "Fast")
-          )
-        )
-
-        shinyjs::enable("run_function_annotation")
-      }
-    })
+    function_job$run(
+      list(
+        res           = rv$module_res,
+        p             = input$func_p_type,
+        pcutoff       = input$func_p_cutoff,
+        ref_data      = ref_data,
+        species       = {
+          x <- trimws(input$func_species)
+          if (nzchar(x)) x else ""
+        } ,
+        biospecimen = {
+          x <- trimws(input$func_biospecimen)
+          if (nzchar(x)) x else ""
+        },
+        phenotype = {
+          x <- trimws(input$func_phenotype)
+          if (nzchar(x)) x else ""
+        },
+        mode          = func_mode,
+        pubmed        = input$func_use_pubmed,
+        years         = input$func_pubmed_years,
+        provider      = input$func_provider,
+        llm_model     = input$func_llm_model,
+        NCBI_api_key  = ncbi_key,
+        llm_api_key   = llm_key,
+        base_url      = llm_base_url,
+        synthesize      = func_synthesize,
+        synthesis_model = input$func_llm_model,
+        debate_html     = func_debate_html,
+        html_dir        = function_html_dir
+      ),
+      title = "Step 5 Running",
+      text = "Module interpretation is in progress. Please wait."
+    )
   })
   
   output$function_main_ui <- renderUI({
@@ -13108,6 +13330,9 @@ server <- function(input, output, session) {
       # ---- temp dir ----
       tmpdir <- tempfile("featuremap_export_")
       dir.create(tmpdir)
+      # The zip is written to `file`, outside tmpdir, so the staging copies
+      # can go as soon as this handler returns.
+      on.exit(unlink(tmpdir, recursive = TRUE, force = TRUE), add = TRUE)
       
       # ---- write files ----
       if (length(export_list) > 0 && input$export_format == "xlsx") {

@@ -1,3 +1,32 @@
+# ---- Shared helpers -------------------------------------------------------
+
+# Seconds to wait for one LLM HTTP request. Models that "think" before
+# answering (Gemini 2.5/3, reasoning models on SiliconFlow) regularly need
+# more than a minute; without any limit a stuck connection would hang the
+# analysis forever. Override with FEATUREMAP_LLM_TIMEOUT.
+featuremap_llm_timeout <- function(default = 300) {
+  value <- suppressWarnings(as.numeric(Sys.getenv("FEATUREMAP_LLM_TIMEOUT", unset = "")))
+  if (length(value) != 1 || is.na(value) || value <= 0) default else value
+}
+
+# A failed call. `retryable` says whether trying again can help: network
+# errors, timeouts, rate limits (429) and server errors (5xx) can; a wrong
+# model ID or an invalid key (other 4xx) cannot, and retrying those only made
+# users wait minutes before anything was reported.
+llm_failure <- function(retryable, status = NA_integer_, message = "") {
+  structure(
+    list(status = status, message = message),
+    class = "featuremap_llm_failure",
+    retryable = isTRUE(retryable)
+  )
+}
+
+is_llm_failure <- function(x) inherits(x, "featuremap_llm_failure")
+
+llm_status_retryable <- function(status) {
+  is.na(status) || status %in% c(408L, 429L) || status >= 500L
+}
+
 chat_openai_silicon_call <- function(
     messages,
     api_key,
@@ -28,16 +57,23 @@ chat_openai_silicon_call <- function(
 
   post_body <- function(body) {
     tryCatch({
-      httr::POST(url, headers, body = jsonlite::toJSON(body, auto_unbox = TRUE))
+      httr::POST(
+        url,
+        headers,
+        body = jsonlite::toJSON(body, auto_unbox = TRUE),
+        httr::timeout(featuremap_llm_timeout())
+      )
     }, error = function(e) {
       message("HTTP error: ", e$message)
       return(NULL)
     })
   }
 
+  network_failure <- llm_failure(TRUE, message = "network error or timeout")
+
   res <- post_body(build_body(token_parameter))
 
-  if (is.null(res)) return(NULL)
+  if (is.null(res)) return(network_failure)
 
   if (httr::status_code(res) != 200) {
     response_text <- httr::content(res, "text", encoding = "UTF-8")
@@ -48,7 +84,7 @@ chat_openai_silicon_call <- function(
       if (!is.null(res) && httr::status_code(res) == 200) {
         token_parameter <- "max_completion_tokens"
       } else if (is.null(res)) {
-        return(NULL)
+        return(network_failure)
       } else {
         response_text <- httr::content(res, "text", encoding = "UTF-8")
       }
@@ -64,24 +100,25 @@ chat_openai_silicon_call <- function(
         token_parameter
       }
       res <- post_body(build_body(retry_token_parameter, include_temperature = FALSE))
-      if (is.null(res)) return(NULL)
+      if (is.null(res)) return(network_failure)
       response_text <- httr::content(res, "text", encoding = "UTF-8")
     }
 
     if (httr::status_code(res) != 200) {
-      message("Chat HTTP status: ", httr::status_code(res))
+      status <- httr::status_code(res)
+      message("Chat HTTP status: ", status)
       message("Response: ", response_text)
-      return(NULL)
+      return(llm_failure(llm_status_retryable(status), status, response_text))
     }
   }
 
   cont <- tryCatch(httr::content(res, encoding = "UTF-8"), error = function(e) NULL)
-  if (is.null(cont)) return(NULL)
+  if (is.null(cont)) return(llm_failure(TRUE, 200L, "unreadable response body"))
   content_txt <- tryCatch(cont$choices[[1]]$message$content, error = function(e) NULL)
   finish_reason <- tryCatch(cont$choices[[1]]$finish_reason, error = function(e) NA_character_)
   if (is.null(content_txt)) {
     message("Failed to extract assistant content.")
-    return(NULL)
+    return(llm_failure(TRUE, 200L, "no assistant content in response"))
   }
 
   list(content = content_txt, raw = cont, finish_reason = finish_reason)
@@ -178,6 +215,8 @@ chat_siliconflow_call <- function(
     temperature = 0
 ) {
   base_urls <- siliconflow_base_urls(api_key)
+  last_failure <- llm_failure(TRUE, message = "no SiliconFlow endpoint configured")
+  any_retryable <- FALSE
   for (i in seq_along(base_urls)) {
     base_url <- base_urls[[i]]
     if (i > 1) {
@@ -192,19 +231,80 @@ chat_siliconflow_call <- function(
       max_tokens = max_tokens,
       temperature = temperature
     )
-    if (!is.null(out)) {
+    if (!is_llm_failure(out)) {
       out$base_url <- base_url
       siliconflow_cache_base_url(api_key, base_url)
       return(out)
     }
+    # A 4xx from one site (e.g. a key or model that only exists on the other
+    # site) is still worth trying on the other one; only the overall result
+    # decides whether the call is retried.
+    last_failure <- out
+    any_retryable <- any_retryable || isTRUE(attr(out, "retryable"))
   }
-  NULL
+  attr(last_failure, "retryable") <- any_retryable
+  last_failure
+}
+
+# "models/gemini-2.5-pro" and "gemini-2.5-pro" name the same model; the URL
+# needs the bare ID.
+gemini_model_id <- function(model) {
+  sub("^models/", "", trimws(as.character(model %||% "")))
+}
+
+# Google strongly recommends leaving temperature at its default (1.0) for
+# Gemini 3: lower values can make the model loop or degrade.
+gemini_is_v3 <- function(model) {
+  grepl("^gemini-3", gemini_model_id(model))
+}
+
+# Largest maxOutputTokens the model accepts. Gemini 1.x/2.0 stop at 8192;
+# 2.5 and later allow 65536.
+gemini_output_cap <- function(model) {
+  if (grepl("^gemini-(1|2\\.0)", gemini_model_id(model))) 8192L else 65536L
+}
+
+# Thinking models (Gemini 2.5, 3) count their thinking tokens against
+# maxOutputTokens, so a limit sized for the JSON answer alone can be spent
+# entirely on thinking. Start with room for both.
+gemini_initial_max_tokens <- function(max_tokens, model) {
+  as.integer(min(max(8192L, max_tokens), gemini_output_cap(model)))
+}
+
+# Limit to retry with after a MAX_TOKENS stop; NULL when already at the cap.
+gemini_next_max_tokens <- function(cur_max, model) {
+  cap <- gemini_output_cap(model)
+  if (cur_max >= cap) return(NULL)
+  as.integer(min(max(3000L, cur_max * 2L), cap))
+}
+
+gemini_hit_max_tokens <- function(res_call) {
+  !is.null(res_call) && !is_llm_failure(res_call) &&
+    !is.null(res_call$finish_reason) &&
+    identical(toupper(as.character(res_call$finish_reason)), "MAX_TOKENS")
+}
+
+# Gemini's schema fields `required` and `enum` are lists of strings, but
+# jsonlite::toJSON(auto_unbox = TRUE) turns a one-element vector into a bare
+# string ("required": "x"), which the API rejects. Mark them as arrays.
+gemini_schema_arrays <- function(x) {
+  if (!is.list(x)) return(x)
+  nms <- names(x)
+  for (i in seq_along(x)) {
+    nm <- if (is.null(nms)) "" else nms[[i]]
+    if (nm %in% c("required", "enum") && is.atomic(x[[i]])) {
+      x[[i]] <- I(as.character(x[[i]]))
+    } else if (is.list(x[[i]])) {
+      x[[i]] <- gemini_schema_arrays(x[[i]])
+    }
+  }
+  x
 }
 
 chat_gemini_call <- function(
     messages,
     api_key,
-    model = "gemini-2.0-pro",
+    model = "gemini-2.5-flash",
     max_tokens = 2000,
     temperature = 0,
     response_schema = NULL
@@ -223,23 +323,27 @@ chat_gemini_call <- function(
 
   url <- sprintf(
     "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s",
-    model, api_key
+    gemini_model_id(model), api_key
   )
+
+  generation_config <- list(
+    maxOutputTokens = as.integer(min(max_tokens, gemini_output_cap(model))),
+    responseMimeType = "application/json"
+  )
+  if (!gemini_is_v3(model)) {
+    generation_config$temperature <- temperature
+  }
 
   body <- list(
     contents = list(list(
       role = "user",
       parts = list(list(text = user_prompt))
     )),
-    generationConfig = list(
-      temperature = temperature,
-      maxOutputTokens = max_tokens,
-      responseMimeType = "application/json"
-    )
+    generationConfig = generation_config
   )
 
   if (!is.null(response_schema)) {
-    body$generationConfig$responseSchema <- response_schema
+    body$generationConfig$responseSchema <- gemini_schema_arrays(response_schema)
   }
 
   if (nzchar(sys_prompt)) {
@@ -253,40 +357,38 @@ chat_gemini_call <- function(
       url,
       httr::add_headers("Content-Type" = "application/json"),
       body = jsonlite::toJSON(body, auto_unbox = TRUE),
-      httr::timeout(60)
+      httr::timeout(featuremap_llm_timeout())
     )
   }, error = function(e) {
     message("Gemini HTTP error: ", e$message)
     return(NULL)
   })
 
-  if (is.null(res)) return(NULL)
+  if (is.null(res)) return(llm_failure(TRUE, message = "network error or timeout"))
 
   if (httr::status_code(res) != 200) {
-    message("Gemini HTTP status: ", httr::status_code(res))
-    message("Response: ", httr::content(res, "text", encoding = "UTF-8"))
-    return(NULL)
+    status <- httr::status_code(res)
+    response_text <- httr::content(res, "text", encoding = "UTF-8")
+    message("Gemini HTTP status: ", status)
+    message("Response: ", response_text)
+    return(llm_failure(llm_status_retryable(status), status, response_text))
   }
 
   cont <- tryCatch(httr::content(res, encoding = "UTF-8"), error = function(e) NULL)
-  if (is.null(cont)) return(NULL)
+  if (is.null(cont)) return(llm_failure(TRUE, 200L, "unreadable response body"))
 
-  txt <- tryCatch({
-    paste(
-      vapply(
-        cont$candidates[[1]]$content$parts,
-        function(p) p$text,
-        character(1)
-      ),
-      collapse = ""
-    )
-  }, error = function(e) NULL)
+  # Keep only the answer text: skip thought-summary parts and parts that carry
+  # no text (e.g. only a thought signature). When thinking used up the whole
+  # output budget, `parts` is empty and the result is "" with finish reason
+  # MAX_TOKENS, which the callers answer with a larger limit.
+  parts <- tryCatch(cont$candidates[[1]]$content$parts, error = function(e) NULL)
+  txt <- paste(
+    vapply(parts %||% list(), function(p) {
+      if (isTRUE(p$thought) || is.null(p$text)) "" else as.character(p$text)[1]
+    }, character(1)),
+    collapse = ""
+  )
   finish_reason <- tryCatch(cont$candidates[[1]]$finishReason, error = function(e) NA_character_)
-
-  if (is.null(txt)) {
-    message("Failed to extract Gemini text.")
-    return(NULL)
-  }
 
   list(content = txt, raw = cont, finish_reason = finish_reason)
 }
@@ -354,12 +456,22 @@ chat_api_call <- function(
 }
 
 safe_chat_call <- function(..., base_url = NULL) {
-  for (i in 1:5) {
+  attempts <- 5
+  for (i in seq_len(attempts)) {
     out <- chat_api_call(..., base_url = base_url)
-    if (!is.null(out)) return(out)
+    if (!is.null(out) && !is_llm_failure(out)) return(out)
 
-    message("Chat call failed. Waiting ", i * 3, " seconds...")
-    Sys.sleep(i * 3)
+    if (is_llm_failure(out) && !isTRUE(attr(out, "retryable"))) {
+      message(
+        "Chat call failed (HTTP ", out$status, "); not retrying, since the ",
+        "same request would fail again. Check the model ID and API key."
+      )
+      return(NULL)
+    }
+    if (i < attempts) {
+      message("Chat call failed. Waiting ", i * 3, " seconds...")
+      Sys.sleep(i * 3)
+    }
   }
   NULL
 }

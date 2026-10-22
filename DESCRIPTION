@@ -58,8 +58,11 @@ Imports:
     masstools,
     methods,
     rlang,
-    cli
+    cli,
+    later,
+    promises
 Suggests:
+    callr,
     DBI,
     RSQLite,
     sodium

@@ -90,6 +90,64 @@ session_html_dir <- function(session = NULL, prefix = "featuremap_html") {
   dir
 }
 
+#' Remove the output directories a session created
+#'
+#' `session_html_dir()` names every directory `<time>_<session token>`, so
+#' the ones a closing session owns can be found again. Called from
+#' `session$onSessionEnded()`; without it every visitor's generated HTML
+#' stayed on disk until the app restarted.
+#'
+#' @param session_token The closing session's `session$token`.
+#' @param prefix Must match the `prefix` given to `session_html_dir()`.
+#' @return Number of directories removed, invisibly.
+#' @noRd
+featuremap_remove_session_dirs <- function(session_token, prefix = "featuremap_html") {
+  token <- gsub("[^A-Za-z0-9._-]+", "_", as.character(session_token %||% ""))
+  if (!nzchar(token)) return(invisible(0L))
+
+  root <- file.path(tempdir(), prefix)
+  if (!dir.exists(root)) return(invisible(0L))
+
+  dirs <- list.dirs(root, full.names = TRUE, recursive = FALSE)
+  owned <- dirs[endsWith(basename(dirs), paste0("_", token))]
+  unlink(owned, recursive = TRUE, force = TRUE)
+  invisible(length(owned))
+}
+
+#' Remove session output directories older than a cut-off
+#'
+#' A safety net for directories whose session never reported its end (for
+#' example a dropped connection while the process was busy). Directories are
+#' judged by modification time, which changes whenever a run writes into
+#' them, so a session still in use is not touched.
+#'
+#' @param max_age_hours Age limit; defaults to `FEATUREMAP_TEMP_MAX_AGE_HOURS`
+#'   or 24.
+#' @param prefix Must match the `prefix` given to `session_html_dir()`.
+#' @return Number of directories removed, invisibly.
+#' @noRd
+featuremap_sweep_session_dirs <- function(max_age_hours = NULL, prefix = "featuremap_html") {
+  if (is.null(max_age_hours)) {
+    max_age_hours <- suppressWarnings(as.numeric(
+      Sys.getenv("FEATUREMAP_TEMP_MAX_AGE_HOURS", unset = "24")
+    ))
+  }
+  if (length(max_age_hours) != 1 || is.na(max_age_hours) || max_age_hours <= 0) {
+    max_age_hours <- 24
+  }
+
+  root <- file.path(tempdir(), prefix)
+  if (!dir.exists(root)) return(invisible(0L))
+
+  dirs <- list.dirs(root, full.names = TRUE, recursive = FALSE)
+  if (length(dirs) == 0) return(invisible(0L))
+
+  age_hours <- as.numeric(difftime(Sys.time(), file.mtime(dirs), units = "hours"))
+  old <- dirs[!is.na(age_hours) & age_hours > max_age_hours]
+  unlink(old, recursive = TRUE, force = TRUE)
+  invisible(length(old))
+}
+
 #' Maximum upload size, in bytes
 #'
 #' Shiny defaults `shiny.maxRequestSize` to 5 MB, which almost every real
@@ -141,10 +199,71 @@ featuremap_env_flag <- function(name, default = "false") {
   value %in% c("true", "1", "yes", "y", "on")
 }
 
+#' Whether this is a public deployment
+#'
+#' `FEATUREMAP_PUBLIC_MODE=true` is for a server open to anyone on the
+#' internet. It switches on the restrictions such a server needs and that
+#' local installs and the lab server do without:
+#' - sign-in is required (it implies `FEATUREMAP_AUTH_ENABLED=true`);
+#' - LLM and NCBI API keys must be entered by each visitor; keys in the
+#'   server's environment are never used, so visitors cannot spend them;
+#' - the "Local" LLM provider is hidden and refused, because its base URL
+#'   would let visitors make the server send requests to any address,
+#'   including machines on the internal network;
+#' - each analysis's thread count is capped (see `featuremap_max_threads()`).
+#'
+#' @return `TRUE` when `FEATUREMAP_PUBLIC_MODE` is set to a true value.
+#' @noRd
+featuremap_public_mode <- function() {
+  featuremap_env_flag("FEATUREMAP_PUBLIC_MODE")
+}
+
+#' Whether visitors must sign in
+#'
+#' @return `TRUE` when `FEATUREMAP_AUTH_ENABLED` is true or the app runs in
+#'   public mode.
+#' @noRd
+featuremap_auth_required <- function() {
+  featuremap_public_mode() || featuremap_env_flag("FEATUREMAP_AUTH_ENABLED")
+}
+
+#' Upper limit for the per-job "Threads" inputs
+#'
+#' Each analysis may start its own parallel R workers (the Threads inputs of
+#' Steps 2-4), and every one of them loads the package and data, so the
+#' memory an analysis needs grows with this number. Set
+#' `FEATUREMAP_MAX_THREADS` to change it; the default is 8 in public mode
+#' and 16 (the old fixed maximum) otherwise.
+#'
+#' @return A positive integer.
+#' @noRd
+featuremap_max_threads <- function() {
+  default <- if (featuremap_public_mode()) 8L else 16L
+  value <- trimws(Sys.getenv("FEATUREMAP_MAX_THREADS", unset = ""))
+  n <- suppressWarnings(as.integer(value))
+  if (length(n) != 1 || is.na(n) || n < 1) n <- default
+  n
+}
+
+#' Clamp a requested thread count to the allowed range
+#'
+#' The Threads inputs carry a `max`, but a browser can send any number, so
+#' the server enforces the limit itself.
+#'
+#' @param x Requested number of threads.
+#' @return An integer between 1 and `featuremap_max_threads()`.
+#' @noRd
+featuremap_clamp_threads <- function(x) {
+  n <- suppressWarnings(as.integer(x))
+  if (length(n) != 1 || is.na(n) || n < 1) n <- 1L
+  min(n, featuremap_max_threads())
+}
+
 #' Fail fast when sign-in is switched on but not set up
 #'
-#' Sign-in is off by default (local installs and the lab server) and only a
-#' public deployment sets `FEATUREMAP_AUTH_ENABLED=true`. When it is on, the
+#' Sign-in is off by default (local installs and the lab server). A public
+#' deployment turns it on with `FEATUREMAP_AUTH_ENABLED=true` or
+#' `FEATUREMAP_PUBLIC_MODE=true`. When it is on, the
 #' account system needs DBI, RSQLite and sodium (kept in Suggests so local
 #' users never have to install libsodium) plus working SMTP settings and a
 #' public URL for the links in verification and password-reset emails.
@@ -158,7 +277,7 @@ featuremap_env_flag <- function(name, default = "false") {
 #'   off. Stops with a list of every problem otherwise.
 #' @noRd
 featuremap_check_auth_setup <- function() {
-  if (!featuremap_env_flag("FEATUREMAP_AUTH_ENABLED")) {
+  if (!featuremap_auth_required()) {
     return(invisible(FALSE))
   }
 
@@ -209,9 +328,11 @@ featuremap_check_auth_setup <- function() {
 
   if (length(problems) > 0) {
     stop(
-      "FEATUREMAP_AUTH_ENABLED=true, but sign-in is not ready:\n",
+      "Sign-in is switched on (FEATUREMAP_AUTH_ENABLED or FEATUREMAP_PUBLIC_MODE), ",
+      "but it is not ready:\n",
       paste0("  - ", problems, collapse = "\n"),
-      "\nFix the above, or set FEATUREMAP_AUTH_ENABLED=false to run without sign-in.",
+      "\nFix the above, or unset FEATUREMAP_PUBLIC_MODE and set ",
+      "FEATUREMAP_AUTH_ENABLED=false to run without sign-in.",
       call. = FALSE
     )
   }
