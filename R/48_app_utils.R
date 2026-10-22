@@ -307,7 +307,7 @@ featuremap_check_auth_setup <- function() {
     if (!nzchar(trimws(password))) {
       problems <- c(problems, paste0(
         "FEATUREMAP_SMTP_PASSWORD is not set, so verification and ",
-        "password-reset emails cannot be sent. For Gmail use an app password."
+        "password-reset emails cannot be sent. Gmail, 163 and QQ mail need an app password / authorization code."
       ))
     }
 

@@ -212,7 +212,11 @@ featuremap_auth_send_mail <- function(to, subject, body) {
     message <- conditionMessage(result)
     if (grepl("login denied|authentication|invalid username|invalid password", message, ignore.case = TRUE)) {
       stop(
-        "Gmail SMTP login failed. Check FEATUREMAP_SMTP_USERNAME and FEATUREMAP_SMTP_PASSWORD; use the Gmail app password, not the normal Gmail password.",
+        paste(
+          "SMTP login failed. Check FEATUREMAP_SMTP_USERNAME and FEATUREMAP_SMTP_PASSWORD.",
+          "Gmail, 163 and QQ mail need an app password / authorization code here,",
+          "not the normal login password."
+        ),
         call. = FALSE
       )
     }
