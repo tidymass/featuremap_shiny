@@ -6962,7 +6962,6 @@ ui <- fluidPage(
             ),
 
             # ---------------- Sticky actions ----------------
-            uiOutput("bg_notice_annotation"),
             tags$div(
               class = "wb-actions",
               actionButton(
@@ -7170,7 +7169,6 @@ ui <- fluidPage(
               )
             ),
 
-            uiOutput("bg_notice_pcsf"),
             tags$div(
               class = "wb-actions",
               actionButton(
@@ -7369,7 +7367,6 @@ ui <- fluidPage(
               )
             ),
 
-            uiOutput("bg_notice_modules"),
             tags$div(
               class = "wb-actions",
               actionButton(
@@ -7660,7 +7657,6 @@ ui <- fluidPage(
               )
             ),
 
-            uiOutput("bg_notice_function"),
             tags$div(
               class = "wb-actions",
               actionButton(
@@ -8962,44 +8958,6 @@ server <- function(input, output, session) {
     }
   })
 
-  # Above each Run button: let visitors know before they click when the
-  # server is already busy with someone else's analysis.
-  bg_server_load <- reactive({
-    if (!featuremap_bg_active()) return(NULL)
-    invalidateLater(3000)
-    featuremap_bg_load()
-  })
-
-  bg_notice <- function() {
-    renderUI({
-      load <- bg_server_load()
-      if (is.null(load)) return(NULL)
-      busy <- load$running + load$waiting
-      own <- length(bg_running())
-      others <- busy - own
-      if (others <= 0) return(NULL)
-      tags$div(
-        class = "wb-empty-foot",
-        style = "margin: 0 0 10px; font-size: 12.5px; color: #8a5a00;",
-        icon("hourglass-half"),
-        paste0(
-          " The server is busy with ", others,
-          if (others == 1) " other analysis" else " other analyses",
-          ". If you click Run now, your job will wait in the queue and start automatically."
-        )
-      )
-    })
-  }
-  output$bg_notice_annotation <- bg_notice()
-  output$bg_notice_pcsf <- bg_notice()
-  output$bg_notice_modules <- bg_notice()
-  output$bg_notice_function <- bg_notice()
-  # The step pages are shown and hidden by our own page switcher, so keep
-  # these updating while hidden; otherwise a notice can stay empty after
-  # the visitor switches to the page.
-  for (id in c("bg_notice_annotation", "bg_notice_pcsf", "bg_notice_modules", "bg_notice_function")) {
-    outputOptions(output, id, suspendWhenHidden = FALSE)
-  }
 
   # A visitor who leaves should not keep the worker busy.
   session$onSessionEnded(function() {
