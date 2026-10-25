@@ -717,6 +717,8 @@ auth_button_press_js <- "this.classList.add('is-auth-pressing'); setTimeout(func
 # UI Definition=================================================================
 ui <- fluidPage(
   useShinyjs(),
+  # Browser tab title; without it the tab just shows the site's URL.
+  title = "FeatureMAP",
   theme = bs_theme(
     version = 5,
     bootswatch = "flatly",
