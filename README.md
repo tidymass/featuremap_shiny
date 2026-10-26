@@ -76,7 +76,7 @@ Detailed server instructions are available in
 
 Input formats, complete workflows, result interpretation, and instructions for
 both the FeatureMAP R package and Shiny application are provided in the
-[FeatureMAP tutorial](https://tidymass.github.io/featuremap_tutorial/).
+[FeatureMAP tutorial](https://www.tidymass.org/featuremap_tutorial).
 
 ## Related project
 

@@ -6453,7 +6453,7 @@ ui <- fluidPage(
             ),
             tags$a(
               class = "btn btn-hero btn-hero-secondary",
-              href = "https://tidymass.github.io/featuremap_tutorial/",
+              href = "https://www.tidymass.org/featuremap_tutorial",
               target = "_blank",
               rel = "noopener noreferrer",
               icon("book"),
@@ -6559,11 +6559,11 @@ ui <- fluidPage(
                     tags$strong("Citation"),
                     tags$br(),
                     tags$em(
-                      "FeatureMAP enables network-guided discovery and interpretation of dysregulated metabolic modules from untargeted metabolomics"
+                      "FeatureMAP enables network-guided interpretation of untargeted metabolomics"
                     ),
                     tags$br(),
                     HTML(
-                      "Yuting Wang<sup>+</sup>, Feifan Zhang<sup>+</sup>, Guoping Peng, Zeng Li, Yijiang Liu, Jiramet Kinchagawat, Xicheng Yang, Tao Huan, Chang Liu, Caroline Johnson, Qi Su, Chuchu Wang, and Xiaotao Shen<sup>*</sup>"
+                      "Yuting Wang<sup>+</sup>, Feifan Zhang<sup>+</sup>, Guoping Peng, Lifeng Qiu, Li Zeng, Yijiang Liu, Jiramet Kinchagawat, Xicheng Yang, Chang Liu, Caroline Johnson, Qi Su, Chuchu Wang, and Xiaotao Shen<sup>*</sup>"
                     ),
                     tags$br(),
                     tags$span(
@@ -8086,7 +8086,7 @@ ui <- fluidPage(
         ),
         tags$a(
           class = "footer-link",
-          href = "https://tidymass.github.io/featuremap_tutorial/",
+          href = "https://www.tidymass.org/featuremap_tutorial",
           target = "_blank",
           rel = "noopener noreferrer",
           "Help"
